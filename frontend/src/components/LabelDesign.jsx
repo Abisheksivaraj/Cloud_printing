@@ -41,6 +41,18 @@ const EnhancedManager = () => {
   const canvasRef = useRef(null);
   const elementIdCounter = useRef(0);
 
+  // Dragging and resizing state
+  const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeHandle, setResizeHandle] = useState(null);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [elementStart, setElementStart] = useState({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+  });
+
   const MM_TO_PX = 3.7795275591;
 
   const getCanvasPixelSize = () => ({
@@ -140,7 +152,7 @@ const EnhancedManager = () => {
 
     if (barcodeType?.library === "qrcode") {
       return (
-        <div className="flex flex-col items-center justify-center w-full h-full p-2">
+        <div className="flex flex-col items-center justify-center w-full h-full p-2 pointer-events-none">
           <QRCodeSVG
             value={element.content || "123456789"}
             size={Math.min(element.width - 20, element.height - 40)}
@@ -154,7 +166,7 @@ const EnhancedManager = () => {
 
     if (barcodeType?.library === "bwip") {
       return (
-        <div className="flex flex-col items-center justify-center w-full h-full p-2">
+        <div className="flex flex-col items-center justify-center w-full h-full p-2 pointer-events-none">
           <canvas
             ref={canvasRef}
             style={{ maxWidth: "100%", maxHeight: "calc(100% - 20px)" }}
@@ -167,7 +179,7 @@ const EnhancedManager = () => {
     }
 
     return (
-      <div className="flex items-center justify-center w-full h-full">
+      <div className="flex items-center justify-center w-full h-full pointer-events-none">
         <svg ref={barcodeRef}></svg>
       </div>
     );
@@ -357,10 +369,11 @@ const EnhancedManager = () => {
 
   const onDrop = (e) => {
     e.preventDefault();
-    if (draggedElement) {
+    if (draggedElement && canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const scale = displayZoom / 100;
+      const x = (e.clientX - rect.left) / scale;
+      const y = (e.clientY - rect.top) / scale;
 
       const newElement = {
         id: generateId(),
@@ -407,6 +420,284 @@ const EnhancedManager = () => {
     }
   };
 
+  // Mouse event handlers for dragging
+  const handleElementMouseDown = (e, element) => {
+    e.stopPropagation();
+    setSelectedElementId(element.id);
+    setIsDragging(true);
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const scale = displayZoom / 100;
+
+    setDragStart({
+      x: e.clientX,
+      y: e.clientY,
+    });
+
+    setElementStart({
+      x: element.x,
+      y: element.y,
+      width: element.width,
+      height: element.height,
+    });
+
+    if (element.type === "barcode") {
+      setSelectedBarcodeType(element.barcodeType || "CODE128");
+    }
+  };
+
+  // Mouse event handlers for resizing
+  const handleResizeMouseDown = (e, element, handle) => {
+    e.stopPropagation();
+    setSelectedElementId(element.id);
+    setIsResizing(true);
+    setResizeHandle(handle);
+
+    setDragStart({
+      x: e.clientX,
+      y: e.clientY,
+    });
+
+    setElementStart({
+      x: element.x,
+      y: element.y,
+      width: element.width,
+      height: element.height,
+    });
+  };
+
+  const handleMouseMove = (e) => {
+    if (!canvasRef.current) return;
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const scale = displayZoom / 100;
+    const dx = (e.clientX - dragStart.x) / scale;
+    const dy = (e.clientY - dragStart.y) / scale;
+
+    if (isDragging && selectedElementId) {
+      const element = elements.find((el) => el.id === selectedElementId);
+      if (!element) return;
+
+      const canvasPixelSize = getCanvasPixelSize();
+      let newX = elementStart.x + dx;
+      let newY = elementStart.y + dy;
+
+      // Constrain to canvas boundaries
+      newX = Math.max(0, Math.min(newX, canvasPixelSize.width - element.width));
+      newY = Math.max(
+        0,
+        Math.min(newY, canvasPixelSize.height - element.height)
+      );
+
+      updateElement(selectedElementId, {
+        x: newX,
+        y: newY,
+      });
+    } else if (isResizing && selectedElementId && resizeHandle) {
+      const element = elements.find((el) => el.id === selectedElementId);
+      if (!element) return;
+
+      const canvasPixelSize = getCanvasPixelSize();
+      let updates = {};
+
+      switch (resizeHandle) {
+        case "se": // Bottom-right
+          updates = {
+            width: Math.max(
+              20,
+              Math.min(
+                elementStart.width + dx,
+                canvasPixelSize.width - element.x
+              )
+            ),
+            height: Math.max(
+              20,
+              Math.min(
+                elementStart.height + dy,
+                canvasPixelSize.height - element.y
+              )
+            ),
+          };
+          break;
+        case "sw": // Bottom-left
+          updates = {
+            x: Math.max(
+              0,
+              Math.min(
+                elementStart.x + dx,
+                elementStart.x + elementStart.width - 20
+              )
+            ),
+            width: Math.max(20, elementStart.width - dx),
+            height: Math.max(
+              20,
+              Math.min(
+                elementStart.height + dy,
+                canvasPixelSize.height - element.y
+              )
+            ),
+          };
+          break;
+        case "ne": // Top-right
+          updates = {
+            y: Math.max(
+              0,
+              Math.min(
+                elementStart.y + dy,
+                elementStart.y + elementStart.height - 20
+              )
+            ),
+            width: Math.max(
+              20,
+              Math.min(
+                elementStart.width + dx,
+                canvasPixelSize.width - element.x
+              )
+            ),
+            height: Math.max(20, elementStart.height - dy),
+          };
+          break;
+        case "nw": // Top-left
+          updates = {
+            x: Math.max(
+              0,
+              Math.min(
+                elementStart.x + dx,
+                elementStart.x + elementStart.width - 20
+              )
+            ),
+            y: Math.max(
+              0,
+              Math.min(
+                elementStart.y + dy,
+                elementStart.y + elementStart.height - 20
+              )
+            ),
+            width: Math.max(20, elementStart.width - dx),
+            height: Math.max(20, elementStart.height - dy),
+          };
+          break;
+        case "n": // Top
+          updates = {
+            y: Math.max(
+              0,
+              Math.min(
+                elementStart.y + dy,
+                elementStart.y + elementStart.height - 20
+              )
+            ),
+            height: Math.max(20, elementStart.height - dy),
+          };
+          break;
+        case "s": // Bottom
+          updates = {
+            height: Math.max(
+              20,
+              Math.min(
+                elementStart.height + dy,
+                canvasPixelSize.height - element.y
+              )
+            ),
+          };
+          break;
+        case "e": // Right
+          updates = {
+            width: Math.max(
+              20,
+              Math.min(
+                elementStart.width + dx,
+                canvasPixelSize.width - element.x
+              )
+            ),
+          };
+          break;
+        case "w": // Left
+          updates = {
+            x: Math.max(
+              0,
+              Math.min(
+                elementStart.x + dx,
+                elementStart.x + elementStart.width - 20
+              )
+            ),
+            width: Math.max(20, elementStart.width - dx),
+          };
+          break;
+      }
+
+      updateElement(selectedElementId, updates);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setIsResizing(false);
+    setResizeHandle(null);
+  };
+
+  useEffect(() => {
+    if (isDragging || isResizing) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      return () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
+    }
+  }, [
+    isDragging,
+    isResizing,
+    selectedElementId,
+    dragStart,
+    elementStart,
+    resizeHandle,
+    elements,
+  ]);
+
+  const renderResizeHandles = (element) => {
+    if (element.id !== selectedElementId) return null;
+
+    const handles = [
+      { pos: "nw", cursor: "nw-resize", style: { left: -4, top: -4 } },
+      {
+        pos: "n",
+        cursor: "n-resize",
+        style: { left: "50%", top: -4, transform: "translateX(-50%)" },
+      },
+      { pos: "ne", cursor: "ne-resize", style: { right: -4, top: -4 } },
+      {
+        pos: "e",
+        cursor: "e-resize",
+        style: { right: -4, top: "50%", transform: "translateY(-50%)" },
+      },
+      { pos: "se", cursor: "se-resize", style: { right: -4, bottom: -4 } },
+      {
+        pos: "s",
+        cursor: "s-resize",
+        style: { left: "50%", bottom: -4, transform: "translateX(-50%)" },
+      },
+      { pos: "sw", cursor: "sw-resize", style: { left: -4, bottom: -4 } },
+      {
+        pos: "w",
+        cursor: "w-resize",
+        style: { left: -4, top: "50%", transform: "translateY(-50%)" },
+      },
+    ];
+
+    return handles.map((handle) => (
+      <div
+        key={handle.pos}
+        className="absolute w-2 h-2 bg-white border-2 border-blue-600 rounded-sm"
+        style={{
+          ...handle.style,
+          cursor: handle.cursor,
+          zIndex: 1000,
+        }}
+        onMouseDown={(e) => handleResizeMouseDown(e, element, handle.pos)}
+      />
+    ));
+  };
+
   const renderElement = (element) => {
     const isSelected = element.id === selectedElementId;
     const style = {
@@ -417,7 +708,7 @@ const EnhancedManager = () => {
       height: element.height,
       transform: `rotate(${element.rotation}deg)`,
       zIndex: element.zIndex,
-      cursor: "move",
+      cursor: isDragging ? "grabbing" : "move",
       border: isSelected ? "2px solid #0066cc" : "1px solid transparent",
       fontSize: element.fontSize,
       fontFamily: element.fontFamily,
@@ -427,17 +718,16 @@ const EnhancedManager = () => {
       textAlign: element.textAlign,
       color: element.color,
       backgroundColor: element.backgroundColor,
-      borderWidth: element.borderWidth,
-      borderColor: element.borderColor,
-      borderStyle: element.borderWidth > 0 ? "solid" : "none",
-    };
-
-    const handleElementClick = (e) => {
-      e.stopPropagation();
-      setSelectedElementId(element.id);
-      if (element.type === "barcode") {
-        setSelectedBarcodeType(element.barcodeType || "CODE128");
-      }
+      borderWidth:
+        !isSelected && element.borderWidth > 0
+          ? element.borderWidth
+          : undefined,
+      borderColor:
+        !isSelected && element.borderWidth > 0
+          ? element.borderColor
+          : undefined,
+      borderStyle: !isSelected && element.borderWidth > 0 ? "solid" : undefined,
+      userSelect: "none",
     };
 
     switch (element.type) {
@@ -446,10 +736,11 @@ const EnhancedManager = () => {
           <div
             key={element.id}
             style={style}
-            onClick={handleElementClick}
+            onMouseDown={(e) => handleElementMouseDown(e, element)}
             className="flex items-center px-2 select-none"
           >
             {element.content}
+            {renderResizeHandles(element)}
           </div>
         );
       case "barcode":
@@ -457,10 +748,11 @@ const EnhancedManager = () => {
           <div
             key={element.id}
             style={style}
-            onClick={handleElementClick}
+            onMouseDown={(e) => handleElementMouseDown(e, element)}
             className="flex items-center justify-center bg-white select-none overflow-hidden"
           >
             <BarcodeElement element={element} />
+            {renderResizeHandles(element)}
           </div>
         );
       case "image":
@@ -468,10 +760,11 @@ const EnhancedManager = () => {
           <div
             key={element.id}
             style={style}
-            onClick={handleElementClick}
+            onMouseDown={(e) => handleElementMouseDown(e, element)}
             className="flex items-center justify-center bg-gray-200 border-2 border-dashed border-gray-400 select-none"
           >
             <Package className="text-gray-500" size={24} />
+            {renderResizeHandles(element)}
           </div>
         );
       case "rectangle":
@@ -479,18 +772,22 @@ const EnhancedManager = () => {
           <div
             key={element.id}
             style={style}
-            onClick={handleElementClick}
-            className="border select-none"
-          ></div>
+            onMouseDown={(e) => handleElementMouseDown(e, element)}
+            className="select-none"
+          >
+            {renderResizeHandles(element)}
+          </div>
         );
       case "circle":
         return (
           <div
             key={element.id}
             style={{ ...style, borderRadius: "50%" }}
-            onClick={handleElementClick}
-            className="border select-none"
-          ></div>
+            onMouseDown={(e) => handleElementMouseDown(e, element)}
+            className="select-none"
+          >
+            {renderResizeHandles(element)}
+          </div>
         );
       default:
         return null;
@@ -574,7 +871,7 @@ const EnhancedManager = () => {
             <div className="flex items-center space-x-3">
               <div className="relative">
                 <button
-                  onClick={() => setShowAddMenu(true)}
+                  onClick={() => setShowAddMenu(!showAddMenu)}
                   className="flex items-center space-x-2 px-4 py-2 bg-white text-gray-800 hover:bg-gray-100 rounded-lg shadow"
                 >
                   <Plus size={18} />
@@ -655,7 +952,11 @@ const EnhancedManager = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 print:hidden">
+      <div
+        className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 print:hidden ${
+          currentView === "labelDesigner" ? "hidden" : ""
+        }`}
+      >
         {currentView === "parts" && (
           <div className="max-w-2xl mx-auto">
             <div className="bg-white rounded-lg shadow-lg">
@@ -672,21 +973,21 @@ const EnhancedManager = () => {
                   value={partNo}
                   onChange={(e) => setPartNo(e.target.value)}
                   placeholder="Part Number"
-                  className="w-full px-4 py-3 border rounded-lg"
+                  className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <input
                   type="text"
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
                   placeholder="Model"
-                  className="w-full px-4 py-3 border rounded-lg"
+                  className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <input
                   type="text"
                   value={prefix}
                   onChange={(e) => setPrefix(e.target.value)}
                   placeholder="Prefix"
-                  className="w-full px-4 py-3 border rounded-lg"
+                  className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
@@ -703,14 +1004,14 @@ const EnhancedManager = () => {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search parts..."
-                  className="w-full pl-10 pr-3 py-3 border rounded-lg"
+                  className="w-full pl-10 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div className="text-sm text-gray-600 font-medium bg-gray-100 px-3 py-1 rounded-full">
                 {filteredParts.length} of {parts.length} parts
               </div>
             </div>
-            <div className="bg-white rounded-lg shadow-lg">
+            <div className="bg-white rounded-lg shadow-lg overflow-hidden">
               {filteredParts.length === 0 ? (
                 <div className="text-center py-16">
                   <Package className="w-16 h-16 mx-auto mb-4 text-gray-400" />
@@ -719,24 +1020,27 @@ const EnhancedManager = () => {
                       ? "No parts added yet"
                       : "No parts found"}
                   </h3>
+                  <p className="text-gray-500 mt-2">
+                    Add a new part to get started
+                  </p>
                 </div>
               ) : (
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Part Number
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Model
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Prefix
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Created At
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -751,38 +1055,43 @@ const EnhancedManager = () => {
                           part.createdAt === row.createdAt
                       );
                       return (
-                        <tr key={originalIndex} className="hover:bg-gray-50">
-                          <td className="px-6 py-4">
+                        <tr
+                          key={originalIndex}
+                          className="hover:bg-gray-50 transition-colors"
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
                               {row.partNo}
                             </div>
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-700">
                               {row.model}
                             </div>
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-700">
                               {row.prefix}
                             </div>
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-500">
                               {row.createdAt}
                             </div>
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center space-x-2">
                               <button
                                 onClick={() => handleEdit(originalIndex)}
-                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-full"
+                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                                title="Edit"
                               >
                                 <Edit2 size={16} />
                               </button>
                               <button
                                 onClick={() => handleDelete(originalIndex)}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-full"
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                                title="Delete"
                               >
                                 <Trash2 size={16} />
                               </button>
@@ -808,14 +1117,14 @@ const EnhancedManager = () => {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search labels..."
-                  className="w-full pl-10 pr-3 py-3 border rounded-lg"
+                  className="w-full pl-10 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div className="text-sm text-gray-600 font-medium bg-gray-100 px-3 py-1 rounded-full">
                 {filteredLabels.length} of {labels.length} labels
               </div>
             </div>
-            <div className="bg-white rounded-lg shadow-lg">
+            <div className="bg-white rounded-lg shadow-lg overflow-hidden">
               {filteredLabels.length === 0 ? (
                 <div className="text-center py-16">
                   <Tag className="w-16 h-16 mx-auto mb-4 text-gray-400" />
@@ -824,63 +1133,86 @@ const EnhancedManager = () => {
                       ? "No labels created yet"
                       : "No labels found"}
                   </h3>
+                  <p className="text-gray-500 mt-2">
+                    Create a new label to get started
+                  </p>
                 </div>
               ) : (
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Label Name
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Size (mm)
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Elements
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Last Modified
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {filteredLabels.map((label) => (
-                      <tr key={label.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4">
+                      <tr
+                        key={label.id}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">
                             {label.name}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-700">
                             {label.labelSize?.width || 100} ×{" "}
-                            {label.labelSize?.height || 80} mm
+                            {label.labelSize?.height || 80}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-700">
-                            {label.elements?.length || 0} elements
+                            {label.elements?.length || 0} element
+                            {label.elements?.length !== 1 ? "s" : ""}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-500">
+                            {label.lastModified}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center space-x-2">
                             <button
                               onClick={() => handlePrintLabel(label)}
-                              className="p-2 text-green-600 hover:bg-green-50 rounded-full"
+                              className="p-2 text-green-600 hover:bg-green-50 rounded-full transition-colors"
                               title="Print"
                             >
                               <Printer size={16} />
                             </button>
                             <button
                               onClick={() => handleEditLabel(label)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-full"
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
                               title="Edit"
                             >
                               <Edit2 size={16} />
                             </button>
                             <button
-                              onClick={() => handleDeleteLabel(label.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-full"
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    `Are you sure you want to delete "${label.name}"?`
+                                  )
+                                ) {
+                                  handleDeleteLabel(label.id);
+                                }
+                              }}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-colors"
                               title="Delete"
                             >
                               <Trash2 size={16} />
@@ -895,385 +1227,387 @@ const EnhancedManager = () => {
             </div>
           </div>
         )}
+      </div>
 
-        {currentView === "labelDesigner" && (
-          <div className="h-screen flex bg-gray-50 -m-8">
-            <div className="w-24 bg-white border-r flex flex-col py-4">
-              <div className="text-xs font-semibold text-gray-600 text-center mb-4">
-                ELEMENTS
-              </div>
-              <div className="flex flex-col space-y-3 px-2">
-                <button
-                  draggable
-                  onDragStart={(e) => onDragStart(e, "text")}
-                  onClick={() => addElement("text")}
-                  className="p-3 hover:bg-blue-50 rounded-lg border-2 border-transparent hover:border-blue-200 flex flex-col items-center space-y-1"
-                >
-                  <FileText size={24} className="text-gray-600" />
-                  <span className="text-xs font-medium text-gray-600">
-                    Text
-                  </span>
-                </button>
-                <button
-                  draggable
-                  onDragStart={(e) => onDragStart(e, "barcode")}
-                  onClick={() => addElement("barcode")}
-                  className="p-3 hover:bg-blue-50 rounded-lg border-2 border-transparent hover:border-blue-200 flex flex-col items-center space-y-1"
-                >
-                  <div className="text-2xl">📊</div>
-                  <span className="text-xs font-medium text-gray-600">
-                    Barcode
-                  </span>
-                </button>
-                <button
-                  draggable
-                  onDragStart={(e) => onDragStart(e, "image")}
-                  onClick={() => addElement("image")}
-                  className="p-3 hover:bg-blue-50 rounded-lg border-2 border-transparent hover:border-blue-200 flex flex-col items-center space-y-1"
-                >
-                  <div className="text-2xl">🖼️</div>
-                  <span className="text-xs font-medium text-gray-600">
-                    Image
-                  </span>
-                </button>
-                <button
-                  draggable
-                  onDragStart={(e) => onDragStart(e, "rectangle")}
-                  onClick={() => addElement("rectangle")}
-                  className="p-3 hover:bg-blue-50 rounded-lg border-2 border-transparent hover:border-blue-200 flex flex-col items-center space-y-1"
-                >
-                  <div className="text-2xl">⬜</div>
-                  <span className="text-xs font-medium text-gray-600">
-                    Shape
-                  </span>
-                </button>
-              </div>
+      {/* Label Designer View - Fixed Full Screen */}
+      {currentView === "labelDesigner" && (
+        <div className="fixed inset-0 top-16 flex bg-gray-50">
+          {/* Left Sidebar - Elements */}
+          <div className="w-24 bg-white border-r flex flex-col py-4 shadow-sm overflow-y-auto">
+            <div className="text-xs font-semibold text-gray-600 text-center mb-4 px-2">
+              ELEMENTS
             </div>
-
-            <div className="flex-1 p-6 flex flex-col justify-center items-center bg-gray-100">
-              <div className="mb-4 text-sm text-gray-600">
-                Label Size: {labelSize.width} × {labelSize.height} mm | Zoom:{" "}
-                {Math.round(displayZoom)}%
-              </div>
-              <div className="bg-white shadow-xl rounded-lg p-4">
-                <div
-                  ref={canvasRef}
-                  className="relative border-2 border-gray-300"
-                  style={{
-                    width: canvasPixelSize.width,
-                    height: canvasPixelSize.height,
-                    transform: `scale(${displayZoom / 100})`,
-                    transformOrigin: "center",
-                    backgroundImage: showGrid
-                      ? "radial-gradient(circle, #e5e7eb 1px, transparent 1px)"
-                      : "none",
-                    backgroundSize: showGrid ? "20px 20px" : "auto",
-                    borderRadius: "12px",
-                    overflow: "hidden",
-                  }}
-                  onDragOver={onDragOver}
-                  onDrop={onDrop}
-                  onClick={() => setSelectedElementId(null)}
-                >
-                  {elements.map(renderElement)}
-                </div>
-              </div>
+            <div className="flex flex-col space-y-3 px-2">
+              <button
+                draggable
+                onDragStart={(e) => onDragStart(e, "text")}
+                onClick={() => addElement("text")}
+                className="p-3 hover:bg-blue-50 rounded-lg border-2 border-transparent hover:border-blue-200 flex flex-col items-center space-y-1 transition-all"
+                title="Add Text"
+              >
+                <FileText size={24} className="text-gray-600" />
+                <span className="text-xs font-medium text-gray-600">Text</span>
+              </button>
+              <button
+                draggable
+                onDragStart={(e) => onDragStart(e, "barcode")}
+                onClick={() => addElement("barcode")}
+                className="p-3 hover:bg-blue-50 rounded-lg border-2 border-transparent hover:border-blue-200 flex flex-col items-center space-y-1 transition-all"
+                title="Add Barcode"
+              >
+                <div className="text-2xl">📊</div>
+                <span className="text-xs font-medium text-gray-600">
+                  Barcode
+                </span>
+              </button>
+              <button
+                draggable
+                onDragStart={(e) => onDragStart(e, "image")}
+                onClick={() => addElement("image")}
+                className="p-3 hover:bg-blue-50 rounded-lg border-2 border-transparent hover:border-blue-200 flex flex-col items-center space-y-1 transition-all"
+                title="Add Image"
+              >
+                <div className="text-2xl">🖼️</div>
+                <span className="text-xs font-medium text-gray-600">Image</span>
+              </button>
+              <button
+                draggable
+                onDragStart={(e) => onDragStart(e, "rectangle")}
+                onClick={() => addElement("rectangle")}
+                className="p-3 hover:bg-blue-50 rounded-lg border-2 border-transparent hover:border-blue-200 flex flex-col items-center space-y-1 transition-all"
+                title="Add Shape"
+              >
+                <div className="text-2xl">⬜</div>
+                <span className="text-xs font-medium text-gray-600">Shape</span>
+              </button>
             </div>
+          </div>
 
-            <div className="w-72 bg-white border-l flex flex-col overflow-y-auto">
-              <div className="p-4 border-b">
-                <h3 className="font-bold text-gray-800">Properties</h3>
-              </div>
-              <div className="flex-1 p-4 space-y-6">
-                <div>
-                  <h4 className="font-semibold text-gray-700 mb-3">
-                    Label Size (mm)
-                  </h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Width (mm)
-                      </label>
-                      <input
-                        type="number"
-                        value={labelSize.width}
-                        onChange={(e) =>
-                          setLabelSize({
-                            ...labelSize,
-                            width: Number(e.target.value),
-                          })
-                        }
-                        min="10"
-                        max="500"
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Height (mm)
-                      </label>
-                      <input
-                        type="number"
-                        value={labelSize.height}
-                        onChange={(e) =>
-                          setLabelSize({
-                            ...labelSize,
-                            height: Number(e.target.value),
-                          })
-                        }
-                        min="10"
-                        max="500"
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
-                      />
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Auto-zoom: {Math.round(displayZoom)}%
-                  </p>
-                </div>
-
-                {selectedEl && (
-                  <>
-                    <div>
-                      <h4 className="font-semibold text-gray-700 mb-3">
-                        Actions
-                      </h4>
-                      <button
-                        onClick={deleteElement}
-                        className="w-full p-3 bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center justify-center space-x-2"
-                      >
-                        <Trash2 size={16} />
-                        <span>Delete</span>
-                      </button>
-                    </div>
-
-                    {selectedEl.type === "barcode" && (
-                      <>
-                        <div>
-                          <h4 className="font-semibold text-gray-700 mb-3">
-                            Barcode Type
-                          </h4>
-                          <select
-                            value={selectedEl.barcodeType || "CODE128"}
-                            onChange={(e) =>
-                              handleBarcodeTypeChange(e.target.value)
-                            }
-                            className="w-full border rounded-lg px-3 py-2 text-sm"
-                          >
-                            {barcodeTypes.map((type) => (
-                              <option key={type.value} value={type.value}>
-                                {type.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <h4 className="font-semibold text-gray-700 mb-3">
-                            Barcode Size
-                          </h4>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                {selectedEl.barcodeType === "QR" ||
-                                selectedEl.barcodeType === "DATAMATRIX" ||
-                                selectedEl.barcodeType === "PDF417" ||
-                                selectedEl.barcodeType === "AZTEC"
-                                  ? "Scale"
-                                  : "Width"}
-                              </label>
-                              <input
-                                type="number"
-                                value={selectedEl.barcodeWidth || 2}
-                                onChange={(e) =>
-                                  updateElement(selectedEl.id, {
-                                    barcodeWidth: Number(e.target.value),
-                                  })
-                                }
-                                min="1"
-                                max="10"
-                                className="w-full border rounded-lg px-3 py-2 text-sm"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                Height
-                              </label>
-                              <input
-                                type="number"
-                                value={selectedEl.barcodeHeight || 40}
-                                onChange={(e) =>
-                                  updateElement(selectedEl.id, {
-                                    barcodeHeight: Number(e.target.value),
-                                  })
-                                }
-                                min="10"
-                                max="200"
-                                className="w-full border rounded-lg px-3 py-2 text-sm"
-                              />
-                            </div>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-2">
-                            {selectedEl.barcodeType === "QR" ||
-                            selectedEl.barcodeType === "DATAMATRIX" ||
-                            selectedEl.barcodeType === "PDF417" ||
-                            selectedEl.barcodeType === "AZTEC"
-                              ? "Scale controls the barcode density"
-                              : "Width controls bar width, Height controls bar height"}
-                          </p>
-                        </div>
-                      </>
-                    )}
-
-                    <div>
-                      <h4 className="font-semibold text-gray-700 mb-3">
-                        Position & Size
-                      </h4>
-                      <div className="grid grid-cols-2 gap-3 mb-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            X
-                          </label>
-                          <input
-                            type="number"
-                            value={selectedEl.x}
-                            onChange={(e) =>
-                              updateElement(selectedEl.id, {
-                                x: Number(e.target.value),
-                              })
-                            }
-                            className="w-full border rounded-lg px-3 py-2 text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Y
-                          </label>
-                          <input
-                            type="number"
-                            value={selectedEl.y}
-                            onChange={(e) =>
-                              updateElement(selectedEl.id, {
-                                y: Number(e.target.value),
-                              })
-                            }
-                            className="w-full border rounded-lg px-3 py-2 text-sm"
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Width
-                          </label>
-                          <input
-                            type="number"
-                            value={selectedEl.width}
-                            onChange={(e) =>
-                              updateElement(selectedEl.id, {
-                                width: Number(e.target.value),
-                              })
-                            }
-                            className="w-full border rounded-lg px-3 py-2 text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Height
-                          </label>
-                          <input
-                            type="number"
-                            value={selectedEl.height}
-                            onChange={(e) =>
-                              updateElement(selectedEl.id, {
-                                height: Number(e.target.value),
-                              })
-                            }
-                            className="w-full border rounded-lg px-3 py-2 text-sm"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {(selectedEl.type === "text" ||
-                      selectedEl.type === "barcode") && (
-                      <div>
-                        <h4 className="font-semibold text-gray-700 mb-3">
-                          Content
-                        </h4>
-                        <textarea
-                          value={selectedEl.content}
-                          onChange={(e) =>
-                            updateElement(selectedEl.id, {
-                              content: e.target.value,
-                            })
-                          }
-                          className="w-full border rounded-lg px-3 py-2 text-sm resize-none"
-                          rows={3}
-                          placeholder="Enter content..."
-                        />
-                      </div>
-                    )}
-
-                    <div>
-                      <h4 className="font-semibold text-gray-700 mb-3">
-                        Colors
-                      </h4>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Text
-                          </label>
-                          <input
-                            type="color"
-                            value={selectedEl.color}
-                            onChange={(e) =>
-                              updateElement(selectedEl.id, {
-                                color: e.target.value,
-                              })
-                            }
-                            className="w-full h-10 border rounded-lg"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Background
-                          </label>
-                          <input
-                            type="color"
-                            value={
-                              selectedEl.backgroundColor === "transparent"
-                                ? "#ffffff"
-                                : selectedEl.backgroundColor
-                            }
-                            onChange={(e) =>
-                              updateElement(selectedEl.id, {
-                                backgroundColor: e.target.value,
-                              })
-                            }
-                            className="w-full h-10 border rounded-lg"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {!selectedEl && (
-                  <div className="text-center py-8 text-gray-500">
-                    <div className="text-lg mb-2">No element selected</div>
-                    <div className="text-sm">Click on an element to edit</div>
-                  </div>
-                )}
+          {/* Center Canvas Area - Fixed and Centered */}
+          <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
+            <div className="flex items-center justify-center">
+              <div
+                ref={canvasRef}
+                className="relative bg-white shadow-2xl"
+                style={{
+                  width: canvasPixelSize.width,
+                  height: canvasPixelSize.height,
+                  transform: `scale(${displayZoom / 100})`,
+                  transformOrigin: "center",
+                  backgroundImage: showGrid
+                    ? "radial-gradient(circle, #e5e7eb 1px, transparent 1px)"
+                    : "none",
+                  backgroundSize: showGrid ? "20px 20px" : "auto",
+                  border: "1px solid #d1d5db",
+                }}
+                onDragOver={onDragOver}
+                onDrop={onDrop}
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) {
+                    setSelectedElementId(null);
+                  }
+                }}
+              >
+                {elements.map(renderElement)}
               </div>
             </div>
           </div>
-        )}
-      </div>
 
+          {/* Right Sidebar - Properties */}
+          <div className="w-80 bg-white border-l flex flex-col overflow-y-auto shadow-sm">
+            <div className="p-4 border-b bg-gray-50">
+              <h3 className="font-bold text-gray-800 text-lg">Properties</h3>
+            </div>
+            <div className="flex-1 p-4 space-y-6">
+              {/* Label Size Section - Always Visible */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-semibold text-gray-700 mb-3 flex items-center">
+                  <span className="mr-2">📐</span> Label Size (mm)
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Width
+                    </label>
+                    <input
+                      type="number"
+                      value={labelSize.width}
+                      onChange={(e) =>
+                        setLabelSize({
+                          ...labelSize,
+                          width: Number(e.target.value),
+                        })
+                      }
+                      min="10"
+                      max="500"
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Height
+                    </label>
+                    <input
+                      type="number"
+                      value={labelSize.height}
+                      onChange={(e) =>
+                        setLabelSize({
+                          ...labelSize,
+                          height: Number(e.target.value),
+                        })
+                      }
+                      min="10"
+                      max="500"
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Auto-zoom: {Math.round(displayZoom)}%
+                </p>
+              </div>
+
+              {/* Element Properties - Only When Selected */}
+              {selectedEl ? (
+                <>
+                  <div className="border-t pt-4">
+                    <h4 className="font-semibold text-gray-700 mb-3 flex items-center">
+                      <span className="mr-2">⚙️</span> Element:{" "}
+                      {selectedEl.type.charAt(0).toUpperCase() +
+                        selectedEl.type.slice(1)}
+                    </h4>
+
+                    {/* Delete Button */}
+                    <button
+                      onClick={deleteElement}
+                      className="w-full p-3 bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center justify-center space-x-2 transition-colors mb-4"
+                    >
+                      <Trash2 size={16} />
+                      <span>Delete Element</span>
+                    </button>
+                  </div>
+
+                  {/* Barcode Type Selector */}
+                  {selectedEl.type === "barcode" && (
+                    <>
+                      <div>
+                        <h4 className="font-semibold text-gray-700 mb-3">
+                          Barcode Type
+                        </h4>
+                        <select
+                          value={selectedEl.barcodeType || "CODE128"}
+                          onChange={(e) =>
+                            handleBarcodeTypeChange(e.target.value)
+                          }
+                          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          {barcodeTypes.map((type) => (
+                            <option key={type.value} value={type.value}>
+                              {type.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold text-gray-700 mb-3">
+                          Barcode Settings
+                        </h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              {selectedEl.barcodeType === "QR" ||
+                              selectedEl.barcodeType === "DATAMATRIX" ||
+                              selectedEl.barcodeType === "PDF417" ||
+                              selectedEl.barcodeType === "AZTEC"
+                                ? "Scale"
+                                : "Bar Width"}
+                            </label>
+                            <input
+                              type="number"
+                              value={selectedEl.barcodeWidth || 2}
+                              onChange={(e) =>
+                                updateElement(selectedEl.id, {
+                                  barcodeWidth: Number(e.target.value),
+                                })
+                              }
+                              min="1"
+                              max="10"
+                              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              Bar Height
+                            </label>
+                            <input
+                              type="number"
+                              value={selectedEl.barcodeHeight || 40}
+                              onChange={(e) =>
+                                updateElement(selectedEl.id, {
+                                  barcodeHeight: Number(e.target.value),
+                                })
+                              }
+                              min="10"
+                              max="200"
+                              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Content Editor */}
+                  {(selectedEl.type === "text" ||
+                    selectedEl.type === "barcode") && (
+                    <div>
+                      <h4 className="font-semibold text-gray-700 mb-3">
+                        Content
+                      </h4>
+                      <textarea
+                        value={selectedEl.content}
+                        onChange={(e) =>
+                          updateElement(selectedEl.id, {
+                            content: e.target.value,
+                          })
+                        }
+                        className="w-full border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        rows={3}
+                        placeholder="Enter content..."
+                      />
+                    </div>
+                  )}
+
+                  {/* Text Style Options */}
+                  {selectedEl.type === "text" && (
+                    <div>
+                      <h4 className="font-semibold text-gray-700 mb-3">
+                        Text Style
+                      </h4>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Font Size
+                          </label>
+                          <input
+                            type="number"
+                            value={selectedEl.fontSize}
+                            onChange={(e) =>
+                              updateElement(selectedEl.id, {
+                                fontSize: Number(e.target.value),
+                              })
+                            }
+                            min="8"
+                            max="72"
+                            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Font Family
+                          </label>
+                          <select
+                            value={selectedEl.fontFamily}
+                            onChange={(e) =>
+                              updateElement(selectedEl.id, {
+                                fontFamily: e.target.value,
+                              })
+                            }
+                            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="Arial">Arial</option>
+                            <option value="Times New Roman">
+                              Times New Roman
+                            </option>
+                            <option value="Courier New">Courier New</option>
+                            <option value="Georgia">Georgia</option>
+                            <option value="Verdana">Verdana</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Text Align
+                          </label>
+                          <select
+                            value={selectedEl.textAlign}
+                            onChange={(e) =>
+                              updateElement(selectedEl.id, {
+                                textAlign: e.target.value,
+                              })
+                            }
+                            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="left">Left</option>
+                            <option value="center">Center</option>
+                            <option value="right">Right</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Color Picker */}
+                  <div>
+                    <h4 className="font-semibold text-gray-700 mb-3">Colors</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Text/Foreground
+                        </label>
+                        <input
+                          type="color"
+                          value={selectedEl.color}
+                          onChange={(e) =>
+                            updateElement(selectedEl.id, {
+                              color: e.target.value,
+                            })
+                          }
+                          className="w-full h-10 border rounded-lg cursor-pointer"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Background
+                        </label>
+                        <input
+                          type="color"
+                          value={
+                            selectedEl.backgroundColor === "transparent"
+                              ? "#ffffff"
+                              : selectedEl.backgroundColor
+                          }
+                          onChange={(e) =>
+                            updateElement(selectedEl.id, {
+                              backgroundColor: e.target.value,
+                            })
+                          }
+                          className="w-full h-10 border rounded-lg cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-12 text-gray-400">
+                  <div className="text-6xl mb-4">🎯</div>
+                  <div className="text-lg font-medium mb-2">
+                    No Element Selected
+                  </div>
+                  <div className="text-sm">
+                    Click on an element in the canvas to edit its properties
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Barcode Value Modal */}
       {showBarcodePopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 animate-slideUp">
             <div className="flex items-center justify-between p-6 border-b">
               <div>
                 <h3 className="text-lg font-medium text-gray-900">
@@ -1289,7 +1623,7 @@ const EnhancedManager = () => {
               </div>
               <button
                 onClick={handleBarcodePopupClose}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <X size={24} />
               </button>
@@ -1303,21 +1637,21 @@ const EnhancedManager = () => {
                 value={barcodeValue}
                 onChange={(e) => setBarcodeValue(e.target.value)}
                 placeholder="Enter value..."
-                className="w-full px-4 py-3 border rounded-lg"
+                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 onKeyPress={(e) => e.key === "Enter" && handleBarcodeCreate()}
                 autoFocus
               />
               <div className="flex justify-end space-x-3 mt-6">
                 <button
                   onClick={handleBarcodePopupClose}
-                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleBarcodeCreate}
                   disabled={!barcodeValue.trim()}
-                  className={`px-6 py-2 rounded-lg font-medium ${
+                  className={`px-6 py-2 rounded-lg font-medium transition-colors ${
                     barcodeValue.trim()
                       ? "bg-blue-600 text-white hover:bg-blue-700"
                       : "bg-gray-300 text-gray-500 cursor-not-allowed"
@@ -1331,9 +1665,10 @@ const EnhancedManager = () => {
         </div>
       )}
 
+      {/* Label Name Modal */}
       {showLabelNameModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 animate-slideUp">
             <div className="flex items-center justify-between p-6 border-b">
               <h3 className="text-lg font-medium text-gray-900">
                 Create New Label
@@ -1343,7 +1678,7 @@ const EnhancedManager = () => {
                   setShowLabelNameModal(false);
                   setLabelName("");
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <X size={24} />
               </button>
@@ -1357,7 +1692,7 @@ const EnhancedManager = () => {
                 value={labelName}
                 onChange={(e) => setLabelName(e.target.value)}
                 placeholder="Enter label name..."
-                className="w-full px-4 py-3 border rounded-lg"
+                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 onKeyPress={(e) => e.key === "Enter" && handleLabelNameSubmit()}
                 autoFocus
               />
@@ -1367,14 +1702,14 @@ const EnhancedManager = () => {
                     setShowLabelNameModal(false);
                     setLabelName("");
                   }}
-                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleLabelNameSubmit}
                   disabled={!labelName.trim()}
-                  className={`px-6 py-2 rounded-lg font-medium ${
+                  className={`px-6 py-2 rounded-lg font-medium transition-colors ${
                     labelName.trim()
                       ? "bg-blue-600 text-white hover:bg-blue-700"
                       : "bg-gray-300 text-gray-500 cursor-not-allowed"
@@ -1388,6 +1723,7 @@ const EnhancedManager = () => {
         </div>
       )}
 
+      {/* Add Menu Backdrop */}
       {showAddMenu && (
         <div
           className="fixed inset-0 z-40"
@@ -1395,6 +1731,7 @@ const EnhancedManager = () => {
         />
       )}
 
+      {/* Print Preview Modal */}
       {showPrintPreview && labelToPreview && (
         <>
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 print:hidden">
@@ -1405,17 +1742,17 @@ const EnhancedManager = () => {
                 </h3>
                 <button
                   onClick={handleClosePrintPreview}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   <X size={24} />
                 </button>
               </div>
               <div className="p-6">
-                <div className="mb-4 text-sm text-gray-600">
+                <div className="mb-4 text-sm text-gray-600 text-center">
                   Label Size: {labelToPreview.labelSize?.width || 100} ×{" "}
                   {labelToPreview.labelSize?.height || 80} mm
                 </div>
-                <div className="flex justify-center bg-gray-50 p-8 border-2 border-dashed border-gray-300">
+                <div className="flex justify-center bg-gray-50 p-8 border-2 border-dashed border-gray-300 rounded-lg">
                   <div
                     className="bg-white shadow-lg border"
                     style={{
@@ -1426,7 +1763,7 @@ const EnhancedManager = () => {
                         (labelToPreview.labelSize?.height || 80) * MM_TO_PX
                       }px`,
                       position: "relative",
-                      borderRadius: "12px",
+                      borderRadius: "8px",
                       overflow: "hidden",
                     }}
                   >
@@ -1439,6 +1776,7 @@ const EnhancedManager = () => {
                         height: element.height,
                         fontSize: element.fontSize,
                         fontFamily: element.fontFamily,
+                        textAlign: element.textAlign,
                         color: element.color,
                         backgroundColor: element.backgroundColor,
                       };
@@ -1469,13 +1807,13 @@ const EnhancedManager = () => {
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
                     onClick={handleClosePrintPreview}
-                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleActualPrint}
-                    className="flex items-center space-x-2 px-6 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg"
+                    className="flex items-center space-x-2 px-6 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors"
                   >
                     <Printer size={18} />
                     <span>Print Label</span>
@@ -1485,6 +1823,7 @@ const EnhancedManager = () => {
             </div>
           </div>
 
+          {/* Actual Print Content */}
           <div className="hidden print:block">
             <div
               ref={printCanvasRef}
@@ -1497,7 +1836,6 @@ const EnhancedManager = () => {
                   (labelToPreview.labelSize?.height || 80) * MM_TO_PX
                 }px`,
                 position: "relative",
-                borderRadius: "12px",
                 overflow: "hidden",
               }}
             >
@@ -1555,6 +1893,7 @@ const EnhancedManager = () => {
         </>
       )}
 
+      {/* Styles */}
       <style>{`
         @media print {
           @page {
@@ -1570,6 +1909,30 @@ const EnhancedManager = () => {
           body { margin: 0; padding: 0; }
           .print\\:hidden { display: none !important; }
           .print\\:block { display: block !important; }
+        }
+        
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        
+        @keyframes slideUp {
+          from { 
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to { 
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out;
+        }
+        
+        .animate-slideUp {
+          animation: slideUp 0.3s ease-out;
         }
       `}</style>
     </div>
