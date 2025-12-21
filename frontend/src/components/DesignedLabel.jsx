@@ -7,6 +7,9 @@ import {
   Download,
   Layers,
   Printer,
+  Upload,
+  FileUp,
+  Sparkles,
 } from "lucide-react";
 import React, { useState, useEffect } from "react";
 
@@ -15,35 +18,33 @@ const DesignedLabel = () => {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewLabelData, setPreviewLabelData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showPdfImportModal, setShowPdfImportModal] = useState(false);
+  const [selectedPdfFile, setSelectedPdfFile] = useState(null);
+  const [pdfProcessing, setPdfProcessing] = useState(false);
+  const [extractedPdfText, setExtractedPdfText] = useState("");
 
-  // Load saved labels from localStorage on component mount
+  // Load saved labels from storage on component mount
   useEffect(() => {
-    const loadSavedLabels = () => {
-      try {
-        const saved = localStorage.getItem("savedLabels");
-        if (saved) {
-          const parsedLabels = JSON.parse(saved);
-          setSavedLabels(parsedLabels);
-        }
-      } catch (error) {
-        console.error("Error loading saved labels:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadSavedLabels();
-
-    // Listen for storage changes (in case labels are added from another component)
-    const handleStorageChange = (e) => {
-      if (e.key === "savedLabels") {
-        loadSavedLabels();
-      }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
+
+  const loadSavedLabels = async () => {
+    try {
+      const result = await window.storage.list("label:");
+      if (result && result.keys) {
+        const labelPromises = result.keys.map(async (key) => {
+          const data = await window.storage.get(key);
+          return data ? JSON.parse(data.value) : null;
+        });
+        const labels = (await Promise.all(labelPromises)).filter(Boolean);
+        setSavedLabels(labels);
+      }
+    } catch (error) {
+      console.error("Error loading saved labels:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Preview functionality
   const showLabelPreview = (label) => {
@@ -147,11 +148,15 @@ const DesignedLabel = () => {
   };
 
   // Delete saved label
-  const deleteSavedLabel = (labelId) => {
+  const deleteSavedLabel = async (labelId) => {
     if (window.confirm("Are you sure you want to delete this label?")) {
-      const updatedLabels = savedLabels.filter((label) => label.id !== labelId);
-      localStorage.setItem("savedLabels", JSON.stringify(updatedLabels));
-      setSavedLabels(updatedLabels);
+      try {
+        await window.storage.delete(`label:${labelId}`);
+        setSavedLabels(savedLabels.filter((label) => label.id !== labelId));
+      } catch (error) {
+        console.error("Error deleting label:", error);
+        alert("Failed to delete label");
+      }
     }
   };
 
@@ -165,6 +170,224 @@ const DesignedLabel = () => {
     link.download = `${label.name.replace(/[^a-z0-9]/gi, "_")}_label.json`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  // Handle PDF file selection
+  const handlePdfFileChange = (event) => {
+    const file = event.target.files[0];
+    if (file && file.type === "application/pdf") {
+      setSelectedPdfFile(file);
+    } else {
+      alert("Please select a valid PDF file");
+    }
+  };
+
+  // Process PDF and generate label
+  const generateLabelFromPdf = async () => {
+    if (!selectedPdfFile) {
+      alert("Please select a PDF file first");
+      return;
+    }
+
+    setPdfProcessing(true);
+
+    try {
+      // Read PDF file
+      const fileData = await selectedPdfFile.arrayBuffer();
+      const uint8Array = new Uint8Array(fileData);
+
+      // Extract text from PDF using mammoth (for simple text extraction)
+      // Note: For proper PDF parsing, you'd typically use pdf.js or similar
+      // Here we'll use a simple text extraction approach
+      const textDecoder = new TextDecoder("utf-8");
+      let extractedText = "";
+
+      try {
+        // Try to extract text content from PDF
+        const pdfText = textDecoder.decode(uint8Array);
+        // Basic extraction - look for text between stream objects
+        const textMatches = pdfText.match(/\(([^)]+)\)/g);
+        if (textMatches) {
+          extractedText = textMatches
+            .map((match) => match.replace(/[()]/g, ""))
+            .filter((text) => text.trim().length > 0)
+            .join(" ");
+        }
+      } catch (error) {
+        console.error("Error extracting text:", error);
+      }
+
+      setExtractedPdfText(extractedText || "No text extracted from PDF");
+
+      // Create a new label from extracted data
+      const newLabel = {
+        id: `label_${Date.now()}`,
+        name: `Label from ${selectedPdfFile.name}`,
+        dimensions: { width: 100, height: 50 },
+        elements: [
+          {
+            id: `element_${Date.now()}_1`,
+            type: "text",
+            content: extractedText.substring(0, 100) || "Extracted from PDF",
+            x: 10,
+            y: 10,
+            width: 350,
+            height: 30,
+            font: "Arial",
+            fontSize: 14,
+            bold: false,
+            italic: false,
+            underline: false,
+            alignment: "left",
+          },
+        ],
+        createdAt: new Date().toISOString(),
+      };
+
+      // Save the generated label
+      await window.storage.set(
+        `label:${newLabel.id}`,
+        JSON.stringify(newLabel)
+      );
+
+      // Reload labels list
+      await loadSavedLabels();
+
+      // Close modal and reset all states
+      setShowPdfImportModal(false);
+      setSelectedPdfFile(null);
+      setExtractedPdfText("");
+      setPdfProcessing(false);
+      alert("Label generated successfully from PDF!");
+    } catch (error) {
+      console.error("Error processing PDF:", error);
+      alert("Failed to process PDF. Please try again.");
+    } finally {
+      setPdfProcessing(false);
+    }
+  };
+
+  // Render PDF Import Modal
+  const renderPdfImportModal = () => {
+    if (!showPdfImportModal) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
+          <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-2xl">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-bold flex items-center">
+                  <FileUp size={24} className="mr-2" />
+                  Import PDF
+                </h3>
+                <p className="text-purple-100 text-sm">
+                  Select a PDF file to extract data and generate a label
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowPdfImportModal(false);
+                  setSelectedPdfFile(null);
+                  setExtractedPdfText("");
+                }}
+                className="text-white hover:text-gray-200 p-2 rounded-full hover:bg-white hover:bg-opacity-20 transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+
+          <div className="p-8">
+            <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center mb-6 hover:border-purple-400 transition-colors">
+              <input
+                type="file"
+                accept="application/pdf"
+                onChange={handlePdfFileChange}
+                className="hidden"
+                id="pdf-upload"
+              />
+              <label
+                htmlFor="pdf-upload"
+                className="cursor-pointer flex flex-col items-center"
+              >
+                <Upload size={48} className="text-purple-500 mb-4" />
+                <p className="text-lg font-semibold text-gray-700 mb-2">
+                  Click to select a PDF file
+                </p>
+                <p className="text-sm text-gray-500">PDF files only (.pdf)</p>
+              </label>
+            </div>
+
+            {selectedPdfFile && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <FileText size={20} className="text-green-600 mr-3" />
+                    <div>
+                      <p className="font-semibold text-green-900">
+                        {selectedPdfFile.name}
+                      </p>
+                      <p className="text-sm text-green-700">
+                        {(selectedPdfFile.size / 1024).toFixed(2)} KB
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedPdfFile(null)}
+                    className="text-green-600 hover:text-green-800"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {extractedPdfText && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 max-h-40 overflow-y-auto">
+                <p className="text-sm text-blue-900 font-mono">
+                  {extractedPdfText}
+                </p>
+              </div>
+            )}
+
+            <div className="flex space-x-4">
+              <button
+                onClick={() => {
+                  setShowPdfImportModal(false);
+                  setSelectedPdfFile(null);
+                  setExtractedPdfText("");
+                }}
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-3 rounded-lg font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={generateLabelFromPdf}
+                disabled={!selectedPdfFile || pdfProcessing}
+                className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all flex items-center justify-center space-x-2 ${
+                  selectedPdfFile && !pdfProcessing
+                    ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                }`}
+              >
+                {pdfProcessing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={20} />
+                    <span>Generate Label</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // Render Preview Modal
@@ -388,6 +611,13 @@ const DesignedLabel = () => {
               </div>
               <div className="flex space-x-3">
                 <button
+                  onClick={() => setShowPdfImportModal(true)}
+                  className="bg-purple-500 bg-opacity-90 hover:bg-opacity-100 px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors shadow-lg"
+                >
+                  <FileUp size={16} />
+                  <span>Import PDF</span>
+                </button>
+                <button
                   onClick={() => window.location.reload()}
                   className="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
                 >
@@ -412,8 +642,8 @@ const DesignedLabel = () => {
                 </p>
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
                   <p className="text-blue-800 text-sm">
-                    💡 <strong>Tip:</strong> Use the Label Designer to create
-                    and save your first label design
+                    💡 <strong>Tip:</strong> Use the Label Designer or Import
+                    PDF button to create your first label design
                   </p>
                 </div>
               </div>
@@ -542,7 +772,7 @@ const DesignedLabel = () => {
                     <strong>Total Labels:</strong> {savedLabels.length}
                   </div>
                   <div className="text-xs text-slate-500">
-                    Data stored locally in your browser
+                    Data stored in persistent storage
                   </div>
                 </div>
               </div>
@@ -551,6 +781,7 @@ const DesignedLabel = () => {
         </div>
       </div>
       {renderPreviewModal()}
+      {renderPdfImportModal()}
     </div>
   );
 };
