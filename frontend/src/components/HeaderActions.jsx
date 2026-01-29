@@ -1,5 +1,8 @@
+// cSpell:words ATPL Archery Technocrats
+
 import React, { useState } from "react";
 import { Tag, Settings, Info, X } from "lucide-react";
+import DetailedInfo from "./DetailedInfo";
 
 // System Settings Modal Component
 export const SystemSettingsModal = ({ onClose }) => {
@@ -64,7 +67,6 @@ export const SystemSettingsModal = ({ onClose }) => {
             </div>
           </div>
 
-          {/* File Association Button */}
           <button className="w-full px-4 py-2 bg-[#F5F7F9] hover:bg-[#8A9BA5] hover:text-white rounded-lg text-[#38474F] font-medium transition-colors">
             File association
           </button>
@@ -73,7 +75,7 @@ export const SystemSettingsModal = ({ onClose }) => {
         <div className="flex justify-end space-x-3 p-4 border-t bg-[#F5F7F9] rounded-b-lg">
           <button
             onClick={onClose}
-            className="px-6 py-2 text-[#38474F] hover:bg-[#F5F7F9] rounded-lg transition-colors"
+            className="px-6 py-2 text-[#38474F] hover:bg-[#E0E4E7] rounded-lg transition-colors"
           >
             Cancel
           </button>
@@ -89,8 +91,16 @@ export const SystemSettingsModal = ({ onClose }) => {
   );
 };
 
-// About/Version Modal Component
+// About Modal
 export const AboutModal = ({ onClose }) => {
+  const [showDetails, setShowDetails] = useState(false);
+
+  if (showDetails) {
+    return (
+      <DetailedInfo onClose={onClose} onBack={() => setShowDetails(false)} />
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl">
@@ -102,26 +112,10 @@ export const AboutModal = ({ onClose }) => {
         </div>
 
         <div className="p-8 text-center space-y-6">
-          {/* Logo */}
-          <div className="flex justify-center">
-            <div className="bg-gradient-to-br from-[#E85874] to-[#C4455D] rounded-2xl p-8 shadow-lg">
-              <div className="flex items-center space-x-2">
-                <div className="grid grid-cols-3 gap-1">
-                  {[...Array(9)].map((_, i) => (
-                    <div key={i} className="w-2 h-2 bg-white rounded-sm"></div>
-                  ))}
-                </div>
-                <div className="text-white text-5xl font-bold">L</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Title */}
           <h2 className="text-3xl font-bold text-[#E85874]">
             ATPL Cloud Printing
           </h2>
 
-          {/* Version */}
           <div className="bg-[#D4EAF7] rounded-lg p-4">
             <p className="text-xl font-semibold text-[#38474F]">
               Version: 2026.01
@@ -129,17 +123,16 @@ export const AboutModal = ({ onClose }) => {
             <p className="text-[#8A9BA5] mt-2">
               Powered by Archery Technocrats
             </p>
+
+            {/* ✅ FIXED LINK */}
             <a
               href="https://www.atplgroup.com"
-              target="_blank"
-              rel="noopener noreferrer"
               className="text-[#39A3DD] hover:text-[#2A7FAF] mt-2 inline-block transition-colors"
             >
               www.atplgroup.com
             </a>
           </div>
 
-          {/* Tagline */}
           <div className="text-sm bg-[#FDD7E0] rounded-lg p-4">
             <p className="font-bold text-[#E85874] text-lg mb-2">
               TARGET PERFECTION
@@ -149,18 +142,24 @@ export const AboutModal = ({ onClose }) => {
             </p>
           </div>
 
-          {/* Copyright */}
           <p className="text-sm text-[#8A9BA5]">
             Copyright© 2026 Archery Technocrats. All Rights Reserved.
           </p>
         </div>
 
-        <div className="flex justify-end p-4 border-t bg-[#F5F7F9] rounded-b-lg">
+        <div className="flex justify-end space-x-3 p-4 border-t bg-[#F5F7F9] rounded-b-lg">
           <button
             onClick={onClose}
-            className="px-6 py-2 bg-[#E85874] text-white rounded-lg hover:bg-[#C4455D] transition-colors"
+            className="px-6 py-2 text-[#38474F] hover:bg-[#E0E4E7] rounded-lg transition-colors font-medium"
           >
             Close
+          </button>
+          <button
+            onClick={() => setShowDetails(true)}
+            className="px-6 py-2 bg-[#39A3DD] text-white rounded-lg hover:bg-[#2A7FAF] transition-colors font-medium flex items-center space-x-2"
+          >
+            <Info size={18} />
+            <span>View Details</span>
           </button>
         </div>
       </div>
@@ -168,7 +167,7 @@ export const AboutModal = ({ onClose }) => {
   );
 };
 
-// App Header Component with Settings & Version
+// App Header
 export const AppHeader = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
@@ -178,7 +177,6 @@ export const AppHeader = () => {
       <div className="bg-white shadow-sm border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Left Side - Logo and Title */}
             <div className="flex items-center space-x-3">
               <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-[#E85874] to-[#C4455D] rounded-xl shadow-lg">
                 <Tag className="text-white" size={24} />
@@ -193,9 +191,7 @@ export const AppHeader = () => {
               </div>
             </div>
 
-            {/* Right Side - Version and Settings */}
             <div className="flex items-center space-x-3">
-              {/* Version Button */}
               <button
                 onClick={() => setShowAbout(true)}
                 className="flex items-center space-x-2 px-4 py-2 bg-[#D4EAF7] hover:bg-[#6BB9E5] rounded-lg transition-colors"
@@ -206,7 +202,6 @@ export const AppHeader = () => {
                 </span>
               </button>
 
-              {/* Settings Button */}
               <button
                 onClick={() => setShowSettings(true)}
                 className="flex items-center space-x-2 px-4 py-2 bg-[#F5F7F9] hover:bg-[#8A9BA5] hover:text-white rounded-lg transition-colors group"
@@ -224,7 +219,6 @@ export const AppHeader = () => {
         </div>
       </div>
 
-      {/* Modals */}
       {showSettings && (
         <SystemSettingsModal onClose={() => setShowSettings(false)} />
       )}
@@ -233,75 +227,4 @@ export const AppHeader = () => {
   );
 };
 
-// Demo App showing integration
-const DemoApp = () => {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F5F7F9] to-[#D4EAF7]">
-      <AppHeader />
-
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="bg-white rounded-xl shadow-lg p-8 text-center border border-[#E0E4E7]">
-          <div className="inline-block p-4 bg-gradient-to-br from-[#E85874] to-[#C4455D] rounded-2xl mb-4">
-            <Tag className="text-white" size={64} />
-          </div>
-          <h2 className="text-2xl font-bold text-[#38474F] mb-4">
-            Welcome to Label Manager Pro
-          </h2>
-          <p className="text-[#8A9BA5] mb-6">
-            Click the Settings or Version buttons in the header to see the
-            modals
-          </p>
-          <div className="flex justify-center space-x-4">
-            <button className="px-6 py-3 bg-[#E85874] text-white rounded-lg hover:bg-[#C4455D] transition-colors font-medium">
-              Get Started
-            </button>
-            <button className="px-6 py-3 bg-[#39A3DD] text-white rounded-lg hover:bg-[#2A7FAF] transition-colors font-medium">
-              Learn More
-            </button>
-          </div>
-        </div>
-
-        {/* Feature Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-          <div className="bg-white rounded-xl shadow-md p-6 border border-[#E0E4E7] hover:shadow-xl transition-shadow">
-            <div className="w-12 h-12 bg-[#FDD7E0] rounded-lg flex items-center justify-center mb-4">
-              <Tag className="text-[#E85874]" size={24} />
-            </div>
-            <h3 className="text-lg font-bold text-[#38474F] mb-2">
-              Easy Design
-            </h3>
-            <p className="text-[#8A9BA5]">
-              Create professional labels with our intuitive design tools
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md p-6 border border-[#E0E4E7] hover:shadow-xl transition-shadow">
-            <div className="w-12 h-12 bg-[#D4EAF7] rounded-lg flex items-center justify-center mb-4">
-              <Settings className="text-[#39A3DD]" size={24} />
-            </div>
-            <h3 className="text-lg font-bold text-[#38474F] mb-2">
-              Customizable
-            </h3>
-            <p className="text-[#8A9BA5]">
-              Adjust settings to match your workflow and preferences
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md p-6 border border-[#E0E4E7] hover:shadow-xl transition-shadow">
-            <div className="w-12 h-12 bg-[#FDD7E0] rounded-lg flex items-center justify-center mb-4">
-              <Info className="text-[#E85874]" size={24} />
-            </div>
-            <h3 className="text-lg font-bold text-[#38474F] mb-2">
-              Target Perfection
-            </h3>
-            <p className="text-[#8A9BA5]">
-              Precision and quality in every label you create
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default DemoApp;
+export default AppHeader;
