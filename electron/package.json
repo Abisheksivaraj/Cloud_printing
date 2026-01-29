@@ -1,0 +1,21 @@
+{
+  "name": "electron",
+  "version": "1.0.0",
+  "description": "ATPL::Cloud Printing",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron ."
+  },
+  "keywords": [
+    "electron",
+    "react",
+    "js",
+    "javascript"
+  ],
+  "author": "AbishekSivaraj",
+  "license": "MIT",
+  "dependencies": {
+    "electron": "^40.0.0"
+  }
+}

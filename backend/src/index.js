@@ -14,7 +14,7 @@ app.use(
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
-  })
+  }),
 );
 
 app.use(
@@ -30,11 +30,16 @@ app.use(
         res.setHeader("Content-Type", "image/png");
       }
     },
-  })
+  }),
 );
 
+// Import routes
 const login = require("./Route/LoginRoute");
+const printerRoutes = require("./Route/PrinterRoute");
+
+// Use routes
 app.use(login);
+app.use(printerRoutes);
 
 app.get("/", (req, res) => {
   return res.status(200).send({

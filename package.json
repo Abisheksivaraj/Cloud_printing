@@ -1,6 +1,8 @@
 {
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "electron": "^40.0.0",
+    "wait-on": "^9.0.3"
   },
   "name": "cloud_printing",
   "version": "1.0.0",
@@ -32,10 +34,10 @@
     "yargs-parser": "^21.1.1"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "backend": "nodemon backend/src/server.js",
     "frontend": "npm run dev --prefix frontend",
-    "dev": "concurrently \"npm run frontend\" \"npm run backend\""
+    "electron": "wait-on http://localhost:5173 && electron electron",
+    "dev": "concurrently -k \"npm run frontend\" \"npm run backend\" \"npm run electron\""
   },
   "keywords": [],
   "author": "",

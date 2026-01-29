@@ -1,80 +1,79 @@
-// import React from "react";
-// import {
-//   BrowserRouter as Router,
-//   Route,
-//   Routes,
-//   useLocation,
-// } from "react-router-dom";
-// import Home from "./components/Home";
-// import Footer from "./components/Footer"; // Fixed casing
-// import Login from "./components/Login"; // Fixed casing
-
-// // Create a separate component for the app content that uses useLocation
-// const AppContent = () => {
-//   const location = useLocation();
-//   const isAuthPage = location.pathname === "/";
-//   const isDashboard = location.pathname === "/dashboard";
-
-//   return (
-//     <div
-//       style={{
-//         display: "flex",
-//         flexDirection: "column",
-//         minHeight: "100vh",
-//       }}
-//     >
-//       {/* Show Home component for non-auth pages */}
-//       {!isAuthPage && <Home />}
-
-//       {/* Main content area */}
-//       <div style={{ flex: 1 }}>
-//         <Routes>
-//           <Route path="/" element={<Login />} />
-//           {/* Add other routes here as needed */}
-//           {/* Example: <Route path="/dashboard" element={<Dashboard />} /> */}
-//         </Routes>
-//       </div>
-
-//       {/* Show Footer for non-auth and non-dashboard pages */}
-//       {!isAuthPage && !isDashboard && (
-//         <div
-//           style={{
-//             position: "fixed",
-//             bottom: 0,
-//             left: 0,
-//             width: "100%",
-//             backgroundColor: "white",
-//             zIndex: 1000,
-//           }}
-//         >
-//           <Footer />
-//         </div>
-//       )}
-//     </div>
-//   );
-// };
-
-// const App = () => {
-//   return (
-//     <Router>
-//       <AppContent />
-//     </Router>
-//   );
-// };
-
-// export default App;
-
-
-import React from 'react'
-// import Home from "./components/Home";
-import LabelDesign from './components/LabelDesign';
-import AddModel from './components/AddModel';
+import React, { useState } from "react";
+import { Tag } from "lucide-react";
+import LabelLibrary from "./components/LabelLibrary";
+import {
+  AppHeader,
+  SystemSettingsModal,
+  AboutModal,
+} from "./components/HeaderActions";
+import LabelDesigner from "./components/LabelDesign"; // ← FIXED: Import LabelDesigner, NOT DesignCanvas
 
 const App = () => {
-  return (
-    <div><LabelDesign/></div>
-    // <div><AddModel/></div>
-  )
-}
+  const [labels, setLabels] = useState([]);
+  const [currentView, setCurrentView] = useState("library");
+  const [currentLabel, setCurrentLabel] = useState(null);
 
-export default App
+  const handleCreateLabel = (labelData) => {
+    const newLabel = {
+      id: `label_${Date.now()}`,
+      ...labelData,
+      createdAt: new Date().toLocaleString(),
+      lastModified: new Date().toLocaleString(),
+    };
+    setLabels([...labels, newLabel]);
+    setCurrentLabel(newLabel);
+    setCurrentView("designer");
+  };
+
+  const handleEditLabel = (label) => {
+    setCurrentLabel(label);
+    setCurrentView("designer");
+  };
+
+  const handleDeleteLabel = (labelId) => {
+    setLabels(labels.filter((label) => label.id !== labelId));
+  };
+
+  const handleSaveLabel = (labelData) => {
+    const updatedLabels = labels.map((label) =>
+      label.id === currentLabel.id
+        ? {
+            ...label,
+            ...labelData,
+            lastModified: new Date().toLocaleString(),
+          }
+        : label,
+    );
+    setLabels(updatedLabels);
+    setCurrentLabel({ ...currentLabel, ...labelData });
+  };
+
+  const handleBackToLibrary = () => {
+    setCurrentView("library");
+    setCurrentLabel(null);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <AppHeader />
+
+      {/* Main Content */}
+      {currentView === "library" ? (
+        <LabelLibrary
+          labels={labels}
+          onCreateLabel={handleCreateLabel}
+          onEditLabel={handleEditLabel}
+          onDeleteLabel={handleDeleteLabel}
+        />
+      ) : (
+        <LabelDesigner
+          label={currentLabel}
+          onSave={handleSaveLabel}
+          onBack={handleBackToLibrary}
+        />
+      )}
+    </div>
+  );
+};
+
+export default App;
