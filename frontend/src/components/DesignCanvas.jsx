@@ -25,6 +25,7 @@ const DesignCanvas = forwardRef(
       setIsDrawingShape,
       currentShapeType,
       generateId,
+      selectedBarcodeType,
       updateElement,
       setSelectedBarcodeType,
       zoom = 100,
@@ -771,7 +772,7 @@ const DesignCanvas = forwardRef(
             width: Math.max(width, 100),
             height: Math.max(height, 50),
             content: "123456789",
-            barcodeType: "CODE128",
+            barcodeType: selectedBarcodeType || "CODE128",
             fontSize: 14,
             fontFamily: "Arial",
             color: "#000000",
@@ -786,7 +787,6 @@ const DesignCanvas = forwardRef(
           const newElements = [...elements, newElement];
           setElements(newElements);
           setSelectedElementId(newElement.id);
-          setSelectedBarcodeType("CODE128");
           setIsDrawingBarcode(false);
           setBarcodeDrawStart(null);
           setTempBarcode(null);
@@ -839,8 +839,8 @@ const DesignCanvas = forwardRef(
         generateId,
         elements,
         setElements,
+        selectedBarcodeType,
         setSelectedElementId,
-        setSelectedBarcodeType,
         setIsDrawingLine,
         setIsDrawingBarcode,
         setIsDrawingShape,
@@ -1006,37 +1006,72 @@ const DesignCanvas = forwardRef(
         if (element.id !== selectedElementId || element.type === "line")
           return null;
 
+        // ✅ Adjust handle position to be closer
+        const handleOffset = -6; // Changed from -4 to -6 for better visibility but closer to edge
+
         const handles = [
-          { pos: "nw", cursor: "nw-resize", style: { left: -4, top: -4 } },
+          {
+            pos: "nw",
+            cursor: "nw-resize",
+            style: { left: handleOffset, top: handleOffset },
+          },
           {
             pos: "n",
             cursor: "n-resize",
-            style: { left: "50%", top: -4, transform: "translateX(-50%)" },
+            style: {
+              left: "50%",
+              top: handleOffset,
+              transform: "translateX(-50%)",
+            },
           },
-          { pos: "ne", cursor: "ne-resize", style: { right: -4, top: -4 } },
+          {
+            pos: "ne",
+            cursor: "ne-resize",
+            style: { right: handleOffset, top: handleOffset },
+          },
           {
             pos: "e",
             cursor: "e-resize",
-            style: { right: -4, top: "50%", transform: "translateY(-50%)" },
+            style: {
+              right: handleOffset,
+              top: "50%",
+              transform: "translateY(-50%)",
+            },
           },
-          { pos: "se", cursor: "se-resize", style: { right: -4, bottom: -4 } },
+          {
+            pos: "se",
+            cursor: "se-resize",
+            style: { right: handleOffset, bottom: handleOffset },
+          },
           {
             pos: "s",
             cursor: "s-resize",
-            style: { left: "50%", bottom: -4, transform: "translateX(-50%)" },
+            style: {
+              left: "50%",
+              bottom: handleOffset,
+              transform: "translateX(-50%)",
+            },
           },
-          { pos: "sw", cursor: "sw-resize", style: { left: -4, bottom: -4 } },
+          {
+            pos: "sw",
+            cursor: "sw-resize",
+            style: { left: handleOffset, bottom: handleOffset },
+          },
           {
             pos: "w",
             cursor: "w-resize",
-            style: { left: -4, top: "50%", transform: "translateY(-50%)" },
+            style: {
+              left: handleOffset,
+              top: "50%",
+              transform: "translateY(-50%)",
+            },
           },
         ];
 
         return handles.map((handle) => (
           <div
             key={handle.pos}
-            className="absolute w-2 h-2 bg-white border-2 border-blue-600 rounded-sm z-50"
+            className="absolute w-2.5 h-2.5 bg-white border-2 border-blue-600 rounded-sm z-50" // ✅ Slightly larger handles
             style={{
               ...handle.style,
               cursor: handle.cursor,
@@ -1187,8 +1222,10 @@ const DesignCanvas = forwardRef(
               : "move",
           border:
             isSelected && !isDrawingLine && !isDrawingBarcode && !isDrawingShape
-              ? "2px solid #0066cc"
-              : "1px solid transparent",
+              ? "2px solid #0066cc" // ✅ Changed from "2px solid #0066cc" - kept same
+              : element.type === "barcode"
+                ? "none" // ✅ No border for unselected barcodes
+                : "1px solid transparent",
           fontSize: element.fontSize,
           fontFamily: element.fontFamily,
           fontWeight: element.fontWeight,
@@ -1218,8 +1255,10 @@ const DesignCanvas = forwardRef(
             isDrawingLine || isDrawingBarcode || isDrawingShape
               ? "none"
               : "auto",
+          // ✅ NEW: Tighter fit for all elements
+          padding: element.type === "text" ? "0 8px" : "0",
+          boxSizing: "border-box",
         };
-
         switch (element.type) {
           case "placeholder":
             return (
@@ -1273,9 +1312,15 @@ const DesignCanvas = forwardRef(
             return (
               <div
                 key={element.id}
-                style={style}
+                style={{
+                  ...style,
+                  padding: 0, // ✅ Remove padding
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
                 onMouseDown={(e) => handleElementMouseDown(e, element)}
-                className="flex items-center justify-center bg-white select-none overflow-hidden"
+                className="select-none overflow-hidden"
               >
                 <BarcodeElement element={element} />
                 {renderResizeHandles(element)}
@@ -1535,12 +1580,32 @@ const DesignCanvas = forwardRef(
                         backgroundColor: "rgba(0, 102, 204, 0.1)",
                         pointerEvents: "none",
                         display: "flex",
+                        flexDirection: "column",
                         alignItems: "center",
                         justifyContent: "center",
+                        gap: "4px",
                       }}
                     >
-                      <span className="text-xs text-blue-600 font-semibold">
-                        Barcode: {Math.round(tempBarcode.width / MM_TO_PX)} ×{" "}
+                      <span className="text-sm text-blue-700 font-bold">
+                        {(() => {
+                          const barcodeTypeNames = {
+                            CODE128: "Code 128",
+                            CODE39: "Code 39",
+                            EAN13: "EAN-13",
+                            EAN8: "EAN-8",
+                            UPC: "UPC-A",
+                            QR: "QR Code",
+                            DATAMATRIX: "Data Matrix",
+                            PDF417: "PDF417",
+                            AZTEC: "Aztec Code",
+                          };
+                          return (
+                            barcodeTypeNames[selectedBarcodeType] || "Barcode"
+                          );
+                        })()}
+                      </span>
+                      <span className="text-xs text-blue-600 font-medium">
+                        {Math.round(tempBarcode.width / MM_TO_PX)} ×{" "}
                         {Math.round(tempBarcode.height / MM_TO_PX)}mm
                       </span>
                     </div>

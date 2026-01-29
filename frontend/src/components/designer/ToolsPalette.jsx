@@ -10,9 +10,10 @@ const ToolsPalette = ({
   onToolSelect,
   onActivateBarcodeDrawing,
   isDrawingBarcode,
-  onActivateShapeDrawing, // ✅ NEW: Shape drawing activation
-  isDrawingShape, // ✅ NEW: Shape drawing state
-  currentShapeType, // ✅ NEW: Current shape being drawn
+  selectedBarcodeType, // Keep this for reference but don't display
+  onActivateShapeDrawing,
+  isDrawingShape,
+  currentShapeType,
 }) => {
   const [selectedTool, setSelectedTool] = useState(null);
 
@@ -29,7 +30,7 @@ const ToolsPalette = ({
     {
       id: "barcode",
       emoji: "📊",
-      label: "Barcode",
+      label: "Barcode", // ✅ ALWAYS show "Barcode" - not dynamic
       type: "barcode",
       special: "barcode",
     },
@@ -45,7 +46,7 @@ const ToolsPalette = ({
       icon: Square,
       label: "Shape",
       type: "shape",
-      special: "shape", // ✅ NEW: Make shape a special tool for drawing mode
+      special: "shape",
     },
   ];
 
@@ -64,7 +65,6 @@ const ToolsPalette = ({
     }
 
     if (tool.special === "shape") {
-      // ✅ NEW: Activate shape drawing mode - opens shape selector in properties panel
       setSelectedTool("shape");
       if (onToolSelect) {
         onToolSelect("shape");
@@ -121,7 +121,7 @@ const ToolsPalette = ({
           const isSelected =
             (tool.special === "line" && isDrawingLine) ||
             (tool.special === "barcode" && isDrawingBarcode) ||
-            (tool.special === "shape" && isDrawingShape) || // ✅ NEW: Highlight when drawing shape
+            (tool.special === "shape" && isDrawingShape) ||
             selectedTool === tool.type;
 
           return (
@@ -152,7 +152,7 @@ const ToolsPalette = ({
               )}
 
               <span
-                className="text-xs font-semibold"
+                className="text-xs font-semibold text-center leading-tight"
                 style={{ color: brandColors.darkGray }}
               >
                 {tool.label}

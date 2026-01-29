@@ -7,6 +7,7 @@ const PropertiesPanel = ({
   deleteElement,
   onBarcodeTypeChange,
   isDrawingLine,
+  isDrawingBarcode, // ✅ ADD THIS: Barcode drawing state
   isDrawingShape, // ✅ NEW: Shape drawing state
   onUndo,
   onRedo,
@@ -19,6 +20,10 @@ const PropertiesPanel = ({
   onActivateShapeDrawing, // ✅ NEW: Activate shape drawing
   showShapeSelector = false,
   showTableCreator = false,
+  onActivateBarcodeDrawing, // ✅ UPDATED: Now receives barcode type
+  showBarcodeSelector = false, // ✅ NEW
+  selectedBarcodeType, // ✅ NEW
+  setSelectedBarcodeType, // ✅ NEW
 }) => {
   const [tableRows, setTableRows] = useState(2);
   const [tableColumns, setTableColumns] = useState(2);
@@ -58,6 +63,13 @@ const PropertiesPanel = ({
   const handleShapeSelection = (shapeType) => {
     if (shapeType && onActivateShapeDrawing) {
       onActivateShapeDrawing(shapeType);
+    }
+  };
+
+  // ✅ NEW: Handle barcode type selection for drawing
+  const handleBarcodeTypeSelection = (barcodeType) => {
+    if (barcodeType && onActivateBarcodeDrawing) {
+      onActivateBarcodeDrawing(barcodeType);
     }
   };
 
@@ -151,6 +163,58 @@ const PropertiesPanel = ({
             </button>
           </div>
         </div>
+
+        {/* ✅ Barcode Type Selector - Shows when barcode tool is selected */}
+        {/* ✅ UPDATED: Barcode Type Selector - Shows when barcode tool is selected */}
+        {showBarcodeSelector && (
+          <div className="bg-gradient-to-br from-blue-50 to-cyan-100 p-4 rounded-xl border border-blue-200">
+            <h4 className="font-bold text-gray-800 mb-3 flex items-center">
+              <span className="mr-2">📊</span> Select Barcode Type
+            </h4>
+            <p className="text-xs text-gray-600 mb-3">
+              Choose a barcode type first, then drag on canvas to draw
+            </p>
+            <select
+              onChange={(e) => {
+                if (e.target.value) {
+                  handleBarcodeTypeSelection(e.target.value);
+                }
+              }}
+              value={selectedBarcodeType || ""}
+              className={`w-full border-2 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+                !selectedBarcodeType
+                  ? "border-red-300 focus:ring-red-500"
+                  : "border-blue-300 focus:ring-blue-500"
+              }`}
+            >
+              <option value="">⚠️ Select Barcode Type First...</option>
+              {barcodeTypes.map((type) => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                </option>
+              ))}
+            </select>
+            {!selectedBarcodeType && (
+              <div className="mt-2 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
+                <p className="text-xs text-yellow-800 font-semibold">
+                  ⚠️ You must select a barcode type before drawing
+                </p>
+              </div>
+            )}
+            {isDrawingBarcode && selectedBarcodeType && (
+              <div className="mt-3 p-2 bg-blue-100 rounded-lg">
+                <p className="text-xs text-blue-800 font-semibold">
+                  📊 Drawing{" "}
+                  {
+                    barcodeTypes.find((t) => t.value === selectedBarcodeType)
+                      ?.label
+                  }{" "}
+                  - Drag on canvas
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ✅ UPDATED: Shape Selector - Activates drawing mode when shape is selected */}
         {showShapeSelector && (
@@ -581,18 +645,26 @@ const PropertiesPanel = ({
           <div className="text-center py-16">
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-4xl">
-                {isDrawingLine ? "✏️" : isDrawingShape ? "🎨" : "🎯"}
+                {isDrawingLine
+                  ? "✏️"
+                  : isDrawingBarcode
+                    ? "📊"
+                    : isDrawingShape
+                      ? "🎨"
+                      : "🎯"}
               </span>
             </div>
             <div className="text-lg font-bold text-gray-700 mb-2">
               {isDrawingLine
                 ? "Line Drawing Mode"
-                : isDrawingShape
-                  ? "Shape Drawing Mode"
-                  : "No Element Selected"}
+                : isDrawingBarcode
+                  ? "Barcode Drawing Mode"
+                  : isDrawingShape
+                    ? "Shape Drawing Mode"
+                    : "No Element Selected"}
             </div>
             <div className="text-sm text-gray-500 px-4">
-              {isDrawingLine || isDrawingShape
+              {isDrawingLine || isDrawingBarcode || isDrawingShape
                 ? "Drag on canvas to draw"
                 : "Select an element to edit"}
             </div>

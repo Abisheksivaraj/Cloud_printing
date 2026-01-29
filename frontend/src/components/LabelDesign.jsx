@@ -13,18 +13,42 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
   const [showGrid, setShowGrid] = useState(true);
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [barcodeValue, setBarcodeValue] = useState("");
-  const [selectedBarcodeType, setSelectedBarcodeType] = useState("CODE128");
+  const [selectedBarcodeType, setSelectedBarcodeType] = useState(null);
   const [isDrawingLine, setIsDrawingLine] = useState(false);
   const [isDrawingBarcode, setIsDrawingBarcode] = useState(false);
-  const [isDrawingShape, setIsDrawingShape] = useState(false); // ✅ NEW: Shape drawing state
-  const [currentShapeType, setCurrentShapeType] = useState(null); // ✅ NEW: Current shape type
+  const [isDrawingShape, setIsDrawingShape] = useState(false);
+  const [currentShapeType, setCurrentShapeType] = useState(null);
   const [selectedTool, setSelectedTool] = useState(null);
   const [zoom, setZoom] = useState(100);
 
-  const activateBarcodeDrawing = () => {
-    console.log("Activating barcode drawing mode");
+  // ✅ NEW: Get display name for barcode type
+  const getBarcodeTypeName = (type) => {
+    const barcodeTypeNames = {
+      CODE128: "Code 128",
+      CODE39: "Code 39",
+      EAN13: "EAN-13",
+      EAN8: "EAN-8",
+      UPC: "UPC-A",
+      QR: "QR Code",
+      DATAMATRIX: "Data Matrix",
+      PDF417: "PDF417",
+      AZTEC: "Aztec Code",
+    };
+    return barcodeTypeNames[type] || type;
+  };
+
+  // ✅ UPDATED: Activate barcode drawing mode with type selection
+  // ✅ UPDATED: Don't activate drawing until type is selected
+  const activateBarcodeDrawing = (barcodeType) => {
+    if (!barcodeType) {
+      console.log("No barcode type selected");
+      return;
+    }
+    console.log("Activating barcode drawing mode with type:", barcodeType);
+    setSelectedBarcodeType(barcodeType);
     setIsDrawingBarcode(true);
     setIsDrawingShape(false);
+    setIsDrawingLine(false);
     setSelectedElementId(null);
     setSelectedTool(null);
   };
@@ -55,7 +79,6 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
     }
   };
 
-  // Add a function to handle zoom changes with logging
   const handleZoomChange = (newZoom) => {
     console.log("LabelDesigner: Setting zoom to", newZoom);
     setZoom(newZoom);
@@ -194,6 +217,7 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
     console.log("Activating line drawing mode");
     setIsDrawingLine(true);
     setIsDrawingShape(false);
+    setIsDrawingBarcode(false);
     setSelectedElementId(null);
     setSelectedTool(null);
   };
@@ -208,14 +232,14 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
       // If changing to QR Code, create a new QR code element near the current barcode
       if (newType === "QR" && element.barcodeType !== "QR") {
         const MM_TO_PX = 3.7795275591;
-        const offset = 20; // Offset to place new QR code nearby
+        const offset = 20;
 
         const newQRElement = {
           id: generateId(),
           type: "barcode",
           x: Math.min(element.x + offset, labelSize.width * MM_TO_PX - 100),
           y: Math.min(element.y + offset, labelSize.height * MM_TO_PX - 100),
-          width: 100, // Square for QR code
+          width: 100,
           height: 100,
           content: element.content || "123456789",
           barcodeType: "QR",
@@ -254,7 +278,6 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
 
   const selectedElement = elements.find((el) => el.id === selectedElementId);
 
-  // Add console log to track zoom state
   console.log("LabelDesigner render - Current zoom:", zoom);
 
   return (
@@ -265,15 +288,15 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
         isDrawingLine={isDrawingLine}
         onDragStart={(type) => canvasRef.current?.setDraggedElement(type)}
         onToolSelect={setSelectedTool}
-        onActivateBarcodeDrawing={activateBarcodeDrawing}
+        onActivateBarcodeDrawing={() => setSelectedTool("barcode")}
         isDrawingBarcode={isDrawingBarcode}
-        onActivateShapeDrawing={activateShapeDrawing} // ✅ NEW
-        isDrawingShape={isDrawingShape} // ✅ NEW
-        currentShapeType={currentShapeType} // ✅ NEW
+        selectedBarcodeType={selectedBarcodeType} // ✅ NEW: Pass selected barcode type
+        onActivateShapeDrawing={activateShapeDrawing}
+        isDrawingShape={isDrawingShape}
+        currentShapeType={currentShapeType}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Reduced header height with smaller padding and text */}
         <div className="bg-white border-b px-4 py-2 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -302,6 +325,22 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
                   <button
                     onClick={() => setIsDrawingLine(false)}
                     className="ml-1 p-0.5 hover:bg-yellow-200 rounded"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
+
+              {isDrawingBarcode && (
+                <div className="flex items-center space-x-2 px-3 py-1.5 bg-blue-100 text-blue-800 rounded-lg text-xs font-medium">
+                  <span>📊</span>
+                  <span>Drawing {getBarcodeTypeName(selectedBarcodeType)}</span>
+                  <button
+                    onClick={() => {
+                      setIsDrawingBarcode(false);
+                      setSelectedBarcodeType("CODE128");
+                    }}
+                    className="ml-1 p-0.5 hover:bg-blue-200 rounded"
                   >
                     <X size={12} />
                   </button>
@@ -360,10 +399,11 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
           setIsDrawingLine={setIsDrawingLine}
           isDrawingBarcode={isDrawingBarcode}
           setIsDrawingBarcode={setIsDrawingBarcode}
-          isDrawingShape={isDrawingShape} // ✅ NEW
-          setIsDrawingShape={setIsDrawingShape} // ✅ NEW
-          currentShapeType={currentShapeType} // ✅ NEW
+          isDrawingShape={isDrawingShape}
+          setIsDrawingShape={setIsDrawingShape}
+          currentShapeType={currentShapeType}
           generateId={generateId}
+          selectedBarcodeType={selectedBarcodeType}
           updateElement={updateElement}
           setSelectedBarcodeType={setSelectedBarcodeType}
           zoom={zoom}
@@ -377,7 +417,8 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
         deleteElement={deleteElement}
         onBarcodeTypeChange={handleBarcodeTypeChange}
         isDrawingLine={isDrawingLine}
-        isDrawingShape={isDrawingShape} // ✅ NEW
+        isDrawingBarcode={isDrawingBarcode}
+        isDrawingShape={isDrawingShape}
         onUndo={() => canvasRef.current?.handleUndo()}
         onRedo={() => canvasRef.current?.handleRedo()}
         onDuplicate={() => canvasRef.current?.handleDuplicate()}
@@ -386,10 +427,15 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
         onAddShape={handleAddShape}
         onAddTable={handleAddTable}
         onAddPlaceholder={handleAddPlaceholder}
-        onActivateShapeDrawing={activateShapeDrawing} // ✅ NEW
+        onActivateShapeDrawing={activateShapeDrawing}
         showShapeSelector={selectedTool === "shape"}
         showTableCreator={selectedTool === "table"}
+        onActivateBarcodeDrawing={activateBarcodeDrawing}
+        showBarcodeSelector={selectedTool === "barcode"}
+        selectedBarcodeType={selectedBarcodeType}
+        setSelectedBarcodeType={setSelectedBarcodeType}
       />
+
       {showBarcodeModal && (
         <BarcodeModal
           value={barcodeValue}
@@ -404,6 +450,6 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
       )}
     </div>
   );
-};
+};;
 
 export default LabelDesigner;
