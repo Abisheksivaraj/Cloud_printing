@@ -5,11 +5,16 @@ import DesignCanvas from "./DesignCanvas";
 import ToolsPalette from "./designer/ToolsPalette";
 import PropertiesPanel from "./designer/PropertiesPanel";
 import BarcodeModal from "../components/Models/BarcodeModel";
+import { useTheme } from "../ThemeContext";
+import { useLanguage } from "../LanguageContext";
+import AIChatbot from "./designer/AIChatbot";
 
 const LabelDesigner = ({ label, onSave, onBack }) => {
+  const { isDarkMode, theme } = useTheme();
+  const { t } = useLanguage();
   const [elements, setElements] = useState(label?.elements || []);
   const [selectedElementId, setSelectedElementId] = useState(null);
-  const [labelSize] = useState(label?.labelSize || { width: 100, height: 80 });
+  const [labelSize, setLabelSize] = useState(label?.labelSize || { width: 100, height: 80 });
   const [showGrid, setShowGrid] = useState(true);
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [barcodeValue, setBarcodeValue] = useState("");
@@ -38,7 +43,6 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
   };
 
   // ✅ UPDATED: Activate barcode drawing mode with type selection
-  // ✅ UPDATED: Don't activate drawing until type is selected
   const activateBarcodeDrawing = (barcodeType) => {
     if (!barcodeType) {
       console.log("No barcode type selected");
@@ -75,12 +79,10 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
         elements,
         labelSize,
       });
-      alert("Label saved successfully!");
     }
   };
 
   const handleZoomChange = (newZoom) => {
-    console.log("LabelDesigner: Setting zoom to", newZoom);
     setZoom(newZoom);
   };
 
@@ -199,7 +201,6 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
   };
 
   const updateElement = (id, updates) => {
-    console.log("Updating element:", id, updates);
     setElements(
       elements.map((el) => (el.id === id ? { ...el, ...updates } : el)),
     );
@@ -207,14 +208,12 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
 
   const deleteElement = () => {
     if (selectedElementId) {
-      console.log("Deleting element:", selectedElementId);
       setElements(elements.filter((el) => el.id !== selectedElementId));
       setSelectedElementId(null);
     }
   };
 
   const activateLineDrawing = () => {
-    console.log("Activating line drawing mode");
     setIsDrawingLine(true);
     setIsDrawingShape(false);
     setIsDrawingBarcode(false);
@@ -222,14 +221,11 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
     setSelectedTool(null);
   };
 
-  // ✅ UPDATED: Handle barcode type change - creates new QR code if changing to QR
   const handleBarcodeTypeChange = (newType) => {
     if (selectedElementId) {
       const element = elements.find((el) => el.id === selectedElementId);
-
       if (!element || element.type !== "barcode") return;
 
-      // If changing to QR Code, create a new QR code element near the current barcode
       if (newType === "QR" && element.barcodeType !== "QR") {
         const MM_TO_PX = 3.7795275591;
         const offset = 20;
@@ -258,7 +254,6 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
         setSelectedElementId(newQRElement.id);
         setSelectedBarcodeType("QR");
       } else {
-        // Normal barcode type change
         setSelectedBarcodeType(newType);
         updateElement(selectedElementId, { barcodeType: newType });
       }
@@ -278,10 +273,8 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
 
   const selectedElement = elements.find((el) => el.id === selectedElementId);
 
-  console.log("LabelDesigner render - Current zoom:", zoom);
-
   return (
-    <div className="fixed inset-0 top-16 flex bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="fixed inset-0 top-16 flex transition-colors duration-500" style={{ backgroundColor: theme.bg }}>
       <ToolsPalette
         onAddElement={addElement}
         onActivateLineDrawing={activateLineDrawing}
@@ -290,98 +283,75 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
         onToolSelect={setSelectedTool}
         onActivateBarcodeDrawing={() => setSelectedTool("barcode")}
         isDrawingBarcode={isDrawingBarcode}
-        selectedBarcodeType={selectedBarcodeType} // ✅ NEW: Pass selected barcode type
+        selectedBarcodeType={selectedBarcodeType}
         onActivateShapeDrawing={activateShapeDrawing}
         isDrawingShape={isDrawingShape}
         currentShapeType={currentShapeType}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="bg-white border-b px-4 py-2 shadow-sm">
+        <div className="border-b px-6 py-3 shadow-sm transition-colors duration-500" style={{ backgroundColor: theme.surface, borderColor: theme.border }}>
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-4">
               <button
                 onClick={onBack}
-                className="flex items-center justify-center w-8 h-8 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
+                className="flex items-center justify-center w-10 h-10 rounded-xl transition-all hover:scale-110 active:scale-95 shadow-sm"
+                style={{ backgroundColor: isDarkMode ? '#334155' : '#F1F5F9', color: theme.text }}
               >
-                <ArrowLeft size={18} />
+                <ArrowLeft size={20} />
               </button>
               <div>
-                <h2 className="text-base font-semibold text-gray-900">
-                  {label?.name || "New Label"}
+                <h2 className="text-lg font-black tracking-tight" style={{ color: theme.text }}>
+                  {label?.name || "Untitled Label"}
                 </h2>
-                <p className="text-xs text-gray-500">
-                  {labelSize.width} × {labelSize.height} mm • {elements.length}{" "}
-                  elements • Zoom: {zoom}%
+                <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: theme.textMuted }}>
+                  {labelSize.width} × {labelSize.height} MM • {elements.length}{" "}
+                  BLOCKS • {zoom}% SCALE
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3">
               {isDrawingLine && (
-                <div className="flex items-center space-x-2 px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-lg text-xs font-medium">
+                <div className="flex items-center space-x-2 px-4 py-2 bg-amber-500/10 text-amber-500 rounded-xl text-[10px] font-black uppercase tracking-widest border border-amber-500/20">
                   <Minus size={14} />
-                  <span>Line Drawing Mode</span>
-                  <button
-                    onClick={() => setIsDrawingLine(false)}
-                    className="ml-1 p-0.5 hover:bg-yellow-200 rounded"
-                  >
-                    <X size={12} />
-                  </button>
+                  <span>Line Vector Mode</span>
+                  <button onClick={() => setIsDrawingLine(false)} className="ml-2 hover:scale-110"><X size={14} /></button>
                 </div>
               )}
 
               {isDrawingBarcode && (
-                <div className="flex items-center space-x-2 px-3 py-1.5 bg-blue-100 text-blue-800 rounded-lg text-xs font-medium">
+                <div className="flex items-center space-x-2 px-4 py-2 bg-blue-500/10 text-blue-500 rounded-xl text-[10px] font-black uppercase tracking-widest border border-blue-500/20">
                   <span>📊</span>
-                  <span>Drawing {getBarcodeTypeName(selectedBarcodeType)}</span>
-                  <button
-                    onClick={() => {
-                      setIsDrawingBarcode(false);
-                      setSelectedBarcodeType("CODE128");
-                    }}
-                    className="ml-1 p-0.5 hover:bg-blue-200 rounded"
-                  >
-                    <X size={12} />
-                  </button>
+                  <span>{getBarcodeTypeName(selectedBarcodeType)} ENGINE</span>
+                  <button onClick={() => { setIsDrawingBarcode(false); setSelectedBarcodeType("CODE128"); }} className="ml-2 hover:scale-110"><X size={14} /></button>
                 </div>
               )}
 
               {isDrawingShape && (
-                <div className="flex items-center space-x-2 px-3 py-1.5 bg-purple-100 text-purple-800 rounded-lg text-xs font-medium">
+                <div className="flex items-center space-x-2 px-4 py-2 bg-purple-500/10 text-purple-500 rounded-xl text-[10px] font-black uppercase tracking-widest border border-purple-500/20">
                   <span>🎨</span>
-                  <span>
-                    Drawing{" "}
-                    {currentShapeType === "rectangle" ? "Rectangle" : "Circle"}
-                  </span>
-                  <button
-                    onClick={() => {
-                      setIsDrawingShape(false);
-                      setCurrentShapeType(null);
-                    }}
-                    className="ml-1 p-0.5 hover:bg-purple-200 rounded"
-                  >
-                    <X size={12} />
-                  </button>
+                  <span>{currentShapeType === "rectangle" ? "Rectangle" : "Circle"} VECTOR</span>
+                  <button onClick={() => { setIsDrawingShape(false); setCurrentShapeType(null); }} className="ml-2 hover:scale-110"><X size={14} /></button>
                 </div>
               )}
 
-              <label className="flex items-center space-x-1.5 text-xs text-gray-600 cursor-pointer">
+              <label className="flex items-center space-x-2 text-[10px] font-black uppercase tracking-widest cursor-pointer px-3 py-2 rounded-xl hover:bg-gray-500/5 transition-colors" style={{ color: theme.textMuted }}>
                 <input
                   type="checkbox"
                   checked={showGrid}
                   onChange={(e) => setShowGrid(e.target.checked)}
-                  className="rounded w-3.5 h-3.5"
+                  className="rounded w-4 h-4 border-2 border-current bg-transparent checked:bg-[#39A3DD]"
                 />
-                <span>Show Grid</span>
+                <span>{t.showGrid}</span>
               </label>
 
               <button
                 onClick={handleSave}
-                className="flex items-center space-x-1.5 px-4 py-1.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg text-sm font-semibold shadow-lg hover:shadow-xl transition-all hover:scale-105"
+                className="flex items-center space-x-2 px-6 py-2.5 bg-[#39A3DD] text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95"
               >
-                <Save size={16} />
-                <span>Save Label</span>
+                <Save size={18} />
+                <span>{t.saveDesign}</span>
               </button>
             </div>
           </div>
@@ -448,8 +418,24 @@ const LabelDesigner = ({ label, onSave, onBack }) => {
           onCreate={handleBarcodeCreate}
         />
       )}
+
+      {/* AI Assistant Chatbot */}
+      <AIChatbot
+        onGenerateElements={(newElements, nextLabelSize, isNewRequest) => {
+          if (nextLabelSize) {
+            setLabelSize(nextLabelSize);
+          }
+          if (isNewRequest) {
+            setElements(newElements);
+          } else {
+            setElements(prev => [...prev, ...newElements]);
+          }
+        }}
+        labelSize={labelSize}
+        generateId={generateId}
+      />
     </div>
   );
-};;
+};
 
 export default LabelDesigner;
