@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { User, Mail, Phone, Lock, Building, ArrowRight, UserPlus, Loader2 } from "lucide-react";
 import { useTheme } from "../../ThemeContext";
 import { useLanguage } from "../../LanguageContext";
@@ -20,6 +20,30 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
 
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [lockedFields, setLockedFields] = useState({
+        email: false,
+        companyName: false
+    });
+
+    useEffect(() => {
+        // Fetch email and companyName from URL parameters
+        const params = new URLSearchParams(window.location.search);
+        const email = params.get('email');
+        const companyName = params.get('companyName');
+
+        if (email || companyName) {
+            setFormData(prev => ({
+                ...prev,
+                email: email || prev.email,
+                companyName: companyName || prev.companyName
+            }));
+
+            setLockedFields({
+                email: !!email,
+                companyName: !!companyName
+            });
+        }
+    }, []);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -173,9 +197,14 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                                     name="companyName"
                                     value={formData.companyName}
                                     onChange={handleChange}
+                                    readOnly={lockedFields.companyName}
                                     placeholder="Acme Printing Co."
-                                    className="w-full pl-12 pr-4 py-4 border-2 border-transparent rounded-2xl focus:outline-none transition-all text-sm font-bold"
-                                    style={{ backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC', color: theme.text, borderColor: isDarkMode ? '#334155' : 'transparent' }}
+                                    className={`w-full pl-12 pr-4 py-4 border-2 border-transparent rounded-2xl focus:outline-none transition-all text-sm font-bold ${lockedFields.companyName ? 'opacity-70 cursor-not-allowed select-none' : ''}`}
+                                    style={{
+                                        backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
+                                        color: theme.text,
+                                        borderColor: isDarkMode ? '#334155' : 'transparent'
+                                    }}
                                 />
                             </div>
                         </div>
@@ -193,9 +222,14 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                                         name="email"
                                         value={formData.email}
                                         onChange={handleChange}
+                                        readOnly={lockedFields.email}
                                         placeholder="john@company.com"
-                                        className="w-full pl-12 pr-4 py-4 border-2 border-transparent rounded-2xl focus:outline-none transition-all text-sm font-bold"
-                                        style={{ backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC', color: theme.text, borderColor: isDarkMode ? '#334155' : 'transparent' }}
+                                        className={`w-full pl-12 pr-4 py-4 border-2 border-transparent rounded-2xl focus:outline-none transition-all text-sm font-bold ${lockedFields.email ? 'opacity-70 cursor-not-allowed select-none' : ''}`}
+                                        style={{
+                                            backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
+                                            color: theme.text,
+                                            borderColor: isDarkMode ? '#334155' : 'transparent'
+                                        }}
                                     />
                                 </div>
                             </div>
