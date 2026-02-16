@@ -60,10 +60,6 @@ const EnhancedCreateLabelModal = ({ onClose, onCreate }) => {
     mediumGray: "#8A9BA5",
   };
 
-  // Function to check if running in Electron
-  const isElectron = () => {
-    return window.electron !== undefined;
-  };
 
   // Fetch available printers on component mount
   useEffect(() => {
@@ -75,40 +71,7 @@ const EnhancedCreateLabelModal = ({ onClose, onCreate }) => {
     setIsLoadingPrinters(true);
     try {
       console.log("Fetching printers...");
-      console.log("Is Electron?", isElectron());
 
-      // Method 1: Try Electron first (if available)
-      if (isElectron() && window.electron.getPrinters) {
-        console.log("Using Electron to get printers...");
-
-        const printers = await window.electron.getPrinters();
-        console.log("Printers from Electron:", printers);
-
-        if (printers && printers.length > 0) {
-          // Format printers for display
-          const formattedPrinters = printers.map((p) => ({
-            name: p.name,
-            displayName: p.displayName || p.name,
-            description: p.description,
-            status: p.status,
-            connection: p.connection || "local",
-            isDefault: p.isDefault || false,
-            isNetwork:
-              p.description?.toLowerCase().includes("network") || false,
-          }));
-
-          setAvailablePrinters(formattedPrinters);
-
-          // Select default printer or first printer
-          const defaultPrinter = formattedPrinters.find((p) => p.isDefault);
-          setSelectedPrinter(
-            defaultPrinter ? defaultPrinter.name : formattedPrinters[0].name,
-          );
-
-          setIsLoadingPrinters(false);
-          return;
-        }
-      }
 
       // Method 2: Fallback to backend API
       console.log("Using backend API to get printers...");
@@ -172,20 +135,6 @@ const EnhancedCreateLabelModal = ({ onClose, onCreate }) => {
         }
       }
 
-      // If in Electron, try to get detailed printer info
-      if (isElectron() && window.electron.getPrinterDetails) {
-        const result = await window.electron.getPrinterDetails(printerName);
-
-        if (result.success && result.printer) {
-          console.log("Printer details:", result.printer);
-
-          // Update settings based on printer capabilities
-          if (result.printer.driver) {
-            // You can adjust settings based on driver info
-            console.log("Printer driver:", result.printer.driver);
-          }
-        }
-      }
     } catch (error) {
       console.error("Error loading printer settings:", error);
     }
@@ -201,26 +150,6 @@ const EnhancedCreateLabelModal = ({ onClose, onCreate }) => {
     try {
       console.log(`Opening printer properties for: ${selectedPrinter}`);
 
-      // Method 1: Try Electron first (best for desktop app)
-      if (isElectron() && window.electron.openPrinterProperties) {
-        console.log("Using Electron to open printer properties...");
-
-        const result =
-          await window.electron.openPrinterProperties(selectedPrinter);
-
-        if (result.success) {
-          console.log("Printer properties opened:", result.method);
-
-          // Show message if manual action is needed
-          if (result.message) {
-            alert(result.message);
-          }
-          return;
-        } else {
-          console.error("Electron method failed:", result.error);
-          // Fall through to next method
-        }
-      }
 
       // Method 2: Try backend API (fallback for web)
       console.log("Using backend API to open printer properties...");
@@ -243,7 +172,7 @@ const EnhancedCreateLabelModal = ({ onClose, onCreate }) => {
         if (data.requiresManualAction || data.message) {
           alert(
             data.message ||
-              "Printer settings opened. Please select your printer to configure.",
+            "Printer settings opened. Please select your printer to configure.",
           );
         }
         return;
@@ -260,16 +189,11 @@ const EnhancedCreateLabelModal = ({ onClose, onCreate }) => {
     }
   };
 
-  // Open Windows Settings
   const openWindowsPrinterSettings = async () => {
     try {
-      if (isElectron() && window.electron.openWindowsSettings) {
-        await window.electron.openWindowsSettings("printers");
-      } else {
-        await fetch("http://localhost:3001/api/open-printer-settings", {
-          method: "POST",
-        });
-      }
+      await fetch("http://localhost:3001/api/open-printer-settings", {
+        method: "POST",
+      });
     } catch (error) {
       console.error("Error opening Windows settings:", error);
       alert(
@@ -769,14 +693,6 @@ const EnhancedCreateLabelModal = ({ onClose, onCreate }) => {
               <p className="text-sm mt-1" style={{ color: colors.mediumGray }}>
                 Configure your die-cut label template (Up to 25 labels: 5×5)
               </p>
-              {isElectron() && (
-                <p
-                  className="text-xs mt-1"
-                  style={{ color: colors.primaryBlue }}
-                >
-                  🖥️ Running in Desktop Mode
-                </p>
-              )}
             </div>
             <button
               onClick={onClose}
