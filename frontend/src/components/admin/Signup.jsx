@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import { User, Mail, Phone, Lock, Building, ArrowRight, UserPlus, Loader2 } from "lucide-react";
 import { useTheme } from "../../ThemeContext";
 import { useLanguage } from "../../LanguageContext";
-import axios from "axios";
 import { toast, Toaster } from "react-hot-toast";
+import { supabase } from "../../supabaseClient";
 
 const Signup = ({ onSignup, onSwitchToLogin }) => {
     const { isDarkMode, theme } = useTheme();
@@ -62,16 +62,10 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
         setError("");
 
         try {
-            const response = await fetch(
-                "https://mcgghxwgqewfwzshsrdm.supabase.co/functions/v1/users-complete-profile",
+            const { data, error: functionError } = await supabase.functions.invoke(
+                'users-complete-profile',
                 {
-                    method: 'POST',
-                    headers: {
-                        "Content-Type": "application/json",
-                        "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jZ2doeHdncWV3Znd6c2hzcmRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5Njk1ODQsImV4cCI6MjA4NjU0NTU4NH0.9wQm6cghImuVU0A7InTaDkWS7q9RNn9C6BTZf-fqkcw",
-                        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jZ2doeHdncWV3Znd6c2hzcmRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5Njk1ODQsImV4cCI6MjA4NjU0NTU4NH0.9wQm6cghImuVU0A7InTaDkWS7q9RNn9C6BTZf-fqkcw"
-                    },
-                    body: JSON.stringify({
+                    body: {
                         firstName: formData.firstName,
                         lastName: formData.lastName,
                         companyName: formData.companyName,
@@ -79,17 +73,17 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                         mobileNumber: formData.mobileNumber,
                         password: formData.password,
                         role: "admin"
-                    })
+                    }
                 }
             );
 
-            if (response.ok) {
-                toast.success("Admin account created successfully!");
-                onSignup(formData);
-            } else {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || "Failed to create account");
-            }
+            if (functionError) throw functionError;
+
+            // Store company name for other components (like AdminDashboard)
+            localStorage.setItem("companyName", formData.companyName);
+
+            toast.success("Admin account created successfully!");
+            onSignup(formData);
         } catch (err) {
             console.error("Signup error:", err);
             const errorMessage = err.message || "Something went wrong. Please try again.";

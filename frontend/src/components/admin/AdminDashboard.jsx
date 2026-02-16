@@ -1,6 +1,8 @@
 import React, { useState } from "react";
-import { UserPlus, Users, Search, X, Shield, Mail, Phone, Edit2, Trash2, MoreVertical, CheckCircle } from "lucide-react";
+import { UserPlus, Users, Search, X, Shield, Mail, Phone, Edit2, Trash2, MoreVertical, CheckCircle, Loader2 } from "lucide-react";
 import { useTheme } from "../../ThemeContext";
+import { supabase } from "../../supabaseClient";
+import { toast, Toaster } from "react-hot-toast";
 
 const AdminDashboard = () => {
     const { isDarkMode, theme } = useTheme();
@@ -12,6 +14,7 @@ const AdminDashboard = () => {
 
     const [showAddModal, setShowAddModal] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const [loading, setLoading] = useState(false);
 
     const [newUser, setNewUser] = useState({
         firstName: "",
@@ -21,11 +24,38 @@ const AdminDashboard = () => {
         role: "Designer",
     });
 
-    const handleAddUser = (e) => {
+    const handleAddUser = async (e) => {
         e.preventDefault();
-        setUsers([...users, { ...newUser, id: users.length + 1, status: "Active" }]);
-        setShowAddModal(false);
-        setNewUser({ firstName: "", lastName: "", email: "", mobile: "", role: "Designer" });
+        setLoading(true);
+
+        try {
+            // Get company name from the current admin's metadata or local storage if available
+            // For now, we'll use a placeholder or check if we can get it from somewhere
+            const companyName = localStorage.getItem("companyName") || "ATPL Cloud Printing";
+
+            const { data, error } = await supabase.functions.invoke('users-invite', {
+                body: {
+                    firstName: newUser.firstName,
+                    lastName: newUser.lastName,
+                    email: newUser.email,
+                    mobileNumber: newUser.mobile,
+                    role: newUser.role.toLowerCase(),
+                    companyName: companyName
+                }
+            });
+
+            if (error) throw error;
+
+            toast.success("Invitation sent successfully!");
+            setUsers([...users, { ...newUser, id: users.length + 1, status: "Invited" }]);
+            setShowAddModal(false);
+            setNewUser({ firstName: "", lastName: "", email: "", mobile: "", role: "Designer" });
+        } catch (error) {
+            console.error("Invite error:", error);
+            toast.error(error.message || "Failed to send invitation");
+        } finally {
+            setLoading(false);
+        }
     };
 
     const filteredUsers = users.filter(u =>
@@ -125,7 +155,7 @@ const AdminDashboard = () => {
                                         </td>
                                         <td className="px-8 py-6">
                                             <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${user.role === 'Manager' ? 'bg-purple-500/10 text-purple-500' :
-                                                    user.role === 'Designer' ? 'bg-blue-500/10 text-blue-500' : 'bg-amber-500/10 text-amber-500'
+                                                user.role === 'Designer' ? 'bg-blue-500/10 text-blue-500' : 'bg-amber-500/10 text-amber-500'
                                                 }`}>
                                                 {user.role}
                                             </span>
@@ -248,15 +278,21 @@ const AdminDashboard = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-12 py-4 bg-[#39A3DD] text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-[#2A7FAF] transition-all hover:scale-105 active:scale-95"
+                                    disabled={loading}
+                                    className={`px-12 py-4 bg-[#39A3DD] text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all flex items-center justify-center space-x-2 ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-[#2A7FAF] hover:scale-105 active:scale-95'}`}
                                 >
-                                    Confirm Enrollment
+                                    {loading ? (
+                                        <Loader2 className="animate-spin" size={18} />
+                                    ) : (
+                                        <span>Confirm Enrollment</span>
+                                    )}
                                 </button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
+            <Toaster position="top-right" />
         </div>
     );
 };
