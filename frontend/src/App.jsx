@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Tag } from "lucide-react";
 import LabelLibrary from "./components/LabelLibrary";
 import {
@@ -11,36 +11,60 @@ import Signup from "./components/admin/Signup";
 import Login from "./components/admin/Login";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import { useTheme } from "./ThemeContext";
+import { supabase } from "./supabaseClient";
 
 const App = () => {
   const { theme } = useTheme();
   const [labels, setLabels] = useState([]);
   const [currentView, setCurrentView] = useState("signup"); // Default to signup
   const [currentLabel, setCurrentLabel] = useState(null);
-  const [isAdminCreated, setIsAdminCreated] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Check for active session on mount
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setIsAuthenticated(true);
+        setCurrentView("admin_dashboard");
+      }
+      setIsLoading(false);
+    };
+
+    checkSession();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setIsAuthenticated(true);
+        setCurrentView("admin_dashboard");
+      } else {
+        setIsAuthenticated(false);
+        setCurrentView("login");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Manage navigation
   const navigateTo = (view) => {
+    if (view === "logout") {
+      supabase.auth.signOut();
+      return;
+    }
     setCurrentView(view);
   };
 
-  const handleSignup = (data) => {
-    console.log("Signup Info:", data);
-    setIsAdminCreated(true);
-    setIsAuthenticated(true);
-    setCurrentView("admin_dashboard");
+  const handleSignup = (user) => {
+    console.log("Signup successful:", user);
+    // onAuthStateChange will handle the redirection
   };
 
-  const handleLogin = (data) => {
-    console.log("Login Info:", data);
-    if (isAdminCreated) {
-      setIsAuthenticated(true);
-      setCurrentView("admin_dashboard");
-    } else {
-      alert("Admin account not found. Please sign up first.");
-      setCurrentView("signup");
-    }
+  const handleLogin = (user) => {
+    console.log("Login successful:", user);
+    // onAuthStateChange will handle the redirection
   };
 
   const handleCreateLabel = (labelData) => {
@@ -93,44 +117,52 @@ const App = () => {
       style={{ backgroundColor: theme.bg, color: theme.text }}
     >
       {/* Navigation / Header - Only show for main app functionality */}
-      {(isAuthenticated || currentView === "library" || currentView === "designer" || currentView === "admin_dashboard") && (
+      {(isAuthenticated || currentView === "library" || currentView === "designer" || currentView === "admin_dashboard") && !isLoading && (
         <AppHeader onNavigate={navigateTo} currentView={currentView} />
       )}
 
       <main className="flex-1">
-        {currentView === "signup" && (
-          <Signup
-            onSignup={handleSignup}
-            onSwitchToLogin={() => setCurrentView("login")}
-          />
-        )}
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full min-h-[calc(100vh-64px)]">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#39A3DD]"></div>
+          </div>
+        ) : (
+          <>
+            {currentView === "signup" && (
+              <Signup
+                onSignup={handleSignup}
+                onSwitchToLogin={() => setCurrentView("login")}
+              />
+            )}
 
-        {currentView === "login" && (
-          <Login
-            onLogin={handleLogin}
-            onSwitchToSignup={() => setCurrentView("signup")}
-          />
-        )}
+            {currentView === "login" && (
+              <Login
+                onLogin={handleLogin}
+                onSwitchToSignup={() => setCurrentView("signup")}
+              />
+            )}
 
-        {currentView === "admin_dashboard" && (
-          <AdminDashboard />
-        )}
+            {currentView === "admin_dashboard" && (
+              <AdminDashboard />
+            )}
 
-        {currentView === "library" && (
-          <LabelLibrary
-            labels={labels}
-            onCreateLabel={handleCreateLabel}
-            onEditLabel={handleEditLabel}
-            onDeleteLabel={handleDeleteLabel}
-          />
-        )}
+            {currentView === "library" && (
+              <LabelLibrary
+                labels={labels}
+                onCreateLabel={handleCreateLabel}
+                onEditLabel={handleEditLabel}
+                onDeleteLabel={handleDeleteLabel}
+              />
+            )}
 
-        {currentView === "designer" && (
-          <LabelDesigner
-            label={currentLabel}
-            onSave={handleSaveLabel}
-            onBack={handleBackToLibrary}
-          />
+            {currentView === "designer" && (
+              <LabelDesigner
+                label={currentLabel}
+                onSave={handleSaveLabel}
+                onBack={handleBackToLibrary}
+              />
+            )}
+          </>
         )}
       </main>
     </div>

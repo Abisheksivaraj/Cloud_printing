@@ -62,35 +62,37 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
         setError("");
 
         try {
-            const response = await axios.post(
+            const response = await fetch(
                 "https://mcgghxwgqewfwzshsrdm.supabase.co/functions/v1/users-complete-profile",
                 {
-                    firstName: formData.firstName,
-                    lastName: formData.lastName,
-                    companyName: formData.companyName,
-                    email: formData.email,
-                    mobileNumber: formData.mobileNumber,
-                    password: formData.password,
-                    role: "admin" // Explicitly setting role as per request for admin signup
-                },
-                {
+                    method: 'POST',
                     headers: {
                         "Content-Type": "application/json",
                         "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jZ2doeHdncWV3Znd6c2hzcmRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5Njk1ODQsImV4cCI6MjA4NjU0NTU4NH0.9wQm6cghImuVU0A7InTaDkWS7q9RNn9C6BTZf-fqkcw",
                         "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jZ2doeHdncWV3Znd6c2hzcmRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5Njk1ODQsImV4cCI6MjA4NjU0NTU4NH0.9wQm6cghImuVU0A7InTaDkWS7q9RNn9C6BTZf-fqkcw"
-                    }
+                    },
+                    body: JSON.stringify({
+                        firstName: formData.firstName,
+                        lastName: formData.lastName,
+                        companyName: formData.companyName,
+                        email: formData.email,
+                        mobileNumber: formData.mobileNumber,
+                        password: formData.password,
+                        role: "admin"
+                    })
                 }
             );
 
-            if (response.status === 200 || response.status === 201) {
+            if (response.ok) {
                 toast.success("Admin account created successfully!");
                 onSignup(formData);
             } else {
-                throw new Error("Failed to create account");
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || "Failed to create account");
             }
         } catch (err) {
             console.error("Signup error:", err);
-            const errorMessage = err.response?.data?.message || err.message || "Something went wrong. Please try again.";
+            const errorMessage = err.message || "Something went wrong. Please try again.";
             setError(errorMessage);
             toast.error(errorMessage);
         } finally {

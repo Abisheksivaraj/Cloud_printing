@@ -1,7 +1,9 @@
 import React, { useState } from "react";
-import { Mail, Lock, LogIn, ArrowRight } from "lucide-react";
+import { Mail, Lock, LogIn, ArrowRight, Loader2 } from "lucide-react";
 import { useTheme } from "../../ThemeContext";
 import { useLanguage } from "../../LanguageContext";
+import { supabase } from "../../supabaseClient";
+import { toast, Toaster } from "react-hot-toast";
 
 const Login = ({ onLogin, onSwitchToSignup }) => {
     const { isDarkMode, theme } = useTheme();
@@ -10,14 +12,30 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
         email: "",
         password: "",
     });
+    const [loading, setLoading] = useState(false);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        onLogin(formData);
+        setLoading(true);
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: formData.email,
+                password: formData.password,
+            });
+
+            if (error) throw error;
+
+            toast.success("Logged in successfully!");
+            onLogin(data.user);
+        } catch (error) {
+            toast.error(error.message || "Failed to login");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -78,11 +96,18 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
 
                         <button
                             type="submit"
-                            className="w-full py-5 text-white rounded-[1.25rem] font-black text-sm uppercase tracking-[0.2em] shadow-xl transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center space-x-3 group"
+                            disabled={loading}
+                            className={`w-full py-5 text-white rounded-[1.25rem] font-black text-sm uppercase tracking-[0.2em] shadow-xl transition-all flex items-center justify-center space-x-3 group ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:scale-[1.02] active:scale-95'}`}
                             style={{ backgroundColor: isDarkMode ? '#334155' : '#38474F' }}
                         >
-                            <span>{t.login}</span>
-                            <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                            {loading ? (
+                                <Loader2 className="animate-spin" size={20} />
+                            ) : (
+                                <>
+                                    <span>{t.login}</span>
+                                    <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                                </>
+                            )}
                         </button>
                     </form>
 
@@ -97,6 +122,7 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
                     </div>
                 </div>
             </div>
+            <Toaster position="top-right" />
         </div>
     );
 };
