@@ -26,10 +26,18 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
     });
 
     useEffect(() => {
-        // Fetch email and companyName from URL parameters
-        const params = new URLSearchParams(window.location.search);
-        const email = params.get('email');
-        const companyName = params.get('companyName');
+        // Fetch parameters from both search (?) and hash (#)
+        const searchParams = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+
+        const email = searchParams.get('email') || hashParams.get('email');
+        const companyName = searchParams.get('companyName') || hashParams.get('companyName');
+        const errorDescription = searchParams.get('error_description') || hashParams.get('error_description');
+
+        if (errorDescription) {
+            setError(errorDescription);
+            toast.error(errorDescription);
+        }
 
         if (email || companyName) {
             setFormData(prev => ({

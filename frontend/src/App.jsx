@@ -25,9 +25,19 @@ const App = () => {
     // Check for active session on mount
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
+
+      // Handle invitation/profile completion route
+      const isCompleteProfile = window.location.pathname === "/complete-profile";
+
+      if (isCompleteProfile) {
+        setCurrentView("signup");
+        setIsAuthenticated(!!session);
+      } else if (session) {
         setIsAuthenticated(true);
         setCurrentView("admin_dashboard");
+      } else {
+        setIsAuthenticated(false);
+        setCurrentView("signup"); // Default to signup for new visitors
       }
       setIsLoading(false);
     };
@@ -36,12 +46,19 @@ const App = () => {
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const isCompleteProfile = window.location.pathname === "/complete-profile";
+
       if (session) {
         setIsAuthenticated(true);
-        setCurrentView("admin_dashboard");
+        // Only redirect to dashboard if NOT in the middle of completing profile
+        if (!isCompleteProfile) {
+          setCurrentView("admin_dashboard");
+        }
       } else {
         setIsAuthenticated(false);
-        setCurrentView("login");
+        if (!isCompleteProfile) {
+          setCurrentView("login");
+        }
       }
     });
 
