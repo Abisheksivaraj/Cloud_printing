@@ -81,7 +81,7 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
 
             // Auto login after registration
             const loginData = await callEdgeFunction(API_URLS.LOGIN, {
-                userName: formData.email,
+                email: formData.email,
                 password: formData.password,
             });
 

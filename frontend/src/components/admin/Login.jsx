@@ -28,7 +28,7 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
 
         try {
             const data = await callEdgeFunction(API_URLS.LOGIN, {
-                userName: formData.userName,
+                email: formData.userName,
                 password: formData.password,
             });
 
