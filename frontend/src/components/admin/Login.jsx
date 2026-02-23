@@ -29,13 +29,12 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
         try {
             const data = await callEdgeFunction(API_URLS.LOGIN, {
                 email: formData.email,
-                user_name: formData.email,
-                userName: formData.email,
                 password: formData.password,
             });
 
             // Store auth token and user data
-            if (data.token) localStorage.setItem("authToken", data.token);
+            const token = data.access_token || data.token;
+            if (token) localStorage.setItem("authToken", token);
             if (data.admin) localStorage.setItem("userData", JSON.stringify(data.admin));
             if (data.user) localStorage.setItem("userData", JSON.stringify(data.user));
 

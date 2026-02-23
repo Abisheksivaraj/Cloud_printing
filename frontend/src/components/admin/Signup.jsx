@@ -23,7 +23,17 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
 
     // Get params from URL (e.g. for invitations)
     React.useEffect(() => {
+        // Check hash and query for errors
+        const hash = window.location.hash;
         const queryParams = new URLSearchParams(window.location.search);
+
+        if (hash.includes('error=access_denied') || hash.includes('otp_expired') || queryParams.get('error') === 'access_denied') {
+            const msg = "This invitation link has expired or is invalid. Please request a new invitation.";
+            setError(msg);
+            toast.error(msg, { duration: 6000 });
+            return;
+        }
+
         const email = queryParams.get('email');
         const companyName = queryParams.get('companyName');
         const firstName = queryParams.get('firstName');

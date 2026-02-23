@@ -23,7 +23,7 @@ const App = () => {
       const token = localStorage.getItem("authToken");
 
       // Handle invitation/profile completion route
-      const isCompleteProfile = window.location.pathname === "/complete-profile";
+      const isCompleteProfile = window.location.pathname === "/complete-profile" || window.location.pathname === "/accept-invite";
 
       if (isCompleteProfile) {
         setCurrentView("signup");
