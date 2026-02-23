@@ -59,6 +59,14 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
         try {
             // Register via complete-profile edge function
             await callEdgeFunction(API_URLS.COMPLETE_PROFILE, {
+                // Backend expects snake_case
+                first_name: formData.firstName,
+                last_name: formData.lastName,
+                company_name: formData.companyName,
+                mobile_number: formData.mobileNumber,
+                user_name: formData.email,
+
+                // Keeping camelCase for safety
                 firstName: formData.firstName,
                 lastName: formData.lastName,
                 companyName: formData.companyName,

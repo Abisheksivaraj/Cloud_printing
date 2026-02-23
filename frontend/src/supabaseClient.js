@@ -20,19 +20,14 @@ export const callEdgeFunction = async (functionName, body) => {
     if (error) {
         console.error(`Error calling function ${functionName}:`, error);
 
-        // Try to get a more specific error message from different possible structures
-        let errorMessage = error.message || 'Request failed';
+        let errorMessage = 'Request failed';
 
-        // Handle FunctionsHttpError and other possible error response bodies
-        try {
-            if (error.context && error.context.json) {
-                errorMessage = error.context.json.error || error.context.json.message || errorMessage;
-            } else if (error.response) {
-                const errorData = await error.response.json().catch(() => ({}));
-                errorMessage = errorData.error || errorData.message || errorMessage;
-            }
-        } catch (e) {
-            console.error("Failed to parse error response:", e);
+        // Supabase FunctionsHttpError usually has the message in the error object itself,
+        // or we can try to extract from the response if it's available.
+        if (error.context && error.context.json) {
+            errorMessage = error.context.json.error || error.context.json.message || errorMessage;
+        } else if (error.message && !error.message.includes("non-2xx")) {
+            errorMessage = error.message;
         }
 
         throw new Error(errorMessage);
