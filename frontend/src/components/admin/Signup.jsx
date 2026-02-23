@@ -92,13 +92,12 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
             // Auto login after registration
             const loginData = await callEdgeFunction(API_URLS.LOGIN, {
                 email: formData.email,
-                user_name: formData.email,
-                userName: formData.email,
                 password: formData.password,
             });
 
             // Store auth token and user data
-            if (loginData.token) localStorage.setItem("authToken", loginData.token);
+            const token = loginData.access_token || loginData.token;
+            if (token) localStorage.setItem("authToken", token);
             if (loginData.admin) localStorage.setItem("userData", JSON.stringify(loginData.admin));
             if (loginData.user) localStorage.setItem("userData", JSON.stringify(loginData.user));
             if (formData.companyName) localStorage.setItem("companyName", formData.companyName);
