@@ -3,7 +3,12 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = 'https://msisdqfgefdrhwdgoauw.supabase.co/';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zaXNkcWZnZWZkcmh3ZGdvYXV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NTg0NDUsImV4cCI6MjA4NzMzNDQ0NX0.gW7Y7byCPqISVwl-1T_9wc5MvtMbTCUqW_4k6YJ_tT8';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+        detectSessionInUrl: true,
+        flowType: "pkce",
+    }
+});
 
 // Edge Function names
 export const API_URLS = {
@@ -13,8 +18,11 @@ export const API_URLS = {
 
 // Helper to call edge functions using the SDK
 export const callEdgeFunction = async (functionName, body) => {
+    const token = localStorage.getItem("authToken");
+
     const { data, error } = await supabase.functions.invoke(functionName, {
         body: body,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
 
     if (error) {

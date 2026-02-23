@@ -3,7 +3,7 @@ import { User, Lock, ArrowRight, LogIn, Loader2, Mail } from "lucide-react";
 import { useTheme } from "../../ThemeContext";
 import { useLanguage } from "../../LanguageContext";
 import { toast, Toaster } from "react-hot-toast";
-import { callEdgeFunction, API_URLS } from "../../supabaseClient";
+import { callEdgeFunction, API_URLS, supabase } from "../../supabaseClient";
 
 const Login = ({ onLogin, onSwitchToSignup }) => {
     const { isDarkMode, theme } = useTheme();
@@ -34,7 +34,14 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
 
             // Store auth token and user data
             const token = data.access_token || data.token;
-            if (token) localStorage.setItem("authToken", token);
+            if (token) {
+                localStorage.setItem("authToken", token);
+                // Call setSession to sync the Supabase client state
+                await supabase.auth.setSession({
+                    access_token: token,
+                    refresh_token: data.refresh_token || ""
+                });
+            }
             if (data.admin) localStorage.setItem("userData", JSON.stringify(data.admin));
             if (data.user) localStorage.setItem("userData", JSON.stringify(data.user));
 

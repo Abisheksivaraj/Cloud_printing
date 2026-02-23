@@ -3,7 +3,7 @@ import { User, Lock, ArrowRight, UserPlus, Loader2, Mail, Phone, Building2 } fro
 import { useTheme } from "../../ThemeContext";
 import { useLanguage } from "../../LanguageContext";
 import { toast, Toaster } from "react-hot-toast";
-import { callEdgeFunction, API_URLS } from "../../supabaseClient";
+import { callEdgeFunction, API_URLS, supabase } from "../../supabaseClient";
 
 const Signup = ({ onSignup, onSwitchToLogin }) => {
     const { isDarkMode, theme } = useTheme();
@@ -32,6 +32,25 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
             setError(msg);
             toast.error(msg, { duration: 6000 });
             return;
+        }
+
+        // Handle invitation tokens in hash
+        if (hash) {
+            const hashParams = new URLSearchParams(hash.replace('#', ''));
+            const accessToken = hashParams.get('access_token');
+            const refreshToken = hashParams.get('refresh_token');
+
+            if (accessToken) {
+                console.log("Found access token in hash, setting session...");
+                localStorage.setItem("authToken", accessToken);
+                supabase.auth.setSession({
+                    access_token: accessToken,
+                    refresh_token: refreshToken || ""
+                }).then(({ error }) => {
+                    if (error) console.error("Error setting session from hash:", error);
+                    else console.log("Session set successfully from hash");
+                });
+            }
         }
 
         const email = queryParams.get('email');
@@ -97,7 +116,14 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
 
             // Store auth token and user data
             const token = loginData.access_token || loginData.token;
-            if (token) localStorage.setItem("authToken", token);
+            if (token) {
+                localStorage.setItem("authToken", token);
+                // Call setSession to sync the Supabase client state
+                await supabase.auth.setSession({
+                    access_token: token,
+                    refresh_token: loginData.refresh_token || ""
+                });
+            }
             if (loginData.admin) localStorage.setItem("userData", JSON.stringify(loginData.admin));
             if (loginData.user) localStorage.setItem("userData", JSON.stringify(loginData.user));
             if (formData.companyName) localStorage.setItem("companyName", formData.companyName);

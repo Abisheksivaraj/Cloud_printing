@@ -7,6 +7,7 @@ import Signup from "./components/admin/Signup";
 import Login from "./components/admin/Login";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import { useTheme } from "./ThemeContext";
+import { supabase } from "./supabaseClient";
 
 
 const App = () => {
@@ -29,6 +30,11 @@ const App = () => {
         setCurrentView("signup");
         setIsAuthenticated(!!token);
       } else if (token) {
+        // Sync session with Supabase client
+        supabase.auth.setSession({
+          access_token: token,
+          refresh_token: "" // We don't have this in storage yet, but access_token is enough for many cases
+        });
         setIsAuthenticated(true);
         setCurrentView("admin_dashboard");
       } else {
