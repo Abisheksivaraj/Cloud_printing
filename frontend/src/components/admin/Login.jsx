@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { User, Lock, ArrowRight, LogIn, Loader2 } from "lucide-react";
+import { User, Lock, ArrowRight, LogIn, Loader2, Mail } from "lucide-react";
 import { useTheme } from "../../ThemeContext";
 import { useLanguage } from "../../LanguageContext";
 import { toast, Toaster } from "react-hot-toast";
