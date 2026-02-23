@@ -7,8 +7,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Edge Function names
 export const API_URLS = {
-    LOGIN: '/functions/v1/login',
-    COMPLETE_PROFILE: '/functions/v1/complete-profile',
+    LOGIN: 'login',
+    COMPLETE_PROFILE: 'complete-profile',
 };
 
 // Helper to call edge functions using the SDK
