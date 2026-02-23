@@ -21,6 +21,25 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
+    // Get params from URL (e.g. for invitations)
+    React.useEffect(() => {
+        const queryParams = new URLSearchParams(window.location.search);
+        const email = queryParams.get('email');
+        const companyName = queryParams.get('companyName');
+        const firstName = queryParams.get('firstName');
+        const lastName = queryParams.get('lastName');
+
+        if (email || companyName || firstName || lastName) {
+            setFormData(prev => ({
+                ...prev,
+                email: email || prev.email,
+                companyName: companyName || prev.companyName,
+                firstName: firstName || prev.firstName,
+                lastName: lastName || prev.lastName,
+            }));
+        }
+    }, []);
+
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
         setError("");
@@ -43,8 +62,10 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                 firstName: formData.firstName,
                 lastName: formData.lastName,
                 companyName: formData.companyName,
+                userName: formData.email,
                 email: formData.email,
                 mobileNumber: formData.mobileNumber,
+                phone: formData.mobileNumber,
                 password: formData.password,
             });
 

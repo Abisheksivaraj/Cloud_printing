@@ -19,7 +19,23 @@ export const callEdgeFunction = async (functionName, body) => {
 
     if (error) {
         console.error(`Error calling function ${functionName}:`, error);
-        throw new Error(error.message || 'Request failed');
+
+        // Try to get a more specific error message from different possible structures
+        let errorMessage = error.message || 'Request failed';
+
+        // Handle FunctionsHttpError and other possible error response bodies
+        try {
+            if (error.context && error.context.json) {
+                errorMessage = error.context.json.error || error.context.json.message || errorMessage;
+            } else if (error.response) {
+                const errorData = await error.response.json().catch(() => ({}));
+                errorMessage = errorData.error || errorData.message || errorMessage;
+            }
+        } catch (e) {
+            console.error("Failed to parse error response:", e);
+        }
+
+        throw new Error(errorMessage);
     }
 
     return data;
