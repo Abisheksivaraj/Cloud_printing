@@ -11,7 +11,9 @@ import {
   Package,
   Clock,
   LayoutGrid,
-  Filter
+  Filter,
+  ArrowRight,
+  Monitor
 } from "lucide-react";
 import CreateLabelModal from "../components/Models/CreateLabelModal";
 import ImportDataModal from "../components/Models/ImportDataModal";
@@ -59,240 +61,134 @@ const LabelLibrary = ({
   };
 
   return (
-    <div
-      className="min-h-screen p-8 transition-colors duration-300"
-      style={{ backgroundColor: theme.bg }}
-    >
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header & Actions */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+    <div className="min-h-screen bg-[#F5F7F9] p-6 lg:p-10 transition-colors duration-300" style={{ backgroundColor: theme.bg }}>
+      <div className="max-w-[1600px] mx-auto space-y-10">
+
+        {/* Modern Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 border-b border-gray-200 pb-10">
           <div>
-            <h1 className="text-4xl font-extrabold tracking-tight mb-2" style={{ color: theme.text }}>
-              Label Library
+            <h1 className="text-4xl font-black text-[#38474F] mb-2 tracking-tight" style={{ color: theme.text }}>
+              TEMPLATE <span className="text-[#39A3DD]">REPOSITORY</span>
             </h1>
-            <p className="text-lg" style={{ color: theme.textMuted }}>
-              Manage, design, and print your label templates with ease.
+            <p className="text-[#8A9BA5] font-medium" style={{ color: theme.textMuted }}>
+              Centralized management for your enterprise label architectures.
             </p>
           </div>
 
-          <div className="flex items-center gap-4 w-full md:w-auto">
-            <div className="relative flex-1 md:w-80 group">
-              <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[var(--color-primary)]"
-                size={18}
-                style={{ color: theme.textMuted }}
-              />
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="relative group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8A9BA5]" size={18} />
               <input
                 type="text"
+                placeholder="Search repository..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search templates..."
-                className="w-full pl-10 pr-10 py-3 rounded-xl border-2 transition-all outline-none focus:ring-4 focus:ring-primary/10"
-                style={{
-                  backgroundColor: theme.surface,
-                  borderColor: theme.border,
-                  color: theme.text,
-                }}
+                className="pl-12 pr-10 py-3.5 bg-white border border-gray-100 rounded shadow-sm outline-none focus:border-[#39A3DD] w-full md:w-80 transition-all text-sm font-medium"
+                style={{ backgroundColor: theme.surface, color: theme.text }}
               />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 hover:scale-110 transition-transform"
-                  style={{ color: theme.textMuted }}
-                >
-                  <X size={16} />
-                </button>
-              )}
             </div>
-
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-6 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:shadow-primary/30 transition-all active:scale-95 flex items-center gap-2 whitespace-nowrap"
+              className="btn-pink px-8 py-3.5 text-xs font-black uppercase tracking-widest"
             >
-              <Plus size={20} />
-              <span>{t.createNewLabel}</span>
+              <Plus size={16} />
+              <span>{t.createNewLabel || "New Template"}</span>
             </button>
           </div>
         </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Quick Insights */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
           {[
-            { label: "Total Labels", value: labels.length, icon: Package, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/20" },
-            { label: "Active", value: labels.filter((l) => l.elements?.length > 0).length, icon: FileText, color: "text-green-500", bg: "bg-green-50 dark:bg-green-900/20" },
-            { label: "Barcodes", value: labels.filter((l) => l.elements?.some((e) => e.type === "barcode")).length, icon: "📊", color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-900/20" },
-            {
-              label: "Recent", value: labels.filter((l) => {
-                // Pseudo-logic for recent, assuming we track last modified eventually
-                return true;
-              }).length, icon: Clock, color: "text-amber-500", bg: "bg-amber-50 dark:bg-amber-900/20"
-            },
+            { label: "Total Templates", value: labels.length, icon: Package, color: "text-[#38474F]", bg: "bg-slate-50" },
+            { label: "Active Designs", value: labels.filter(l => l.elements?.length > 0).length, icon: Edit2, color: "text-[#39A3DD]", bg: "bg-blue-50" },
+            { label: "Production Ready", value: labels.length, icon: CheckCircle, color: "text-[#E85874]", bg: "bg-pink-50" },
+            { label: "Sync Status", value: "Verified", icon: Activity, color: "text-green-500", bg: "bg-green-50" },
           ].map((stat, i) => (
-            <div
-              key={i}
-              className="p-5 rounded-2xl border transition-all hover:shadow-md"
-              style={{
-                backgroundColor: theme.surface,
-                borderColor: theme.border,
-              }}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className={`w-12 h-12 rounded-xl ${stat.bg} ${stat.color} flex items-center justify-center`}>
-                  {typeof stat.icon === 'string' ? <span className="text-xl">{stat.icon}</span> : <stat.icon size={24} />}
+            <div key={i} className="card-premium p-6" style={{ backgroundColor: theme.surface }}>
+              <div className="flex items-center gap-4">
+                <div className={`w-12 h-12 rounded flex items-center justify-center ${stat.bg} ${stat.color}`}>
+                  {typeof stat.icon === 'string' ? <span>{stat.icon}</span> : <stat.icon size={20} />}
                 </div>
-                {i === 0 && <div className="text-xs font-bold px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-lg text-gray-500">All Time</div>}
-              </div>
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-wider mb-1" style={{ color: theme.textMuted }}>{stat.label}</p>
-                <p className="text-3xl font-black tracking-tight" style={{ color: theme.text }}>{stat.value}</p>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#8A9BA5] mb-0.5">{stat.label}</p>
+                  <p className="text-2xl font-black text-[#38474F]" style={{ color: theme.text }}>{stat.value}</p>
+                </div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Labels Grid */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: theme.text }}>
-              <LayoutGrid size={20} className="text-[var(--color-primary)]" />
+        {/* Gallery Section */}
+        <div className="space-y-6">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+            <h2 className="text-sm font-black text-[#38474F] uppercase tracking-[0.2em] flex items-center gap-2" style={{ color: theme.text }}>
+              <LayoutGrid size={16} className="text-[#39A3DD]" />
               Templates Gallery
             </h2>
-            <button className="flex items-center gap-2 text-sm font-medium hover:text-[var(--color-primary)] transition-colors" style={{ color: theme.textMuted }}>
-              <Filter size={16} />
-              Filter & Sort
-            </button>
+            <div className="flex items-center gap-4">
+              <button className="text-[10px] font-black text-[#8A9BA5] uppercase tracking-widest hover:text-[#38474F] transition-colors">
+                Recent First
+              </button>
+              <div className="h-3 w-px bg-gray-200"></div>
+              <button className="text-[10px] font-black text-[#8A9BA5] uppercase tracking-widest hover:text-[#38474F] transition-colors">
+                List View
+              </button>
+            </div>
           </div>
 
           {filteredLabels.length === 0 ? (
-            <div
-              className="py-16 rounded-2xl border border-dashed flex flex-col items-center justify-center text-center"
-              style={{
-                backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.2)' : 'rgba(248, 250, 252, 0.8)',
-                borderColor: theme.border,
-              }}
-            >
-              <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
-                <Package className="text-gray-400" size={32} />
+            <div className="card-premium py-24 flex flex-col items-center justify-center" style={{ backgroundColor: theme.surface }}>
+              <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
+                <Monitor className="text-[#8A9BA5]" size={36} />
               </div>
-              <h3 className="text-lg font-bold mb-1" style={{ color: theme.text }}>
-                {labels.length === 0 ? "No templates yet" : "No matching results"}
-              </h3>
-              <p className="max-w-sm mb-6 text-sm" style={{ color: theme.textMuted }}>
-                {labels.length === 0
-                  ? "Click \"Create New Label\" above to design your first label template."
-                  : "Try a different search term."}
-              </p>
-              {labels.length === 0 && (
-                <button
-                  onClick={() => setShowCreateModal(true)}
-                  className="px-5 py-2.5 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white text-sm font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2"
-                >
-                  <Plus size={16} />
-                  <span>New Label</span>
-                </button>
-              )}
+              <h3 className="text-2xl font-black text-[#38474F] uppercase mb-2">Workspace Empty</h3>
+              <p className="text-[#8A9BA5] font-bold max-w-xs text-center mb-8">Initialize your labeling workspace by creating your first design template.</p>
+              <button onClick={() => setShowCreateModal(true)} className="btn-blue px-10">Begin Designing</button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               {filteredLabels.map((label) => (
-                <div
-                  key={label.id}
-                  className="group rounded-2xl overflow-hidden border transition-all hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1"
-                  style={{
-                    backgroundColor: theme.surface,
-                    borderColor: theme.border,
-                  }}
-                >
-                  {/* Card Header */}
-                  <div className="p-5 border-b" style={{ borderColor: theme.border }}>
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1 min-w-0 pr-3">
-                        <h3 className="font-bold text-lg truncate mb-1" style={{ color: theme.text }}>
-                          {label.name}
-                        </h3>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-500">
-                            {label.labelSize?.width || 100} × {label.labelSize?.height || 80}mm
-                          </span>
-                        </div>
+                <div key={label.id} className="card-premium group hover:border-[#39A3DD] transition-all hover:shadow-xl hover:shadow-[#39A3DD]/5" style={{ backgroundColor: theme.surface }}>
+                  {/* Visual Preview */}
+                  <div className="h-44 bg-[#F8FAFC] flex items-center justify-center relative border-b border-gray-50 overflow-hidden"
+                    style={{ backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC' }}>
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-[#38474F]/40 backdrop-blur-[2px] z-10 flex items-center justify-center transition-all">
+                      <button onClick={() => onEditLabel(label)} className="btn-blue py-2 px-6 text-[10px]">Open Architecture</button>
+                    </div>
+                    {/* Abstract design representation */}
+                    <div className="w-24 h-16 bg-white border border-gray-100 shadow-sm rounded flex flex-col gap-1 p-2">
+                      <div className="w-full h-1 bg-gray-100 rounded"></div>
+                      <div className="w-2/3 h-1 bg-gray-50 rounded"></div>
+                      <div className="mt-auto w-full h-4 bg-slate-50 rounded flex items-center justify-center gap-1 opacity-50">
+                        <div className="w-1 h-1 rounded-full bg-slate-200"></div>
+                        <div className="w-1 h-1 rounded-full bg-slate-200"></div>
+                        <div className="w-1 h-1 rounded-full bg-slate-200"></div>
                       </div>
-                      {label.attachedPdf && (
-                        <span className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide bg-red-100 text-red-600 rounded-md">
-                          PDF
-                        </span>
-                      )}
                     </div>
                   </div>
 
-                  {/* Preview Area */}
-                  <div className="h-48 bg-gray-50 dark:bg-gray-900/50 flex items-center justify-center p-6 relative overflow-hidden group-hover:bg-gray-100 dark:group-hover:bg-gray-900 transition-colors">
-                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[var(--color-primary)]/5 flex items-center justify-center backdrop-blur-sm z-10">
-                      <button
-                        onClick={() => onEditLabel(label)}
-                        className="bg-white dark:bg-gray-800 text-[var(--color-primary)] px-6 py-2 rounded-full font-bold shadow-lg transform scale-90 group-hover:scale-100 transition-transform"
-                      >
-                        Open Editor
-                      </button>
+                  {/* Template Info */}
+                  <div className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="min-w-0 pr-4">
+                        <h3 className="text-xs font-black text-[#38474F] uppercase tracking-wider truncate mb-1" style={{ color: theme.text }}>{label.name}</h3>
+                        <p className="text-[10px] font-bold text-[#8A9BA5] uppercase tracking-tighter">
+                          {label.labelSize?.width || 100}W × {label.labelSize?.height || 80}H MILLIMETERS
+                        </p>
+                      </div>
+                      <div className="flex-shrink-0">
+                        <button onClick={() => onEditLabel(label)} className="p-2 text-[#8A9BA5] hover:text-[#39A3DD] transition-colors"><Edit2 size={14} /></button>
+                      </div>
                     </div>
 
-                    {label.elements && label.elements.length > 0 ? (
-                      <div className="w-full h-full border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg flex flex-col items-center justify-center bg-white dark:bg-gray-800 shadow-sm relative">
-                        <div className="absolute top-2 right-2 flex gap-1">
-                          {[...Array(Math.min(3, label.elements.length))].map((_, idx) => (
-                            <div key={idx} className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600"></div>
-                          ))}
-                        </div>
-                        <FileText className="text-[var(--color-primary)] opacity-40 mb-2" size={40} />
-                        <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Preview</span>
+                    <div className="flex items-center justify-between gap-2 pt-4 border-t border-gray-50" style={{ borderColor: theme.border }}>
+                      <div className="flex gap-1">
+                        <button onClick={() => handleImportData(label)} className="p-2.5 bg-slate-50 hover:bg-blue-50 text-[#8A9BA5] hover:text-[#39A3DD] rounded transition-all" title="Source Data"><Upload size={14} /></button>
+                        <button onClick={() => handlePrint(label)} className="p-2.5 bg-slate-50 hover:bg-pink-50 text-[#8A9BA5] hover:text-[#E85874] rounded transition-all" title="Authorize Print"><Printer size={14} /></button>
                       </div>
-                    ) : (
-                      <div className="text-center opacity-50">
-                        <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-2">
-                          <Plus className="text-gray-400" size={20} />
-                        </div>
-                        <span className="text-xs font-semibold">Empty</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Actions Footer */}
-                  <div className="p-4 bg-gray-50/50 dark:bg-gray-900/20 flex items-center justify-between gap-2 border-t" style={{ borderColor: theme.border }}>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleImportData(label)}
-                        className="p-2 text-gray-500 hover:text-[var(--color-primary)] hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                        title="Import Data"
-                      >
-                        <Upload size={18} />
-                      </button>
-                      <button
-                        onClick={() => handlePrint(label)}
-                        className="p-2 text-gray-500 hover:text-[var(--color-secondary)] hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
-                        title="Print"
-                      >
-                        <Printer size={18} />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => onEditLabel(label)}
-                        className="p-2 text-gray-500 hover:text-[var(--color-primary)] hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                        title="Edit"
-                      >
-                        <Edit2 size={18} />
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (window.confirm(`Delete "${label.name}"?`)) {
-                            onDeleteLabel(label.id);
-                          }
-                        }}
-                        className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      <button onClick={() => { if (window.confirm('Delete template?')) onDeleteLabel(label.id) }}
+                        className="p-2.5 text-[#8A9BA5] hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
                     </div>
                   </div>
                 </div>
@@ -302,50 +198,16 @@ const LabelLibrary = ({
         </div>
       </div>
 
-      {/* Modals */}
-      {showCreateModal && (
-        <CreateLabelModal
-          onClose={() => setShowCreateModal(false)}
-          onCreate={onCreateLabel}
-        />
-      )}
+      {/* Legacy Modals Integration */}
+      {showCreateModal && <CreateLabelModal onClose={() => setShowCreateModal(false)} onCreate={onCreateLabel} />}
+      {showImportModal && selectedLabelForImport && <ImportDataModal label={selectedLabelForImport} onClose={() => { setShowImportModal(false); setSelectedLabelForImport(null); }} onLabelsGenerated={handleLabelsGenerated} />}
+      {showPrintPreview && labelToPrint && <PrintPreviewModal label={labelToPrint} onClose={() => { setShowPrintPreview(false); setLabelToPrint(null); }} />}
+      {showGeneratedPreview && generatedLabels.length > 0 && <GeneratedLabelsPreview labels={generatedLabels} onClose={() => { setShowGeneratedPreview(false); setGeneratedLabels([]); }} />}
 
-      {showImportModal && selectedLabelForImport && (
-        <ImportDataModal
-          label={selectedLabelForImport}
-          onClose={() => {
-            setShowImportModal(false);
-            setSelectedLabelForImport(null);
-          }}
-          onLabelsGenerated={handleLabelsGenerated}
-        />
-      )}
-
-      {showPrintPreview && labelToPrint && (
-        <PrintPreviewModal
-          label={labelToPrint}
-          onClose={() => {
-            setShowPrintPreview(false);
-            setLabelToPrint(null);
-          }}
-        />
-      )}
-
-      {showGeneratedPreview && generatedLabels.length > 0 && (
-        <GeneratedLabelsPreview
-          labels={generatedLabels}
-          onClose={() => {
-            setShowGeneratedPreview(false);
-            setGeneratedLabels([]);
-          }}
-        />
-      )}
-
-      {/* AI Assistant Chatbot */}
       <AIChatbot
-        onGenerateElements={(newElements, nextLabelSize, isNewRequest) => {
+        onGenerateElements={(newElements, nextLabelSize) => {
           onCreateLabel({
-            name: `AI Design - ${new Date().toLocaleTimeString()}`,
+            name: `AI Design ${new Date().toLocaleTimeString()}`,
             elements: newElements,
             labelSize: nextLabelSize || { width: 100, height: 80 }
           });

@@ -1,70 +1,77 @@
-import { Tag, Sun, Moon, LogOut } from "lucide-react";
+import React from "react";
+import { Tag, Sun, Moon, LogOut, Bell, User } from "lucide-react";
 import { useTheme } from "../ThemeContext";
 import { useLanguage } from "../LanguageContext";
+import logo from "../assets/companyLogo.png";
 
 export const AppHeader = ({ onNavigate }) => {
   const { isDarkMode, toggleTheme, theme } = useTheme();
   const { t } = useLanguage();
 
   return (
-    <div
-      className="sticky top-0 z-50 transition-all duration-300 border-b backdrop-blur-md supports-[backdrop-filter]:bg-opacity-80"
+    <header
+      className="sticky top-0 z-50 border-b transition-colors duration-300"
       style={{
-        backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)',
-        borderColor: theme.border
+        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+        borderColor: isDarkMode ? '#374151' : '#E5E7EB'
       }}
     >
-      <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-12 md:h-14">
+      <div className="max-w-[1920px] mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
 
-          {/* Left: Brand */}
-          <div className="flex items-center gap-8">
-            <div
-              className="flex items-center gap-3 cursor-pointer group select-none"
-              onClick={() => onNavigate("designer")}
-            >
-              <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-[var(--color-secondary)] to-[var(--color-secondary-hover)] rounded-xl shadow-lg shadow-secondary/20 flex items-center justify-center transform group-hover:rotate-6 transition-transform duration-300">
-                <Tag className="text-white" size={16} />
-              </div>
-              <div className="hidden sm:block">
-                <h1 className="text-sm md:text-base font-black tracking-tight leading-none" style={{ color: theme.text }}>
-                  Perfect Labeler
-                </h1>
-                <span className="text-[9px] font-bold text-[var(--color-primary)] uppercase tracking-[0.2em]">
-                  Pro Edition
-                </span>
-              </div>
-            </div>
+        {/* Brand Section */}
+        <div
+          className="flex items-center gap-4 cursor-pointer group"
+          onClick={() => onNavigate("dashboard")}
+        >
+          <div className="h-10 px-3 bg-white border border-gray-100 rounded shadow-sm flex items-center justify-center transition-transform group-hover:scale-105">
+            <img src={logo} alt="Archery Technocrats" className="h-6 object-contain" />
           </div>
+          <div className="hidden sm:block border-l pl-4 border-gray-100">
+            <h1 className="text-lg font-black tracking-tight leading-none text-[#38474F]" style={{ color: theme.text }}>
+              PERFECT <span className="text-[#39A3DD]">LABELER</span>
+            </h1>
+            <p className="text-[9px] font-black uppercase tracking-[0.3em] text-[#8A9BA5] mt-1">
+              Cloud Solutions
+            </p>
+          </div>
+        </div>
 
-          {/* Right: Actions */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={toggleTheme}
-              className="p-2.5 rounded-xl transition-all hover:scale-105 active:scale-95 border hover:border-gray-300 dark:hover:border-gray-600"
-              style={{ backgroundColor: theme.bg, borderColor: 'transparent' }}
-              title={isDarkMode ? "Light Mode" : "Dark Mode"}
-            >
-              {isDarkMode ? <Sun size={18} className="text-yellow-400" /> : <Moon size={18} className="text-slate-600" />}
-            </button>
+        {/* Action Controls */}
+        <div className="flex items-center gap-2 md:gap-4">
+          {/* Notifications Placeholder */}
+          <button className="p-2 text-[#8A9BA5] hover:bg-gray-50 dark:hover:bg-gray-800 rounded transition-colors">
+            <Bell size={20} />
+          </button>
 
-            <div className="h-6 w-px bg-gray-200 dark:bg-gray-700 mx-1"></div>
+          <div className="h-4 w-px bg-gray-200 dark:bg-gray-700 mx-2"></div>
+
+          {/* Theme Toggle */}
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800 transition-all flex items-center gap-2"
+            title={isDarkMode ? "Light Mode" : "Dark Mode"}
+          >
+            {isDarkMode ? <Sun size={20} className="text-yellow-400" /> : <Moon size={20} className="text-[#38474F]" />}
+          </button>
+
+          {/* User Profile / Logout */}
+          <div className="flex items-center gap-3 ml-2 pl-4 border-l border-gray-100">
+            <div className="hidden md:block text-right">
+              <p className="text-xs font-black text-[#38474F] uppercase tracking-wider" style={{ color: theme.text }}>Admin User</p>
+              <p className="text-[10px] text-[#8A9BA5] font-bold">Project Manager</p>
+            </div>
 
             <button
               onClick={() => onNavigate("logout")}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all border-2 border-transparent hover:border-red-100 hover:bg-red-50 dark:hover:bg-red-900/10 dark:hover:border-red-900/30 group"
+              className="flex items-center justify-center h-10 w-10 bg-gray-50 hover:bg-red-50 text-[#8A9BA5] hover:text-red-500 rounded border border-gray-100 transition-all"
+              title="Logout"
             >
-              <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-red-400 to-pink-500 flex items-center justify-center text-[10px] text-white font-bold shadow-sm">
-                <LogOut size={12} className="ml-0.5" />
-              </div>
-              <span className="hidden md:inline text-[10px] font-black uppercase tracking-widest text-red-500 group-hover:text-red-600 transition-colors">
-                {t.logout || "Logout"}
-              </span>
+              <LogOut size={18} />
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </header>
   );
 };
 

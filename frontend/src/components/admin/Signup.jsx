@@ -1,12 +1,14 @@
 import React, { useState } from "react";
-import { User, Lock, ArrowRight, UserPlus, Loader2, Mail, Phone, Building2 } from "lucide-react";
+import { Mail, Lock, User, Building2, Phone, Loader2, ArrowLeft, ShieldCheck, Zap, ArrowRight } from "lucide-react";
 import { useTheme } from "../../ThemeContext";
 import { useLanguage } from "../../LanguageContext";
 import { toast, Toaster } from "react-hot-toast";
 import { callEdgeFunction, API_URLS, supabase } from "../../supabaseClient";
+import { motion } from "framer-motion";
+import logo from "../../assets/companyLogo.png";
 
 const Signup = ({ onSignup, onSwitchToLogin }) => {
-    const { isDarkMode, theme } = useTheme();
+    const { theme } = useTheme();
     const { t } = useLanguage();
     const [formData, setFormData] = useState({
         firstName: "",
@@ -18,54 +20,26 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
         confirmPassword: "",
     });
 
-    const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [isInvite, setIsInvite] = useState(false);
+    const [error, setError] = useState("");
 
-    // Get params from URL (e.g. for invitations)
     React.useEffect(() => {
-        // Check hash and query for errors
         const hash = window.location.hash;
         const queryParams = new URLSearchParams(window.location.search);
-
-        if (hash.includes('error=access_denied') || hash.includes('otp_expired') || queryParams.get('error') === 'access_denied') {
-            const msg = "This invitation link has expired or is invalid. Please request a new invitation.";
-            setError(msg);
-            toast.error(msg, { duration: 6000 });
-            return;
-        }
-
-        // Handle invitation tokens in hash
         if (hash) {
             const hashParams = new URLSearchParams(hash.replace('#', ''));
-            const accessToken = hashParams.get('access_token');
-            const refreshToken = hashParams.get('refresh_token');
-
-            if (accessToken) {
-                console.log("Found access token in hash, setting session...");
-                localStorage.setItem("authToken", accessToken);
-                supabase.auth.setSession({
-                    access_token: accessToken,
-                    refresh_token: refreshToken || ""
-                }).then(({ error }) => {
-                    if (error) console.error("Error setting session from hash:", error);
-                    else console.log("Session set successfully from hash");
-                });
+            const access_token = hashParams.get('access_token');
+            const type = hashParams.get('type');
+            if (access_token && (type === 'invite' || type === 'signup')) {
+                setIsInvite(true);
+                supabase.auth.setSession({ access_token, refresh_token: "" });
             }
         }
-
         const email = queryParams.get('email');
         const companyName = queryParams.get('companyName');
-        const firstName = queryParams.get('firstName');
-        const lastName = queryParams.get('lastName');
-
-        if (email || companyName || firstName || lastName) {
-            setFormData(prev => ({
-                ...prev,
-                email: email || prev.email,
-                companyName: companyName || prev.companyName,
-                firstName: firstName || prev.firstName,
-                lastName: lastName || prev.lastName,
-            }));
+        if (email || companyName) {
+            setFormData(prev => ({ ...prev, email: email || prev.email, companyName: companyName || prev.companyName }));
         }
     }, []);
 
@@ -76,62 +50,30 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setError("");
+
         if (formData.password !== formData.confirmPassword) {
-            setError("Passwords do not match!");
-            toast.error("Passwords do not match!");
+            const msg = "Security credentials do not match.";
+            setError(msg);
+            toast.error(msg);
             return;
         }
 
         setLoading(true);
-        setError("");
-
         try {
-            // Register via complete-profile edge function
             await callEdgeFunction(API_URLS.COMPLETE_PROFILE, {
-                // Backend expects snake_case
                 first_name: formData.firstName,
                 last_name: formData.lastName,
                 company_name: formData.companyName,
                 mobile_number: formData.mobileNumber,
-                user_name: formData.email,
-
-                // Keeping camelCase for safety
-                firstName: formData.firstName,
-                lastName: formData.lastName,
-                companyName: formData.companyName,
-                userName: formData.email,
-                email: formData.email,
-                mobileNumber: formData.mobileNumber,
-                phone: formData.mobileNumber,
-                password: formData.password,
-            });
-
-            toast.success("Account created successfully!");
-
-            // Auto login after registration
-            const loginData = await callEdgeFunction(API_URLS.LOGIN, {
                 email: formData.email,
                 password: formData.password,
             });
-
-            // Store auth token and user data
-            const token = loginData.access_token || loginData.token;
-            if (token) {
-                localStorage.setItem("authToken", token);
-                // Call setSession to sync the Supabase client state
-                await supabase.auth.setSession({
-                    access_token: token,
-                    refresh_token: loginData.refresh_token || ""
-                });
-            }
-            if (loginData.admin) localStorage.setItem("userData", JSON.stringify(loginData.admin));
-            if (loginData.user) localStorage.setItem("userData", JSON.stringify(loginData.user));
-            if (formData.companyName) localStorage.setItem("companyName", formData.companyName);
-
+            toast.success("Identity Provisioned Successful!");
+            const loginData = await callEdgeFunction(API_URLS.LOGIN, { email: formData.email, password: formData.password });
             onSignup(loginData.admin || loginData.user);
         } catch (err) {
-            console.error("Signup error:", err);
-            const errorMessage = err.message || "Something went wrong. Please try again.";
+            const errorMessage = err.message || "Credential verification failed.";
             setError(errorMessage);
             toast.error(errorMessage);
         } finally {
@@ -139,240 +81,158 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
         }
     };
 
-    // Reusable input field style
-    const inputStyle = {
-        backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#fff',
-        borderColor: theme.border,
-        color: theme.text,
-    };
-
     return (
-        <div
-            className="min-h-screen flex items-center justify-center p-6 transition-colors duration-500"
-            style={{ backgroundColor: theme.bg }}
-        >
-            <div
-                className="w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in-95 duration-300"
-                style={{ backgroundColor: theme.surface, borderColor: theme.border }}
-            >
-                {/* Left Side - Brand / Info */}
-                <div className="md:w-2/5 p-10 md:p-12 text-white flex flex-col relative overflow-hidden bg-[var(--color-primary)]">
-                    <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-hover)] opacity-90"></div>
-
-                    {/* Decorative Circles */}
-                    <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
-                    <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-black/10 rounded-full blur-3xl"></div>
-
-                    <div className="relative z-10 flex-1 flex flex-col justify-center">
-                        <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-8 shadow-lg">
-                            <UserPlus size={32} className="text-white" />
-                        </div>
-
-                        <h2 className="text-3xl font-bold mb-4 tracking-tight">Join the Platform.</h2>
-                        <p className="text-white/80 text-lg leading-relaxed mb-8">
-                            Create your account to manage labels, users, and print jobs seamlessly.
+        <div className="h-screen w-full flex bg-[#F5F7F9] overflow-hidden font-inter">
+            {/* Left Design - Fixed Hero (ALWAYS VISIBLE) */}
+            <div className="hidden lg:flex lg:w-4/12 flex-col justify-between p-10 xl:p-12 relative bg-white border-r border-gray-100 z-20">
+                <div className="max-w-md w-full">
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mb-8"
+                    >
+                        <img src={logo} alt="Archery Technocrats" className="h-10 mb-8" />
+                        <h1 className="text-5xl font-black text-[#38474F] mb-4 leading-tight font-oswald uppercase tracking-tight">
+                            Identity <br /><span className="text-[#E85874]">Registry.</span>
+                        </h1>
+                        <p className="text-sm text-[#8A9BA5] leading-relaxed font-medium mb-8">
+                            Join the elite enterprise network for professional label synchronization.
                         </p>
 
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-3 text-white/90">
-                                <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                <span className="text-sm font-semibold tracking-wide">Enterprise Grade Security</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-white/90">
-                                <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                <span className="text-sm font-semibold tracking-wide">Cloud-Native Architecture</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-white/90">
-                                <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                <span className="text-sm font-semibold tracking-wide">Multi-User Collaboration</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="relative z-10 mt-12 pt-8 border-t border-white/20">
-                        <p className="text-xs font-bold uppercase tracking-wider text-white/70 mb-3">Already have an account?</p>
+                        {/* NAV LINK MOVED TO HERO FOR VISIBILITY */}
                         <button
                             onClick={onSwitchToLogin}
-                            className="flex items-center gap-2 text-white font-bold hover:text-white/80 transition-colors group"
+                            className="inline-flex items-center gap-3 px-6 py-3 border-2 border-gray-100 rounded-xl text-xs font-black text-[#38474F] hover:bg-[#38474F] hover:text-white hover:border-[#38474F] transition-all uppercase tracking-widest group"
                         >
-                            <span>Back to Login</span>
-                            <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                            <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+                            Return to Login
                         </button>
+                    </motion.div>
+
+                    <div className="space-y-3 mt-12">
+                        <div className="flex items-center gap-3 p-4 rounded-xl bg-slate-50 border-l-4 border-[#E85874]">
+                            <div className="text-[#E85874] font-black"><Zap size={18} /></div>
+                            <div>
+                                <h3 className="text-[10px] font-black text-[#38474F] uppercase tracking-wider">Dynamic Node</h3>
+                                <p className="text-[#8A9BA5] text-[9px] font-medium leading-tight">Provision global assets in milliseconds.</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 p-4 rounded-xl bg-slate-50 border-l-4 border-[#39A3DD]">
+                            <div className="text-[#39A3DD] font-black"><ShieldCheck size={18} /></div>
+                            <div>
+                                <h3 className="text-[10px] font-black text-[#38474F] uppercase tracking-wider">Secure Protocol</h3>
+                                <p className="text-[#8A9BA5] text-[9px] font-medium leading-tight">Secured with enterprise encryption.</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                {/* Right Side - Form */}
-                <div className="md:w-3/5 p-8 md:p-12 flex flex-col justify-center overflow-y-auto max-h-[90vh]" style={{ backgroundColor: isDarkMode ? theme.surface : '#fff' }}>
-                    <div className="mb-6">
-                        <h1 className="text-3xl font-bold tracking-tight mb-2" style={{ color: theme.text }}>{t.signup || "Create Account"}</h1>
-                        <p className="text-sm" style={{ color: theme.textMuted }}>
-                            Fill in your details to get started with your workspace.
-                        </p>
-                    </div>
-
-                    <form onSubmit={handleSubmit} className="space-y-5">
-                        {/* First Name & Last Name - Side by side */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>
-                                    First Name
-                                </label>
-                                <div className="relative group">
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={16} />
-                                    <input
-                                        required
-                                        type="text"
-                                        name="firstName"
-                                        value={formData.firstName}
-                                        onChange={handleChange}
-                                        placeholder="John"
-                                        className="input pl-11 py-2.5 text-sm"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>
-                                    Last Name
-                                </label>
-                                <div className="relative group">
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={16} />
-                                    <input
-                                        required
-                                        type="text"
-                                        name="lastName"
-                                        value={formData.lastName}
-                                        onChange={handleChange}
-                                        placeholder="Doe"
-                                        className="input pl-11 py-2.5 text-sm"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Company Name */}
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>
-                                Company Name
-                            </label>
-                            <div className="relative group">
-                                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={16} />
-                                <input
-                                    required
-                                    type="text"
-                                    name="companyName"
-                                    value={formData.companyName}
-                                    onChange={handleChange}
-                                    placeholder="ATPL Cloud Printing"
-                                    className="input pl-11 py-2.5 text-sm"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Email & Mobile - Side by side */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>
-                                    Email
-                                </label>
-                                <div className="relative group">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={16} />
-                                    <input
-                                        required
-                                        type="email"
-                                        name="email"
-                                        value={formData.email}
-                                        onChange={handleChange}
-                                        placeholder="john@company.com"
-                                        className="input pl-11 py-2.5 text-sm"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>
-                                    Mobile Number
-                                </label>
-                                <div className="relative group">
-                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={16} />
-                                    <input
-                                        required
-                                        type="tel"
-                                        name="mobileNumber"
-                                        value={formData.mobileNumber}
-                                        onChange={handleChange}
-                                        placeholder="+91 98765 43210"
-                                        className="input pl-11 py-2.5 text-sm"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Password & Confirm Password - Side by side */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>
-                                    {t.password || "Password"}
-                                </label>
-                                <div className="relative group">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={16} />
-                                    <input
-                                        required
-                                        type="password"
-                                        name="password"
-                                        value={formData.password}
-                                        onChange={handleChange}
-                                        placeholder="••••••••"
-                                        className="input pl-11 py-2.5 text-sm"
-                                        minLength={6}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>
-                                    {t.confirmPassword || "Confirm Password"}
-                                </label>
-                                <div className="relative group">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={16} />
-                                    <input
-                                        required
-                                        type="password"
-                                        name="confirmPassword"
-                                        value={formData.confirmPassword}
-                                        onChange={handleChange}
-                                        placeholder="••••••••"
-                                        className="input pl-11 py-2.5 text-sm"
-                                        minLength={6}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {error && (
-                            <div className="p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-center gap-2 animate-in slide-in-from-left-2">
-                                <span className="font-bold">Error:</span> {error}
-                            </div>
-                        )}
-
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="btn btn-primary w-full py-3.5 text-sm font-bold uppercase tracking-widest shadow-lg hover:shadow-primary/20 flex items-center justify-center gap-3 group"
-                        >
-                            {loading ? (
-                                <Loader2 className="animate-spin" size={20} />
-                            ) : (
-                                <>
-                                    <span>{t.createAccount || "Create Account"}</span>
-                                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                                </>
-                            )}
-                        </button>
-                    </form>
-                    <Toaster position="top-right" />
+                <div className="pt-6 border-t border-gray-50 flex items-center justify-between">
+                    <span className="text-[9px] font-black uppercase text-[#8A9BA5] tracking-[0.3em]">v2.4.0 • PRODUCTION</span>
                 </div>
             </div>
+
+            {/* Right Form - Skewed Section */}
+            <div className="w-full lg:w-8/12 flex flex-col justify-center p-8 md:p-12 lg:p-16 relative z-10 bg-[#F5F7F9] overflow-hidden">
+                {/* Skewed Decoration */}
+                <div className="absolute top-0 left-0 w-24 h-full bg-white -ml-12 skew-x-[-15deg] border-r border-gray-100 shadow-[10px_0_40px_rgba(0,0,0,0.03)] hidden lg:block z-0"></div>
+
+                <div className="max-w-3xl w-full mx-auto relative z-10">
+                    <div className="lg:hidden mb-8 text-center flex flex-col items-center gap-4">
+                        <img src={logo} alt="Archery Technocrats" className="h-8 mx-auto" />
+                        <button onClick={onSwitchToLogin} className="text-[10px] font-black text-[#E85874] uppercase tracking-widest underline">Return to Login</button>
+                    </div>
+
+                    <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="mb-8 text-center lg:text-left"
+                    >
+                        <h2 className="text-4xl xl:text-5xl font-black text-[#38474F] mb-2 font-oswald uppercase tracking-tight">New Admin Registration</h2>
+                        <p className="text-[#8A9BA5] font-medium italic text-base">Fill in the enterprise registration form to provision your slot.</p>
+                    </motion.div>
+
+                    <form onSubmit={handleSubmit} className="space-y-5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-1">
+                                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">First Name</label>
+                                <div className="relative group">
+                                    <User className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#E85874] transition-colors" size={16} />
+                                    <input required name="firstName" value={formData.firstName} onChange={handleChange} placeholder="John" className="w-full bg-transparent border-b-2 border-gray-200 py-2.5 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#E85874] transition-colors" />
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">Last Name</label>
+                                <div className="relative group">
+                                    <User className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#E85874] transition-colors" size={16} />
+                                    <input required name="lastName" value={formData.lastName} onChange={handleChange} placeholder="Doe" className="w-full bg-transparent border-b-2 border-gray-200 py-2.5 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#E85874] transition-colors" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">Company Name</label>
+                            <div className="relative group">
+                                <Building2 className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#39A3DD] transition-colors" size={16} />
+                                <input required name="companyName" value={formData.companyName} onChange={handleChange} placeholder="Global Prints Inc." className="w-full bg-transparent border-b-2 border-gray-200 py-3 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#39A3DD] transition-colors" />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-1">
+                                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">E-mail</label>
+                                <div className="relative group">
+                                    <Mail className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#39A3DD] transition-colors" size={16} />
+                                    <input required type="email" name="email" value={formData.email} onChange={handleChange} disabled={isInvite} placeholder="john@company.com" className={`w-full bg-transparent border-b-2 border-gray-200 py-2.5 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#39A3DD] transition-colors ${isInvite ? 'opacity-50' : ''}`} />
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">Mobile</label>
+                                <div className="relative group">
+                                    <Phone className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#39A3DD] transition-colors" size={16} />
+                                    <input required type="tel" name="mobileNumber" value={formData.mobileNumber} onChange={handleChange} placeholder="+91 00000 00000" className="w-full bg-transparent border-b-2 border-gray-100 py-2.5 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#39A3DD] transition-colors" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-1">
+                                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">Password</label>
+                                <div className="relative group">
+                                    <Lock className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#38474F] transition-colors" size={16} />
+                                    <input required type="password" name="password" value={formData.password} onChange={handleChange} placeholder="••••••••" className="w-full bg-transparent border-b-2 border-gray-200 py-2.5 text-base text-[#38474F] font-bold outline-none focus:border-[#38474F] transition-colors pl-8" />
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">Confirm Password</label>
+                                <div className="relative group">
+                                    <Lock className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#38474F] transition-colors" size={16} />
+                                    <input required type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} placeholder="••••••••" className="w-full bg-transparent border-b-2 border-gray-100 py-2.5 text-base text-[#38474F] font-bold outline-none focus:border-[#38474F] transition-colors pl-8" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="pt-6 flex flex-col md:flex-row items-center justify-between gap-6">
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full md:w-auto px-12 py-4 bg-[#E85874] hover:bg-[#C4455D] text-white font-black uppercase tracking-[0.3em] text-[13px] rounded-xl shadow-xl shadow-pink-500/10 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
+                            >
+                                {loading ? <Loader2 className="animate-spin" size={20} /> : (
+                                    <>
+                                        <span>ADMIN ONBOARD</span>
+                                        <ArrowRight size={18} className="opacity-50" />
+                                    </>
+                                )}
+                            </button>
+                            <p className="text-[9px] text-[#8A9BA5] font-black uppercase tracking-widest text-center flex items-center gap-2 opacity-60">
+                                <ShieldCheck size={12} className="text-green-500" /> AUTHORIZED NODES ONLY
+                            </p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <Toaster position="top-right" />
         </div>
     );
 };

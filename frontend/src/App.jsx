@@ -20,7 +20,10 @@ const App = () => {
 
   useEffect(() => {
     // Check for active session on mount
-    const checkSession = () => {
+    const checkSession = async () => {
+      // ✅ Handle session detection from URL hash (invites/resets)
+      await supabase.auth.getSession();
+
       const token = localStorage.getItem("authToken");
 
       // Handle invitation/profile completion route
@@ -117,10 +120,7 @@ const App = () => {
   const showMainApp = isAuthenticated && (currentView === "library" || currentView === "designer");
 
   return (
-    <div
-      className="min-h-screen transition-colors duration-300 flex flex-col"
-      style={{ backgroundColor: theme.bg, color: theme.text }}
-    >
+    <div className="h-screen w-screen transition-colors duration-300 flex flex-col overflow-hidden bg-white">
       {/* Navigation / Header - Only show for main app functionality */}
       {(isAuthenticated || currentView === "library" || currentView === "designer" || currentView === "admin_dashboard") && !isLoading && (
         <AppHeader onNavigate={navigateTo} currentView={currentView} />

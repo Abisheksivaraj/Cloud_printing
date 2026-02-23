@@ -408,8 +408,8 @@ const LabelDesigner = ({ label, labels = [], onSave, onSelectLabel, onCreateLabe
           {/* Left: label info */}
           <div className="flex items-center gap-3">
             <div>
-              <h2 className="text-sm font-black tracking-tight" style={{ color: theme.text }}>
-                {label?.name || "Untitled Label"}
+              <h2 className="text-sm font-black tracking-tight uppercase font-oswald" style={{ color: theme.text }}>
+                {label?.name || "Untitled Label Template"}
               </h2>
               <div
                 className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider opacity-60"
@@ -496,10 +496,10 @@ const LabelDesigner = ({ label, labels = [], onSave, onSelectLabel, onCreateLabe
             <div className="flex items-center gap-1 bg-[var(--color-bg-main)] p-1 rounded-xl border border-[var(--color-border)]">
               <button
                 onClick={handleSave}
-                className="px-4 py-1.5 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
+                className="btn-blue px-6 py-1.5 text-[9px] font-black uppercase tracking-[0.2em] shadow-sm transform-none h-auto rounded-md"
               >
                 <Save size={14} />
-                Save
+                Authorize Save
               </button>
               <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1"></div>
               <button

@@ -15,13 +15,14 @@ export const brandColors = {
   white: "#FFFFFF",
   lightGray: "#F5F7F9",
   mediumGray: "#8A9BA5",
+  darkerGray: "#1F2937",
 
   // Dark Mode specific
-  darkBackground: "#0F172A",
-  darkSurface: "#1E293B",
-  darkBorder: "#334155",
+  darkBackground: "#24303F",
+  darkSurface: "#313D4A",
+  darkBorder: "#3D4D5C",
   darkText: "#F8FAFC",
-  darkTextMuted: "#94A3B8"
+  darkTextMuted: "#AEB7C0"
 };
 
 export const getThemeColors = (isDarkMode) => {
@@ -32,19 +33,19 @@ export const getThemeColors = (isDarkMode) => {
       border: brandColors.darkBorder,
       text: brandColors.darkText,
       textMuted: brandColors.darkTextMuted,
-      inputBg: "#1E293B",
-      accentPink: brandColors.primaryPink,
-      accentBlue: brandColors.primaryBlue
+      primary: brandColors.primaryPink,
+      secondary: brandColors.primaryBlue,
+      accent: brandColors.primaryBlue
     };
   }
   return {
-    bg: "#F8FAFC",
+    bg: brandColors.lightGray,
     surface: brandColors.white,
     border: "#E2E8F0",
     text: brandColors.darkGray,
     textMuted: brandColors.mediumGray,
-    inputBg: brandColors.lightGray,
-    accentPink: brandColors.primaryPink,
-    accentBlue: brandColors.primaryBlue
+    primary: brandColors.primaryPink,
+    secondary: brandColors.primaryBlue,
+    accent: brandColors.primaryBlue
   };
 };

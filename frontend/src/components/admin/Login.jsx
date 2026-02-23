@@ -1,12 +1,14 @@
 import React, { useState } from "react";
-import { User, Lock, ArrowRight, LogIn, Loader2, Mail } from "lucide-react";
+import { Mail, Lock, Loader2, ArrowRight, ShieldCheck, Zap, UserPlus } from "lucide-react";
 import { useTheme } from "../../ThemeContext";
 import { useLanguage } from "../../LanguageContext";
 import { toast, Toaster } from "react-hot-toast";
 import { callEdgeFunction, API_URLS, supabase } from "../../supabaseClient";
+import { motion } from "framer-motion";
+import logo from "../../assets/companyLogo.png";
 
 const Login = ({ onLogin, onSwitchToSignup }) => {
-    const { isDarkMode, theme } = useTheme();
+    const { theme } = useTheme();
     const { t } = useLanguage();
     const [formData, setFormData] = useState({
         email: "",
@@ -32,11 +34,9 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
                 password: formData.password,
             });
 
-            // Store auth token and user data
             const token = data.access_token || data.token;
             if (token) {
                 localStorage.setItem("authToken", token);
-                // Call setSession to sync the Supabase client state
                 await supabase.auth.setSession({
                     access_token: token,
                     refresh_token: data.refresh_token || ""
@@ -45,11 +45,11 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
             if (data.admin) localStorage.setItem("userData", JSON.stringify(data.admin));
             if (data.user) localStorage.setItem("userData", JSON.stringify(data.user));
 
-            toast.success("Login successful!");
+            toast.success("Identity Verified. Welcome back!");
             onLogin(data.admin || data.user);
         } catch (err) {
             console.error("Login error:", err);
-            const errorMessage = err.message || "Invalid email or password.";
+            const errorMessage = err.message || "Invalid credentials.";
             setError(errorMessage);
             toast.error(errorMessage);
         } finally {
@@ -58,95 +58,100 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
     };
 
     return (
-        <div
-            className="min-h-screen flex items-center justify-center p-6 transition-colors duration-500"
-            style={{ backgroundColor: theme.bg }}
-        >
-            <div
-                className="w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in-95 duration-300"
-                style={{ backgroundColor: theme.surface, borderColor: theme.border }}
-            >
-                {/* Left Side - Brand / Info */}
-                <div className="md:w-2/5 p-12 text-white flex flex-col relative overflow-hidden bg-[var(--color-primary)]">
-                    <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-hover)] opacity-90"></div>
-
-                    {/* Decorative Circles */}
-                    <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
-                    <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-black/10 rounded-full blur-3xl"></div>
-
-                    <div className="relative z-10 flex-1 flex flex-col justify-center">
-                        <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-8 shadow-lg">
-                            <LogIn size={32} className="text-white" />
-                        </div>
-
-                        <h2 className="text-3xl font-bold mb-4 tracking-tight">Welcome Back.</h2>
-                        <p className="text-white/80 text-lg leading-relaxed mb-8">
-                            Sign in to access your dashboard, manage labels, and monitor print jobs.
+        <div className="h-screen w-full flex bg-white overflow-hidden font-inter">
+            {/* Left Design - Fixed Hero (ALWAYS VISIBLE) */}
+            <div className="hidden lg:flex lg:w-4/12 flex-col justify-between p-10 xl:p-12 relative bg-white border-r border-gray-100 z-20">
+                <div className="max-w-md w-full">
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mb-8"
+                    >
+                        <img src={logo} alt="Archery Technocrats" className="h-10 mb-8" />
+                        <h1 className="text-5xl font-black text-[#38474F] mb-4 leading-tight font-oswald uppercase tracking-tight">
+                            Member <br /><span className="text-[#39A3DD]">Portal.</span>
+                        </h1>
+                        <p className="text-sm text-[#8A9BA5] leading-relaxed font-medium mb-8">
+                            Efficiently manage and design professional labels in a seamless enterprise environment.
                         </p>
 
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-3 text-white/90">
-                                <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                <span className="text-sm font-semibold tracking-wide">Secure Access</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-white/90">
-                                <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                <span className="text-sm font-semibold tracking-wide">Real-time Analytics</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="relative z-10 mt-12 pt-8 border-t border-white/20">
-                        <p className="text-xs font-bold uppercase tracking-wider text-white/70 mb-3">New to the platform?</p>
+                        {/* NAV LINK MOVED TO HERO FOR VISIBILITY */}
                         <button
                             onClick={onSwitchToSignup}
-                            className="flex items-center gap-2 text-white font-bold hover:text-white/80 transition-colors group"
+                            className="inline-flex items-center gap-3 px-6 py-3 border-2 border-gray-100 rounded-xl text-xs font-black text-[#38474F] hover:bg-[#38474F] hover:text-white hover:border-[#38474F] transition-all uppercase tracking-widest group"
                         >
-                            <span>Create an Account</span>
-                            <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                            <UserPlus size={16} className="group-hover:scale-110 transition-transform" />
+                            Create Account
                         </button>
+                    </motion.div>
+
+                    <div className="space-y-3 mt-12">
+                        <div className="flex items-center gap-3 p-4 rounded-xl bg-slate-50 border-l-4 border-[#39A3DD]">
+                            <div className="text-[#39A3DD] font-black"><Zap size={18} /></div>
+                            <div>
+                                <h3 className="text-[10px] font-black text-[#38474F] uppercase tracking-wider">Fast Setup</h3>
+                                <p className="text-[#8A9BA5] text-[9px] font-medium leading-tight">Instant deployment across your global network.</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 p-4 rounded-xl bg-slate-50 border-l-4 border-[#E85874]">
+                            <div className="text-[#E85874] font-black"><ShieldCheck size={18} /></div>
+                            <div>
+                                <h3 className="text-[10px] font-black text-[#38474F] uppercase tracking-wider">Secure Data</h3>
+                                <p className="text-[#8A9BA5] text-[9px] font-medium leading-tight">Industry-leading security protocols enabled.</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                {/* Right Side - Form */}
-                <div className="md:w-3/5 p-12 md:p-16 flex flex-col justify-center bg-white dark:bg-gray-900">
-                    <div className="mb-10">
-                        <h1 className="text-3xl font-bold tracking-tight mb-2" style={{ color: theme.text }}>{t.login}</h1>
-                        <p className="text-sm" style={{ color: theme.textMuted }}>
-                            Enter your credentials to access your account.
-                        </p>
+                <div className="pt-6 border-t border-gray-50 flex items-center justify-between">
+                    <span className="text-[9px] font-black uppercase text-[#8A9BA5] tracking-[0.3em]">v2.4.0 • PRODUCTION</span>
+                </div>
+            </div>
+
+            {/* Right Form - Skewed Section */}
+            <div className="w-full lg:w-8/12 flex flex-col justify-center p-8 md:p-12 lg:p-24 relative z-10 bg-[#F5F7F9] overflow-hidden">
+                {/* Skewed Decoration */}
+                <div className="absolute top-0 left-0 w-32 h-full bg-white -ml-16 skew-x-[-15deg] border-r border-gray-100 shadow-[20px_0_60px_rgba(0,0,0,0.03)] hidden lg:block z-0"></div>
+
+                <div className="max-w-md w-full mx-auto relative z-10">
+                    <div className="lg:hidden mb-12 text-center flex flex-col items-center gap-4">
+                        <img src={logo} alt="Archery Technocrats" className="h-8 mx-auto" />
+                        <button onClick={onSwitchToSignup} className="text-[10px] font-black text-[#39A3DD] uppercase tracking-widest underline">Create New Account</button>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="text-center lg:text-left mb-10"
+                    >
+                        <h2 className="text-5xl font-black text-[#38474F] mb-3 font-oswald uppercase tracking-tight">Welcome Back..!</h2>
+                        <p className="text-[#8A9BA5] font-medium italic text-lg opacity-80 whitespace-nowrap">Enter credentials to access the console.</p>
+                    </motion.div>
+
+                    <form onSubmit={handleSubmit} className="space-y-8">
                         <div className="space-y-2">
-                            <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>
-                                {t.email}
-                            </label>
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">E-mail</label>
                             <div className="relative group">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={18} />
+                                <Mail className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#39A3DD] transition-colors" size={20} />
                                 <input
                                     required
                                     type="email"
                                     name="email"
                                     value={formData.email}
                                     onChange={handleChange}
-                                    placeholder="Enter your email"
-                                    className="input pl-11 py-3"
+                                    placeholder="your@email.com"
+                                    className="w-full bg-transparent border-b-2 border-gray-200 py-4 pl-10 text-lg text-[#38474F] font-bold outline-none focus:border-[#39A3DD] transition-colors"
                                 />
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>
-                                    {t.password}
-                                </label>
-                                <button type="button" className="text-xs font-semibold text-[var(--color-primary)] hover:underline">
-                                    Forgot Password?
-                                </button>
+                            <div className="flex items-center justify-between px-1">
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8A9BA5]">Password</label>
+                                <button type="button" className="text-[10px] font-black uppercase text-[#39A3DD] hover:underline tracking-widest">Reset Password ?</button>
                             </div>
                             <div className="relative group">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={18} />
+                                <Lock className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#39A3DD] transition-colors" size={20} />
                                 <input
                                     required
                                     type="password"
@@ -154,35 +159,27 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
                                     value={formData.password}
                                     onChange={handleChange}
                                     placeholder="••••••••"
-                                    className="input pl-11 py-3"
+                                    className="w-full bg-transparent border-b-2 border-gray-200 py-4 pl-10 text-lg text-[#38474F] font-bold outline-none focus:border-[#39A3DD] transition-colors"
                                 />
                             </div>
                         </div>
 
-                        {error && (
-                            <div className="p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-center gap-2 animate-in slide-in-from-left-2">
-                                <span className="font-bold">Error:</span> {error}
-                            </div>
-                        )}
-
                         <button
                             type="submit"
                             disabled={loading}
-                            className="btn btn-primary w-full py-4 text-sm font-bold uppercase tracking-widest shadow-lg hover:shadow-primary/20 flex items-center justify-center gap-3 group"
+                            className="w-full py-6 bg-[#39A3DD] hover:bg-[#2A7FAF] text-white font-black uppercase tracking-[0.4em] text-sm mt-10 rounded-xl shadow-2xl shadow-blue-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
                         >
-                            {loading ? (
-                                <Loader2 className="animate-spin" size={20} />
-                            ) : (
+                            {loading ? <Loader2 className="animate-spin" size={24} /> : (
                                 <>
-                                    <span>{t.login}</span>
-                                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                                    <span>ACCESS ACCOUNT</span>
+                                    <ArrowRight size={20} className="opacity-50" />
                                 </>
                             )}
                         </button>
                     </form>
-                    <Toaster position="top-right" />
                 </div>
             </div>
+            <Toaster position="top-right" />
         </div>
     );
 };
