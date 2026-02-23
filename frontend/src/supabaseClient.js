@@ -20,9 +20,15 @@ export const API_URLS = {
 export const callEdgeFunction = async (functionName, body) => {
     const token = localStorage.getItem("authToken");
 
+    // Skip Authorization header for login endpoint
+    const headers = {};
+    if (token && functionName !== API_URLS.LOGIN) {
+        headers.Authorization = `Bearer ${token}`;
+    }
+
     const { data, error } = await supabase.functions.invoke(functionName, {
         body: body,
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: headers,
     });
 
     if (error) {
