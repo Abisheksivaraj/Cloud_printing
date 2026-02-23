@@ -5,28 +5,21 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Edge Function API endpoints
+// Edge Function names
 export const API_URLS = {
-    LOGIN: `${supabaseUrl}/functions/v1/login`,
-    COMPLETE_PROFILE: `${supabaseUrl}/functions/v1/complete-profile`,
+    LOGIN: '/functions/v1/login',
+    COMPLETE_PROFILE: '/functions/v1/complete-profile',
 };
 
-// Helper to call edge functions with auth header
-export const callEdgeFunction = async (url, body) => {
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseAnonKey}`,
-            'apikey': supabaseAnonKey,
-        },
-        body: JSON.stringify(body),
+// Helper to call edge functions using the SDK
+export const callEdgeFunction = async (functionName, body) => {
+    const { data, error } = await supabase.functions.invoke(functionName, {
+        body: body,
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-        throw new Error(data.error || data.message || 'Request failed');
+    if (error) {
+        console.error(`Error calling function ${functionName}:`, error);
+        throw new Error(error.message || 'Request failed');
     }
 
     return data;
