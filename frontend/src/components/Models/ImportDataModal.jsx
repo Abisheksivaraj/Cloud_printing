@@ -8,11 +8,27 @@ import {
   Search,
   Filter,
   Eye,
-  Printer,
+  ArrowRight,
+  CheckCircle,
+  AlertCircle,
+  Database,
+  Table,
+  Columns,
+  Barcode,
+  ArrowDown
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import { useTheme } from "../../ThemeContext";
+
+/*
+  ImportDataModal Component
+  Refactored for premium aesthetic and consistent theming.
+  Handles CSV/Excel import, data mapping, and row selection.
+*/
 
 const ImportDataModal = ({ label, onClose, onLabelsGenerated }) => {
+  const { theme, isDarkMode } = useTheme();
+
   const [importFile, setImportFile] = useState(null);
   const [importedData, setImportedData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -31,7 +47,7 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated }) => {
   const rowsPerPage = 10;
   const fileInputRef = useRef(null);
 
-  // ✅ Get display name for barcode type
+  // Get display name for barcode type
   const getBarcodeTypeName = (barcodeType) => {
     const barcodeTypeNames = {
       CODE128: "Code 128",
@@ -47,19 +63,7 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated }) => {
     return barcodeTypeNames[barcodeType] || "Barcode";
   };
 
-  // ✅ Get appropriate icon for barcode type
-  const getBarcodeIcon = (barcodeType) => {
-    if (
-      barcodeType === "QR" ||
-      barcodeType === "DATAMATRIX" ||
-      barcodeType === "AZTEC"
-    ) {
-      return "⬛";
-    }
-    return "📊";
-  };
-
-  // ✅ Search functionality
+  // Search functionality
   const handleSearch = (term) => {
     setSearchTerm(term);
     setCurrentPage(1);
@@ -82,7 +86,7 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated }) => {
     setFilteredData(filtered);
   };
 
-  // ✅ Handle row selection
+  // Handle row selection
   const handleRowSelect = (index) => {
     const newSelected = new Set(selectedRows);
     if (newSelected.has(index)) {
@@ -93,7 +97,7 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated }) => {
     setSelectedRows(newSelected);
   };
 
-  // ✅ Select all visible rows
+  // Select all visible rows
   const handleSelectAll = () => {
     if (selectedRows.size === filteredData.length) {
       setSelectedRows(new Set());
@@ -105,7 +109,7 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated }) => {
     }
   };
 
-  // ✅ Get data based on selection mode
+  // Get data based on selection mode
   const getDataToGenerate = () => {
     switch (selectMode) {
       case "all":
@@ -178,7 +182,7 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated }) => {
               (col) =>
                 col.toLowerCase().trim() === fieldName ||
                 col.toLowerCase().replace(/[_\s]/g, "") ===
-                  fieldName.replace(/[_\s]/g, ""),
+                fieldName.replace(/[_\s]/g, ""),
             );
 
             if (matchingColumn) {
@@ -433,703 +437,477 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated }) => {
   const currentData = filteredData.slice(startIndex, endIndex);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full mx-4 max-h-[90vh] overflow-auto">
-        <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10 rounded-t-2xl">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-300">
+      <div
+        className="rounded-[2.5rem] shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300 transition-all border"
+        style={{ backgroundColor: theme.surface, borderColor: theme.border }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 md:p-8 border-b shrink-0 bg-white dark:bg-gray-800" style={{ borderColor: theme.border }}>
           <div>
-            <h3 className="text-xl font-bold text-gray-900">
-              Import Data for Label Generation
-            </h3>
-            <p className="text-sm text-gray-500 mt-1">Template: {label.name}</p>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-[var(--color-primary)]/10 rounded-xl text-[var(--color-primary)]">
+                <Database size={24} />
+              </div>
+              <h3 className="text-2xl font-black tracking-tight" style={{ color: theme.text }}>
+                Data Import Wizard
+              </h3>
+            </div>
+            <p className="text-sm font-medium" style={{ color: theme.textMuted }}>
+              Mapping external data to: <span className="text-[var(--color-primary)] font-bold">{label.name}</span>
+            </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
+            className="p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            style={{ color: theme.textMuted }}
           >
             <X size={24} />
           </button>
         </div>
 
-        <div className="p-6">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar" style={{ backgroundColor: theme.bg }}>
           {!importFile ? (
-            <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-blue-400 transition-colors bg-gradient-to-br from-gray-50 to-blue-50">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                onChange={handleFileSelect}
-                className="hidden"
-                id="import-data-input"
-              />
-              <label
-                htmlFor="import-data-input"
-                className="cursor-pointer flex flex-col items-center"
+            <div className="h-full flex flex-col items-center justify-center">
+              <div
+                className="w-full max-w-2xl border-4 border-dashed rounded-[3rem] p-16 text-center hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 transition-all group cursor-pointer flex flex-col items-center justify-center relative overflow-hidden"
+                style={{ borderColor: theme.border, backgroundColor: theme.surface }}
               >
-                <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-                  <Upload size={40} className="text-blue-600" />
-                </div>
-                <p className="text-xl font-bold text-gray-900 mb-2">
-                  Upload Data File
-                </p>
-                <p className="text-sm text-gray-600">
-                  Supported formats: CSV, Excel (.xlsx, .xls)
-                </p>
-                <p className="text-xs text-gray-500 mt-2">
-                  Click to browse or drag and drop
-                </p>
-              </label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  id="import-data-input"
+                />
+                <label
+                  htmlFor="import-data-input"
+                  className="cursor-pointer flex flex-col items-center w-full h-full z-10"
+                >
+                  <div className="w-24 h-24 rounded-full flex items-center justify-center mb-8 transition-all group-hover:scale-110 group-hover:shadow-xl bg-[var(--color-primary)] shadow-lg shadow-primary/20">
+                    <Upload size={40} className="text-white" />
+                  </div>
+                  <h4 className="text-3xl font-black mb-4 tracking-tight" style={{ color: theme.text }}>
+                    Drop your data file here
+                  </h4>
+                  <p className="text-base max-w-md mx-auto mb-8 font-medium leading-relaxed" style={{ color: theme.textMuted }}>
+                    Supports <span className="font-bold text-[var(--color-primary)]">.CSV</span>, <span className="font-bold text-[var(--color-secondary)]">.XLSX</span>, and .XLS files.
+                  </p>
+                  <div className="px-8 py-3 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold text-sm uppercase tracking-wider group-hover:bg-[var(--color-primary)] dark:group-hover:bg-[var(--color-primary)] group-hover:text-white transition-colors">
+                    Browse Files
+                  </div>
+                </label>
+
+                {/* Decorative Elements */}
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              </div>
             </div>
           ) : (
-            <>
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-4 mb-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-3">
-                    <FileText size={24} className="text-green-600 mt-1" />
-                    <div className="flex-1">
-                      <p className="font-semibold text-green-900 text-lg">
-                        {importFile.name}
-                      </p>
-                      <p className="text-sm text-green-700">
-                        {(importFile.size / 1024).toFixed(2)} KB •{" "}
-                        {importedData.length} rows
-                      </p>
+            <div className="space-y-8 animate-in slide-in-from-bottom-8 duration-500">
+              {/* File Info Card */}
+              <div
+                className="rounded-2xl p-4 flex items-center justify-between shadow-sm border bg-white dark:bg-gray-800"
+                style={{ borderColor: theme.border }}
+              >
+                <div className="flex items-center space-x-4">
+                  <div className="p-4 rounded-xl bg-green-50 dark:bg-green-900/20 text-green-600">
+                    <FileText size={28} />
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-lg" style={{ color: theme.text }}>{importFile.name}</h5>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500">
+                        {importFile.type.toUpperCase()}
+                      </span>
+                      <span className="text-xs text-gray-400">•</span>
+                      <span className="text-xs text-gray-500 font-medium">{(importFile.size / 1024).toFixed(2)} KB</span>
+                      <span className="text-xs text-gray-400">•</span>
+                      <span className="text-xs text-green-500 font-bold">{importedData.length} records found</span>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      setImportFile(null);
-                      setImportedData([]);
-                      setFilteredData([]);
-                      setColumnMapping({});
-                      setBarcodeMultiMapping({});
-                      setBarcodeSeparators({});
-                      setAvailableColumns([]);
-                      setSearchTerm("");
-                      setSelectedRows(new Set());
-                      setSelectMode("all");
-                      setShowDataTable(false);
-                      if (fileInputRef.current) {
-                        fileInputRef.current.value = "";
-                      }
-                    }}
-                    className="text-green-600 hover:text-green-800 hover:bg-green-100 p-2 rounded-lg transition-colors"
-                    title="Remove File"
-                  >
-                    <X size={20} />
-                  </button>
                 </div>
+                <button
+                  onClick={() => {
+                    setImportFile(null);
+                    setImportedData([]);
+                    setFilteredData([]);
+                    setColumnMapping({});
+                    setBarcodeMultiMapping({});
+                    setBarcodeSeparators({});
+                    setAvailableColumns([]);
+                    setSearchTerm("");
+                    setSelectedRows(new Set());
+                    setSelectMode("all");
+                    setShowDataTable(false);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                  className="p-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors hover:scale-105 active:scale-95"
+                  title="Remove File"
+                >
+                  <Trash2 size={24} />
+                </button>
               </div>
 
               {isImporting ? (
-                <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-700 font-medium">
-                    Processing file...
-                  </p>
+                <div className="flex flex-col items-center justify-center py-20">
+                  <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-[var(--color-primary)] mb-6"></div>
+                  <p className="text-lg font-bold" style={{ color: theme.text }}>Parsing Data...</p>
+                  <p className="text-sm" style={{ color: theme.textMuted }}>Please wait while we process your file.</p>
                 </div>
               ) : importedData.length > 0 ? (
-                <>
-                  {/* ✅ Selection Mode Options */}
-                  <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-4">
-                    <h4 className="font-bold text-gray-800 mb-3 text-lg flex items-center">
-                      <Filter size={20} className="mr-2" />
-                      Selection Options
-                    </h4>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Option 1: All Data */}
-                      <label className="flex items-start space-x-3 p-3 bg-white rounded-lg border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-colors">
-                        <input
-                          type="radio"
-                          name="selectMode"
-                          value="all"
-                          checked={selectMode === "all"}
-                          onChange={(e) => setSelectMode(e.target.value)}
-                          className="mt-1"
-                        />
-                        <div className="flex-1">
-                          <p className="font-semibold text-gray-800">
-                            All Data
-                          </p>
-                          <p className="text-xs text-gray-600">
-                            Generate labels for all {importedData.length} rows
-                          </p>
-                        </div>
-                      </label>
-
-                      {/* Option 2: Range Selection */}
-                      <label className="flex items-start space-x-3 p-3 bg-white rounded-lg border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-colors">
-                        <input
-                          type="radio"
-                          name="selectMode"
-                          value="range"
-                          checked={selectMode === "range"}
-                          onChange={(e) => setSelectMode(e.target.value)}
-                          className="mt-1"
-                        />
-                        <div className="flex-1">
-                          <p className="font-semibold text-gray-800">
-                            Range Selection
-                          </p>
-                          <p className="text-xs text-gray-600 mb-2">
-                            Select specific row range
-                          </p>
-                          {selectMode === "range" && (
-                            <div className="flex items-center space-x-2 mt-2">
-                              <input
-                                type="number"
-                                min="1"
-                                max={importedData.length}
-                                value={rangeStart}
-                                onChange={(e) =>
-                                  setRangeStart(Number(e.target.value))
-                                }
-                                className="w-20 border border-gray-300 rounded px-2 py-1 text-sm"
-                                placeholder="From"
-                              />
-                              <span className="text-gray-600">to</span>
-                              <input
-                                type="number"
-                                min={rangeStart}
-                                max={importedData.length}
-                                value={rangeEnd}
-                                onChange={(e) =>
-                                  setRangeEnd(Number(e.target.value))
-                                }
-                                className="w-20 border border-gray-300 rounded px-2 py-1 text-sm"
-                                placeholder="To"
-                              />
-                              <span className="text-xs text-gray-600">
-                                (
-                                {Math.max(
-                                  0,
-                                  Math.min(rangeEnd, importedData.length) -
-                                    Math.max(1, rangeStart) +
-                                    1,
-                                )}{" "}
-                                rows)
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </label>
-
-                      {/* Option 3: Search & Filter */}
-                      <label className="flex items-start space-x-3 p-3 bg-white rounded-lg border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-colors">
-                        <input
-                          type="radio"
-                          name="selectMode"
-                          value="search"
-                          checked={selectMode === "search"}
-                          onChange={(e) => setSelectMode(e.target.value)}
-                          className="mt-1"
-                        />
-                        <div className="flex-1">
-                          <p className="font-semibold text-gray-800">
-                            Search & Filter
-                          </p>
-                          <p className="text-xs text-gray-600 mb-2">
-                            Search and generate filtered results (
-                            {filteredData.length} rows)
-                          </p>
-                          {selectMode === "search" && (
-                            <div className="relative mt-2">
-                              <Search
-                                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                                size={16}
-                              />
-                              <input
-                                type="text"
-                                value={searchTerm}
-                                onChange={(e) => handleSearch(e.target.value)}
-                                placeholder="Search in all columns..."
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </label>
-
-                      {/* Option 4: Manual Selection */}
-                      <label className="flex items-start space-x-3 p-3 bg-white rounded-lg border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-colors">
-                        <input
-                          type="radio"
-                          name="selectMode"
-                          value="selected"
-                          checked={selectMode === "selected"}
-                          onChange={(e) => setSelectMode(e.target.value)}
-                          className="mt-1"
-                        />
-                        <div className="flex-1">
-                          <p className="font-semibold text-gray-800">
-                            Manual Selection
-                          </p>
-                          <p className="text-xs text-gray-600">
-                            Select specific rows from table ({selectedRows.size}{" "}
-                            selected)
-                          </p>
-                          {selectMode === "selected" && (
-                            <button
-                              onClick={() => setShowDataTable(true)}
-                              className="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600 transition-colors flex items-center space-x-1"
-                            >
-                              <Eye size={14} />
-                              <span>View & Select Rows</span>
-                            </button>
-                          )}
-                        </div>
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* ✅ Data Table View (for manual selection) */}
-                  {showDataTable && (
-                    <div className="mb-6 bg-white border-2 border-gray-300 rounded-xl overflow-hidden">
-                      <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-4 border-b flex items-center justify-between">
-                        <h4 className="font-bold text-gray-800 text-lg">
-                          Data Table - Select Rows
-                        </h4>
-                        <button
-                          onClick={() => setShowDataTable(false)}
-                          className="text-gray-600 hover:text-gray-800 p-1"
-                        >
-                          <X size={20} />
-                        </button>
-                      </div>
-
-                      {/* Search in table view */}
-                      <div className="p-4 bg-gray-50 border-b">
-                        <div className="relative">
-                          <Search
-                            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                            size={18}
-                          />
-                          <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => handleSearch(e.target.value)}
-                            placeholder="Search in all columns..."
-                            className="w-full pl-10 pr-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                        <div className="mt-2 flex items-center justify-between">
-                          <button
-                            onClick={handleSelectAll}
-                            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                          >
-                            {selectedRows.size === filteredData.length
-                              ? "Deselect All"
-                              : "Select All Visible"}
-                          </button>
-                          <p className="text-sm text-gray-600">
-                            {selectedRows.size} of {importedData.length} rows
-                            selected
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="overflow-x-auto max-h-96">
-                        <table className="min-w-full">
-                          <thead className="bg-gray-100 sticky top-0">
-                            <tr>
-                              <th className="px-4 py-3 text-left">
-                                <input
-                                  type="checkbox"
-                                  checked={
-                                    selectedRows.size === filteredData.length &&
-                                    filteredData.length > 0
-                                  }
-                                  onChange={handleSelectAll}
-                                  className="rounded"
-                                />
-                              </th>
-                              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">
-                                #
-                              </th>
-                              {availableColumns.map((col, i) => (
-                                <th
-                                  key={i}
-                                  className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase whitespace-nowrap"
-                                >
-                                  {col}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {currentData.map((row, displayIndex) => {
-                              const actualIndex = importedData.indexOf(row);
-                              const rowNumber = actualIndex + 1;
-                              const isSelected = selectedRows.has(actualIndex);
-
-                              return (
-                                <tr
-                                  key={actualIndex}
-                                  className={`hover:bg-blue-50 transition-colors ${
-                                    isSelected ? "bg-blue-100" : ""
-                                  }`}
-                                >
-                                  <td className="px-4 py-3">
-                                    <input
-                                      type="checkbox"
-                                      checked={isSelected}
-                                      onChange={() =>
-                                        handleRowSelect(actualIndex)
-                                      }
-                                      className="rounded"
-                                    />
-                                  </td>
-                                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                                    {rowNumber}
-                                  </td>
-                                  {availableColumns.map((col, j) => (
-                                    <td
-                                      key={j}
-                                      className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap"
-                                    >
-                                      {row[col]}
-                                    </td>
-                                  ))}
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Pagination */}
-                      {totalPages > 1 && (
-                        <div className="bg-gray-50 px-4 py-3 border-t flex items-center justify-between">
-                          <div className="text-sm text-gray-600">
-                            Showing {startIndex + 1} to{" "}
-                            {Math.min(endIndex, filteredData.length)} of{" "}
-                            {filteredData.length} rows
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <button
-                              onClick={() =>
-                                setCurrentPage(Math.max(1, currentPage - 1))
-                              }
-                              disabled={currentPage === 1}
-                              className="px-3 py-1 border border-gray-300 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-                            >
-                              Previous
-                            </button>
-                            <span className="text-sm text-gray-600">
-                              Page {currentPage} of {totalPages}
-                            </span>
-                            <button
-                              onClick={() =>
-                                setCurrentPage(
-                                  Math.min(totalPages, currentPage + 1),
-                                )
-                              }
-                              disabled={currentPage === totalPages}
-                              className="px-3 py-1 border border-gray-300 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-                            >
-                              Next
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Data Preview (condensed) */}
-                  {!showDataTable && (
-                    <div className="mb-6">
-                      <h4 className="font-bold text-gray-800 mb-3 text-lg flex items-center">
-                        📊 Data Preview
-                        <span className="ml-2 text-sm font-normal text-gray-600">
-                          (showing first 3 rows)
-                        </span>
+                  {/* Left Column: Selection & Filter */}
+                  <div className="lg:col-span-1 space-y-6">
+                    <div className="p-6 rounded-3xl border bg-white dark:bg-gray-800 shadow-sm" style={{ borderColor: theme.border }}>
+                      <h4 className="font-black text-sm uppercase tracking-wider mb-6 flex items-center gap-2" style={{ color: theme.textMuted }}>
+                        <Filter size={16} />
+                        Filter & Selection
                       </h4>
-                      <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-4 max-h-48 overflow-auto">
-                        <table className="min-w-full text-sm">
-                          <thead>
-                            <tr className="border-b-2 border-gray-300">
-                              {availableColumns.map((col, i) => (
-                                <th
-                                  key={i}
-                                  className="px-4 py-2 text-left font-bold text-gray-800 whitespace-nowrap"
-                                >
-                                  {col}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {importedData.slice(0, 3).map((row, i) => (
-                              <tr key={i} className="border-b border-gray-200">
-                                {availableColumns.map((col, j) => (
-                                  <td
-                                    key={j}
-                                    className="px-4 py-2 text-gray-700 whitespace-nowrap"
-                                  >
-                                    {row[col]}
-                                  </td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
 
-                  {/* Column Mapping Section */}
-                  <div className="mb-6">
-                    <h4 className="font-bold text-gray-800 mb-4 text-lg">
-                      🔗 Map Your Data Columns
-                    </h4>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Match each label field with a column from your file:
-                    </p>
-
-                    <div className="space-y-3">
-                      {/* Placeholder Elements */}
-                      {placeholderElements.map((element) => {
-                        const fieldName = getFieldName(element.content);
-                        return (
-                          <div
-                            key={element.id}
-                            className="bg-white border-2 border-gray-200 rounded-xl p-4 hover:border-blue-300 transition-colors"
+                      <div className="space-y-3">
+                        {[
+                          { id: 'all', label: 'All Records', desc: `Process all ${importedData.length} rows` },
+                          { id: 'range', label: 'Specific Range', desc: 'Select a range of rows' },
+                          { id: 'search', label: 'Search Results', desc: `Use filtered results (${filteredData.length})` },
+                          { id: 'selected', label: 'Manual Selection', desc: `${selectedRows.size} manually picked rows` }
+                        ].map((mode) => (
+                          <label
+                            key={mode.id}
+                            className={`flex items-start p-4 rounded-xl border-2 cursor-pointer transition-all ${selectMode === mode.id ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
                           >
-                            <div className="flex items-center gap-4">
-                              <div className="flex-shrink-0 w-1/3">
-                                <label className="text-sm font-semibold text-gray-700">
-                                  {fieldName}
-                                </label>
-                                <p className="text-xs text-gray-500 mt-0.5">
-                                  Label field
-                                </p>
+                            <div className="mt-1">
+                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectMode === mode.id ? 'border-[var(--color-primary)]' : 'border-gray-300'}`}>
+                                {selectMode === mode.id && <div className="w-2.5 h-2.5 rounded-full bg-[var(--color-primary)]"></div>}
                               </div>
-
-                              <div className="flex-shrink-0 text-gray-400">
-                                <span className="text-xl">→</span>
-                              </div>
-
-                              <div className="flex-1">
-                                <select
-                                  value={columnMapping[element.id] || ""}
-                                  onChange={(e) =>
-                                    handleColumnMappingChange(
-                                      element.id,
-                                      e.target.value,
-                                    )
-                                  }
-                                  className="w-full border-2 border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                >
-                                  <option value="">
-                                    -- Select column from file --
-                                  </option>
-                                  {availableColumns.map((col) => (
-                                    <option key={col} value={col}>
-                                      {col}
-                                    </option>
-                                  ))}
-                                </select>
-                                {columnMapping[element.id] &&
-                                  importedData[0] && (
-                                    <p className="text-xs text-green-600 mt-1 font-medium">
-                                      ✓ Example: "
-                                      {
-                                        importedData[0][
-                                          columnMapping[element.id]
-                                        ]
-                                      }
-                                      "
-                                    </p>
-                                  )}
-                              </div>
+                              <input type="radio" name="selectMode" value={mode.id} checked={selectMode === mode.id} onChange={(e) => setSelectMode(e.target.value)} className="hidden" />
                             </div>
-                          </div>
-                        );
-                      })}
+                            <div className="ml-4 flex-1">
+                              <span className="block text-sm font-bold" style={{ color: theme.text }}>{mode.label}</span>
+                              <span className="block text-xs font-medium mt-0.5" style={{ color: theme.textMuted }}>{mode.desc}</span>
 
-                      {/* Barcode Elements */}
-                      {barcodeElements.map((element) => {
-                        const barcodeTypeName = getBarcodeTypeName(
-                          element.barcodeType,
-                        );
-                        const barcodeIcon = getBarcodeIcon(element.barcodeType);
-
-                        return (
-                          <div
-                            key={element.id}
-                            className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-4"
-                          >
-                            <div className="flex items-center justify-between mb-3">
-                              <label className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                                <span className="text-lg">{barcodeIcon}</span>
-                                <span>{barcodeTypeName}</span>
-                                <span className="text-xs font-normal text-gray-600 ml-1">
-                                  ({element.content})
-                                </span>
-                              </label>
-                              <button
-                                onClick={() =>
-                                  handleAddBarcodeColumn(element.id)
-                                }
-                                className="flex items-center space-x-1 px-3 py-1 bg-purple-600 text-white text-xs rounded-lg hover:bg-purple-700 transition-colors"
-                              >
-                                <Plus size={14} />
-                                <span>Add Column</span>
-                              </button>
-                            </div>
-
-                            <div className="space-y-3">
-                              {/* Separator Input */}
-                              <div className="flex items-center space-x-2 bg-white p-2 rounded-lg border border-purple-200">
-                                <label className="text-xs font-semibold text-gray-700 whitespace-nowrap">
-                                  Separator:
-                                </label>
-                                <input
-                                  type="text"
-                                  value={barcodeSeparators[element.id] || " "}
-                                  onChange={(e) =>
-                                    handleSeparatorChange(
-                                      element.id,
-                                      e.target.value,
-                                    )
-                                  }
-                                  placeholder="Space"
-                                  className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                  maxLength={5}
-                                />
-                                <span className="text-xs text-gray-500">
-                                  (e.g., " ", "-", ", ")
-                                </span>
-                              </div>
-
-                              {/* Column Selections */}
-                              {(barcodeMultiMapping[element.id] || []).map(
-                                (selectedCol, index) => (
-                                  <div
-                                    key={index}
-                                    className="flex items-center space-x-2"
-                                  >
-                                    <div className="flex-1">
-                                      <select
-                                        value={selectedCol}
-                                        onChange={(e) =>
-                                          handleBarcodeColumnChange(
-                                            element.id,
-                                            index,
-                                            e.target.value,
-                                          )
-                                        }
-                                        className="w-full border-2 border-purple-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                      >
-                                        <option value="">
-                                          -- Select Column {index + 1} --
-                                        </option>
-                                        {availableColumns.map((col) => (
-                                          <option key={col} value={col}>
-                                            {col}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                    <button
-                                      onClick={() =>
-                                        handleRemoveBarcodeColumn(
-                                          element.id,
-                                          index,
-                                        )
-                                      }
-                                      className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
-                                      title="Remove Column"
-                                    >
-                                      <Trash2 size={16} />
-                                    </button>
-                                  </div>
-                                ),
+                              {selectMode === 'range' && mode.id === 'range' && (
+                                <div className="flex items-center gap-2 mt-3 animate-in fade-in slide-in-from-top-2">
+                                  <input type="number" min="1" max={importedData.length} value={rangeStart} onChange={(e) => setRangeStart(Number(e.target.value))} className="w-20 p-2 rounded-lg border text-sm font-bold text-center outline-none focus:border-[var(--color-primary)]" style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }} />
+                                  <span className="text-xs font-bold uppercase" style={{ color: theme.textMuted }}>to</span>
+                                  <input type="number" min={rangeStart} max={importedData.length} value={rangeEnd} onChange={(e) => setRangeEnd(Number(e.target.value))} className="w-20 p-2 rounded-lg border text-sm font-bold text-center outline-none focus:border-[var(--color-primary)]" style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }} />
+                                </div>
                               )}
 
-                              {/* Preview of combined value */}
-                              {barcodeMultiMapping[element.id] &&
-                                barcodeMultiMapping[element.id].some(
-                                  (col) => col !== "",
-                                ) && (
-                                  <div className="bg-white p-3 rounded-lg border border-purple-300">
-                                    <p className="text-xs font-semibold text-gray-700 mb-1">
-                                      Preview (First Row):
-                                    </p>
-                                    <p className="text-sm text-purple-900 font-mono">
-                                      {barcodeMultiMapping[element.id]
-                                        .filter((col) => col !== "")
-                                        .map(
-                                          (col) => importedData[0][col] || "",
-                                        )
-                                        .filter((val) => val !== "")
-                                        .join(
-                                          barcodeSeparators[element.id] || " ",
-                                        )}
-                                    </p>
-                                  </div>
-                                )}
+                              {selectMode === 'search' && mode.id === 'search' && (
+                                <div className="mt-3 relative animate-in fade-in slide-in-from-top-2">
+                                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                  <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={e => handleSearch(e.target.value)}
+                                    placeholder="Type to search..."
+                                    className="w-full pl-9 pr-3 py-2 rounded-lg border text-sm font-medium outline-none focus:border-[var(--color-primary)]"
+                                    style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
+                                  />
+                                </div>
+                              )}
+
+                              {selectMode === 'selected' && mode.id === 'selected' && (
+                                <button onClick={() => setShowDataTable(true)} className="mt-3 w-full py-2 rounded-lg border-2 border-dashed border-gray-300 hover:border-[var(--color-primary)] text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2" style={{ color: theme.textMuted }}>
+                                  <Table size={14} /> Open Data Table
+                                </button>
+                              )}
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Column Mapping */}
+                  <div className="lg:col-span-2 space-y-6">
+
+                    {showDataTable ? (
+                      <div className="p-6 rounded-3xl border bg-white dark:bg-gray-800 shadow-sm h-[600px] flex flex-col" style={{ borderColor: theme.border }}>
+                        {/* Table Header */}
+                        <div className="flex items-center justify-between mb-6">
+                          <div>
+                            <h4 className="font-black text-lg flex items-center gap-2" style={{ color: theme.text }}>
+                              <Eye size={20} className="text-[var(--color-primary)]" />
+                              Data Preview
+                            </h4>
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-1">Review & Select Rows</p>
+                          </div>
+                          <button onClick={() => setShowDataTable(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                            <X size={20} className="text-gray-400" />
+                          </button>
+                        </div>
+
+                        {/* Table Controls */}
+                        <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-900/50 mb-4 flex flex-col sm:flex-row gap-4 justify-between items-center border" style={{ borderColor: theme.border }}>
+                          <div className="relative w-full sm:w-64">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                            <input
+                              type="text"
+                              value={searchTerm}
+                              onChange={e => handleSearch(e.target.value)}
+                              placeholder="Filter table rows..."
+                              className="w-full pl-10 pr-4 py-2 rounded-lg border text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)]"
+                              style={{ backgroundColor: theme.surface, borderColor: theme.border, color: theme.text }}
+                            />
+                          </div>
+                          <button onClick={handleSelectAll} className="text-xs font-bold text-[var(--color-primary)] hover:underline flex items-center gap-1">
+                            <CheckCircle size={14} />
+                            {selectedRows.size === filteredData.length ? "Deselect All Rows" : "Select All Visible"}
+                          </button>
+                        </div>
+
+                        {/* Table Content */}
+                        <div className="flex-1 overflow-auto rounded-xl border" style={{ borderColor: theme.border }}>
+                          <table className="w-full text-sm text-left">
+                            <thead className="sticky top-0 z-10 bg-gray-100 dark:bg-gray-900 shadow-sm">
+                              <tr>
+                                <th className="p-4 w-12">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedRows.size === filteredData.length && filteredData.length > 0}
+                                    onChange={handleSelectAll}
+                                    className="rounded border-gray-300 text-[var(--color-primary)] focus:ring-[var(--color-primary)] w-4 h-4 cursor-pointer"
+                                  />
+                                </th>
+                                <th className="p-4 font-black uppercase text-xs tracking-wider text-gray-500">#</th>
+                                {availableColumns.map((col) => (
+                                  <th key={col} className="p-4 font-black uppercase text-xs tracking-wider text-gray-500 whitespace-nowrap">{col}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y" style={{ divideColor: theme.border }}>
+                              {currentData.map((row) => {
+                                const actualIndex = importedData.indexOf(row);
+                                const isSelected = selectedRows.has(actualIndex);
+                                return (
+                                  <tr
+                                    key={actualIndex}
+                                    className={`transition-colors group ${isSelected ? 'bg-[var(--color-primary)]/5' : 'hover:bg-gray-50 dark:hover:bg-gray-700/30'}`}
+                                  >
+                                    <td className="p-4">
+                                      <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={() => handleRowSelect(actualIndex)}
+                                        className="rounded border-gray-300 text-[var(--color-primary)] focus:ring-[var(--color-primary)] w-4 h-4 cursor-pointer"
+                                      />
+                                    </td>
+                                    <td className="p-4 font-mono text-gray-400 text-xs">{actualIndex + 1}</td>
+                                    {availableColumns.map(col => (
+                                      <td key={col} className="p-4 whitespace-nowrap font-medium" style={{ color: theme.text }}>{row[col]}</td>
+                                    ))}
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                          <div className="mt-4 flex items-center justify-between">
+                            <span className="text-xs font-bold text-gray-400">Page {currentPage} of {totalPages}</span>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setCurrentPage(c => Math.max(1, c - 1))}
+                                disabled={currentPage === 1}
+                                className="px-4 py-2 rounded-lg border text-xs font-bold uppercase transition-all hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{ borderColor: theme.border, color: theme.text }}
+                              >
+                                Previous
+                              </button>
+                              <button
+                                onClick={() => setCurrentPage(c => Math.min(totalPages, c + 1))}
+                                disabled={currentPage === totalPages}
+                                className="px-4 py-2 rounded-lg border text-xs font-bold uppercase transition-all hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{ borderColor: theme.border, color: theme.text }}
+                              >
+                                Next
+                              </button>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-8 p-1">
 
-                    {placeholderElements.length === 0 &&
-                      barcodeElements.length === 0 && (
-                        <div className="text-center py-8 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
-                          <p className="text-gray-600">
-                            No placeholder or barcode fields found in this label
-                            template.
-                          </p>
-                          <p className="text-sm text-gray-500 mt-2">
-                            Add placeholders or barcodes to your label design to
-                            map data.
-                          </p>
+                        {/* Helper Banner */}
+                        <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 flex items-start gap-3">
+                          <Info size={18} className="mt-0.5 shrink-0" />
+                          <div className="text-sm">
+                            <p className="font-bold">Map your data columns</p>
+                            <p className="opacity-80 mt-1">Match the columns from your uploaded file to the fields in your label design. </p>
+                          </div>
                         </div>
-                      )}
-                  </div>
-                </>
-              ) : null}
-            </>
-          )}
 
-          <div className="flex justify-end space-x-3 pt-6 border-t-2 border-gray-200">
+                        {/* Placeholders */}
+                        <div className="space-y-4">
+                          <h4 className="font-black text-sm uppercase tracking-wider flex items-center gap-2 mb-4" style={{ color: theme.textMuted }}>
+                            <Columns size={16} /> Text Fields
+                          </h4>
+                          {placeholderElements.map((element) => {
+                            const fieldName = getFieldName(element.content);
+                            return (
+                              <div key={element.id} className="p-5 rounded-2xl border bg-white dark:bg-gray-800 shadow-sm transition-all hover:shadow-md hover:border-[var(--color-primary)] group" style={{ borderColor: theme.border }}>
+                                <div className="flex flex-col md:flex-row md:items-center gap-4">
+                                  <div className="w-full md:w-1/3">
+                                    <div className="text-base font-bold flex items-center gap-2" style={{ color: theme.text }}>
+                                      <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 font-serif">T</div>
+                                      {fieldName}
+                                    </div>
+                                    <div className="text-xs font-bold uppercase tracking-wider text-gray-400 mt-1 ml-10">Label Field</div>
+                                  </div>
+
+                                  <div className="hidden md:flex text-gray-300">
+                                    <ArrowRight size={20} className="group-hover:text-[var(--color-primary)] group-hover:translate-x-1 transition-all" />
+                                  </div>
+
+                                  <div className="flex-1">
+                                    <div className="relative">
+                                      <select
+                                        value={columnMapping[element.id] || ""}
+                                        onChange={(e) => handleColumnMappingChange(element.id, e.target.value)}
+                                        className="w-full p-3 pl-4 pr-10 rounded-xl border-2 font-medium text-sm outline-none transition-all focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/10 appearance-none cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900"
+                                        style={{ backgroundColor: theme.bg, borderColor: columnMapping[element.id] ? 'var(--color-primary)' : theme.border, color: theme.text }}
+                                      >
+                                        <option value="">Select a column...</option>
+                                        {availableColumns.map(col => <option key={col} value={col}>{col}</option>)}
+                                      </select>
+                                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                                        <ArrowDown size={14} />
+                                      </div>
+                                    </div>
+                                    {columnMapping[element.id] && importedData[0] && (
+                                      <div className="mt-2 flex items-center gap-2 text-xs font-medium text-green-600 dark:text-green-400 animate-in fade-in slide-in-from-top-1">
+                                        <CheckCircle size={12} />
+                                        <span>Preview: "{importedData[0][columnMapping[element.id]]}"</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Barcodes */}
+                        {barcodeElements.length > 0 && (
+                          <div className="space-y-4 pt-4 border-t" style={{ borderColor: theme.border }}>
+                            <h4 className="font-black text-sm uppercase tracking-wider flex items-center gap-2 mb-4" style={{ color: theme.textMuted }}>
+                              <Barcode size={16} /> Composite Barcodes
+                            </h4>
+                            {barcodeElements.map((element) => (
+                              <div key={element.id} className="p-5 rounded-2xl border bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 shadow-sm" style={{ borderColor: theme.border }}>
+                                <div className="flex items-center justify-between mb-6">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-[var(--color-secondary)]/10 flex items-center justify-center text-[var(--color-secondary)]">
+                                      <span className="text-xl font-black">{getBarcodeIcon(element.barcodeType)}</span>
+                                    </div>
+                                    <div>
+                                      <div className="font-bold text-base" style={{ color: theme.text }}>{getBarcodeTypeName(element.barcodeType)}</div>
+                                      <div className="text-xs font-bold uppercase tracking-wider text-gray-400">Composite Data Source</div>
+                                    </div>
+                                  </div>
+                                  <button onClick={() => handleAddBarcodeColumn(element.id)} className="px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white rounded-lg text-xs font-bold uppercase tracking-wider shadow-lg flex items-center gap-2 transition-all active:scale-95">
+                                    <Plus size={14} /> Add Segment
+                                  </button>
+                                </div>
+
+                                <div className="space-y-4 pl-4 md:pl-12 border-l-2 ml-4" style={{ borderColor: theme.border }}>
+                                  <div className="flex items-center gap-3 mb-4">
+                                    <label className="text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: theme.textMuted }}>Join Separator:</label>
+                                    <input
+                                      type="text"
+                                      value={barcodeSeparators[element.id] || " "}
+                                      onChange={(e) => handleSeparatorChange(element.id, e.target.value)}
+                                      className="input py-2 px-3 w-24 text-center font-mono text-xs font-bold rounded-lg border-2 focus:border-[var(--color-secondary)]"
+                                      placeholder="space"
+                                      style={{ backgroundColor: theme.bg, borderColor: theme.border }}
+                                    />
+                                    <span className="text-xs text-gray-400">(Character between segments)</span>
+                                  </div>
+
+                                  {(barcodeMultiMapping[element.id] || []).map((selectedCol, index) => (
+                                    <div key={index} className="flex gap-3 animate-in fade-in slide-in-from-left-2">
+                                      <div className="flex-1 relative">
+                                        <select
+                                          value={selectedCol}
+                                          onChange={(e) => handleBarcodeColumnChange(element.id, index, e.target.value)}
+                                          className="w-full p-3 rounded-xl border-2 font-medium text-sm outline-none transition-all focus:border-[var(--color-secondary)] appearance-none cursor-pointer hover:bg-white dark:hover:bg-gray-900"
+                                          style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
+                                        >
+                                          <option value="">Select Segment {index + 1}...</option>
+                                          {availableColumns.map(col => <option key={col} value={col}>{col}</option>)}
+                                        </select>
+                                      </div>
+                                      <button onClick={() => handleRemoveBarcodeColumn(element.id, index)} className="p-3 text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
+                                        <Trash2 size={18} />
+                                      </button>
+                                    </div>
+                                  ))}
+                                  {(barcodeMultiMapping[element.id] || []).length === 0 && (
+                                    <div className="text-sm italic opacity-50 p-2 border-2 border-dashed rounded-lg text-center" style={{ color: theme.textMuted }}>
+                                      No data segments added yet. Add sources to build the barcode value.
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Empty State */}
+                        {placeholderElements.length === 0 && barcodeElements.length === 0 && (
+                          <div className="p-8 text-center border-2 border-dashed rounded-3xl flex flex-col items-center justify-center gap-4 opacity-60" style={{ borderColor: theme.border }}>
+                            <AlertCircle size={40} className="text-gray-400" />
+                            <p className="text-lg font-bold" style={{ color: theme.text }}>No dynamic fields found</p>
+                            <p className="text-sm max-w-xs mx-auto" style={{ color: theme.textMuted }}>
+                              This label template doesn't have any placeholders or dynamic barcodes to map data to.
+                            </p>
+                          </div>
+                        )}
+
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 border-t flex items-center justify-between gap-4 shrink-0 bg-white dark:bg-gray-800" style={{ borderColor: theme.border }}>
+          <div>
+            {importFile && (
+              <span className="text-xs font-bold uppercase tracking-wider opacity-60 ml-2" style={{ color: theme.textMuted }}>
+                Step {importedData.length > 0 ? (showDataTable ? '2B' : '2A') : '1'} of 2
+              </span>
+            )}
+          </div>
+          <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="px-6 py-2.5 text-gray-700 hover:bg-gray-200 rounded-xl transition-colors font-medium"
+              className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              style={{ color: theme.textMuted }}
             >
               Cancel
             </button>
             <button
               onClick={handleGenerateLabels}
               disabled={importedData.length === 0 || !hasValidMapping()}
-              className={`px-6 py-2.5 rounded-xl font-semibold transition-all flex items-center space-x-2 ${
-                importedData.length > 0 && hasValidMapping()
-                  ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:shadow-lg hover:scale-105"
-                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
-              }`}
+              className="px-8 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:shadow-primary/30 transition-all active:scale-95 text-xs uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:shadow-none disabled:active:scale-100"
             >
-              <Printer size={18} />
-              <span>
-                {importedData.length > 0
-                  ? `Generate ${getDataToGenerate().length} Label${getDataToGenerate().length !== 1 ? "s" : ""}`
-                  : "Generate Labels"}
-              </span>
+              <CheckCircle size={16} />
+              <span>Generate Labels</span>
             </button>
           </div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.2s ease-out;
-        }
-      `}</style>
     </div>
   );
 };

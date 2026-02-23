@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { X, Printer, Settings } from "lucide-react";
+import { X, Printer, Settings, Maximize2, Minimize2, Check } from "lucide-react";
 import BarcodeElement from "../designer/code";
+import { useTheme } from "../../ThemeContext";
 
 const MM_TO_PX = 3.7795275591;
 
@@ -16,78 +17,14 @@ const CutMarks = () => {
 
   return (
     <>
-      <div
-        style={{
-          ...style,
-          top: -markLength,
-          left: 0,
-          width: 1,
-          height: markLength,
-        }}
-      />
-      <div
-        style={{
-          ...style,
-          top: 0,
-          left: -markLength,
-          width: markLength,
-          height: 1,
-        }}
-      />
-      <div
-        style={{
-          ...style,
-          top: -markLength,
-          right: 0,
-          width: 1,
-          height: markLength,
-        }}
-      />
-      <div
-        style={{
-          ...style,
-          top: 0,
-          right: -markLength,
-          width: markLength,
-          height: 1,
-        }}
-      />
-      <div
-        style={{
-          ...style,
-          bottom: -markLength,
-          left: 0,
-          width: 1,
-          height: markLength,
-        }}
-      />
-      <div
-        style={{
-          ...style,
-          bottom: 0,
-          left: -markLength,
-          width: markLength,
-          height: 1,
-        }}
-      />
-      <div
-        style={{
-          ...style,
-          bottom: -markLength,
-          right: 0,
-          width: 1,
-          height: markLength,
-        }}
-      />
-      <div
-        style={{
-          ...style,
-          bottom: 0,
-          right: -markLength,
-          width: markLength,
-          height: 1,
-        }}
-      />
+      <div style={{ ...style, top: -markLength, left: 0, width: 1, height: markLength }} />
+      <div style={{ ...style, top: 0, left: -markLength, width: markLength, height: 1 }} />
+      <div style={{ ...style, top: -markLength, right: 0, width: 1, height: markLength }} />
+      <div style={{ ...style, top: 0, right: -markLength, width: markLength, height: 1 }} />
+      <div style={{ ...style, bottom: -markLength, left: 0, width: 1, height: markLength }} />
+      <div style={{ ...style, bottom: 0, left: -markLength, width: markLength, height: 1 }} />
+      <div style={{ ...style, bottom: -markLength, right: 0, width: 1, height: markLength }} />
+      <div style={{ ...style, bottom: 0, right: -markLength, width: markLength, height: 1 }} />
     </>
   );
 };
@@ -256,6 +193,7 @@ const MULTI_UP_CONFIGS = {
    MAIN MODAL
 ========================= */
 const PrintPreviewModal = ({ label, onClose }) => {
+  const { theme, isDarkMode } = useTheme();
   const { labelSize } = label;
 
   // State for multi-up configuration
@@ -291,8 +229,9 @@ const PrintPreviewModal = ({ label, onClose }) => {
     (margins.top + margins.bottom) * MM_TO_PX;
 
   // Calculate preview scale to fit in viewport
-  const maxPreviewWidth = window.innerWidth * 0.7;
-  const maxPreviewHeight = window.innerHeight * 0.5;
+  // We want a bit more padding for the new UI
+  const maxPreviewWidth = window.innerWidth * 0.6;
+  const maxPreviewHeight = window.innerHeight * 0.6;
   const previewScale = Math.min(
     maxPreviewWidth / sheetWidth,
     maxPreviewHeight / sheetHeight,
@@ -305,31 +244,35 @@ const PrintPreviewModal = ({ label, onClose }) => {
 
   return (
     <>
-      {/* ================= PREVIEW ================= */}
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 print:hidden overflow-auto">
-        <div className="bg-white rounded-2xl w-[95vw] max-w-7xl max-h-[95vh] flex flex-col">
+      {/* ================= PREVIEW UI ================= */}
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 print:hidden overflow-hidden p-6 animate-in fade-in duration-200">
+        <div
+          className="rounded-2xl shadow-2xl w-full max-w-[90vw] h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+          style={{ backgroundColor: theme.surface, borderColor: theme.border }}
+        >
           {/* Header */}
-          <div className="flex justify-between items-center border-b p-6">
+          <div className="flex justify-between items-center border-b p-6" style={{ borderColor: theme.border }}>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: theme.text }}>
+                <Printer size={24} className="text-[var(--color-primary)]" />
                 Print Preview
               </h2>
-              <p className="text-sm text-gray-500 mt-1">
-                {config.name} • {labelSize.width}×{labelSize.height}mm • Each
-                label contains all elements
+              <p className="text-sm mt-1" style={{ color: theme.textMuted }}>
+                {config.name} • {labelSize.width}×{labelSize.height}mm
               </p>
             </div>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowSettings(!showSettings)}
-                className="flex items-center gap-2 px-4 py-2 border-2 rounded-lg hover:bg-gray-50 transition-colors"
+                className={`btn btn-outline flex items-center gap-2 ${showSettings ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)] border-[var(--color-primary)]' : ''}`}
               >
                 <Settings size={18} />
-                <span className="font-medium">Settings</span>
+                <span className="font-medium hidden sm:inline">Settings</span>
               </button>
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                className="p-2 rounded-full hover:bg-[var(--color-bg-main)] transition-colors"
+                style={{ color: theme.textMuted }}
               >
                 <X size={24} />
               </button>
@@ -339,18 +282,21 @@ const PrintPreviewModal = ({ label, onClose }) => {
           <div className="flex flex-1 overflow-hidden">
             {/* Settings Panel */}
             {showSettings && (
-              <div className="w-80 border-r p-6 overflow-y-auto bg-gray-50">
-                <h3 className="font-bold text-lg mb-4">Print Settings</h3>
+              <div
+                className="w-80 border-r p-6 overflow-y-auto animate-in slide-in-from-left-4 duration-200"
+                style={{ backgroundColor: theme.bg, borderColor: theme.border }}
+              >
+                <h3 className="font-bold text-sm uppercase tracking-wider mb-6" style={{ color: theme.textMuted }}>Configuration</h3>
 
                 {/* Multi-Up Layout */}
-                <div className="mb-6">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Layout
+                <div className="mb-8">
+                  <label className="block text-sm font-semibold mb-2" style={{ color: theme.text }}>
+                    Layout Configuration
                   </label>
                   <select
                     value={multiUpConfig}
                     onChange={(e) => setMultiUpConfig(e.target.value)}
-                    className="w-full border-2 rounded-lg px-3 py-2 text-sm"
+                    className="input text-sm"
                   >
                     {Object.entries(MULTI_UP_CONFIGS).map(([key, cfg]) => (
                       <option key={key} value={key}>
@@ -358,33 +304,31 @@ const PrintPreviewModal = ({ label, onClose }) => {
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Each label will contain all your designed elements
+                  <p className="text-xs mt-2" style={{ color: theme.textMuted }}>
+                    {cols * rows} labels per sheet
                   </p>
                 </div>
 
                 {/* Gaps */}
-                <div className="mb-6">
-                  <h4 className="font-semibold text-sm mb-3">Spacing</h4>
-                  <div className="space-y-3">
+                <div className="mb-8">
+                  <h4 className="font-semibold text-sm mb-3" style={{ color: theme.text }}>Spacing (mm)</h4>
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">
-                        Horizontal Gap (mm)
+                      <label className="block text-xs mb-1" style={{ color: theme.textMuted }}>
+                        Horizontal
                       </label>
                       <input
                         type="number"
                         value={horizontalGap}
-                        onChange={(e) =>
-                          setHorizontalGap(Number(e.target.value))
-                        }
+                        onChange={(e) => setHorizontalGap(Number(e.target.value))}
                         min="0"
                         max="50"
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
+                        className="input text-sm py-1"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">
-                        Vertical Gap (mm)
+                      <label className="block text-xs mb-1" style={{ color: theme.textMuted }}>
+                        Vertical
                       </label>
                       <input
                         type="number"
@@ -392,217 +336,165 @@ const PrintPreviewModal = ({ label, onClose }) => {
                         onChange={(e) => setVerticalGap(Number(e.target.value))}
                         min="0"
                         max="50"
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
+                        className="input text-sm py-1"
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* Margins */}
-                <div className="mb-6">
-                  <h4 className="font-semibold text-sm mb-3">Margins (mm)</h4>
+                <div className="mb-8">
+                  <h4 className="font-semibold text-sm mb-3" style={{ color: theme.text }}>Margins (mm)</h4>
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">
-                        Left
-                      </label>
-                      <input
-                        type="number"
-                        value={margins.left}
-                        onChange={(e) =>
-                          setMargins({
-                            ...margins,
-                            left: Number(e.target.value),
-                          })
-                        }
-                        min="0"
-                        max="50"
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">
-                        Right
-                      </label>
-                      <input
-                        type="number"
-                        value={margins.right}
-                        onChange={(e) =>
-                          setMargins({
-                            ...margins,
-                            right: Number(e.target.value),
-                          })
-                        }
-                        min="0"
-                        max="50"
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">
-                        Top
-                      </label>
-                      <input
-                        type="number"
-                        value={margins.top}
-                        onChange={(e) =>
-                          setMargins({
-                            ...margins,
-                            top: Number(e.target.value),
-                          })
-                        }
-                        min="0"
-                        max="50"
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">
-                        Bottom
-                      </label>
-                      <input
-                        type="number"
-                        value={margins.bottom}
-                        onChange={(e) =>
-                          setMargins({
-                            ...margins,
-                            bottom: Number(e.target.value),
-                          })
-                        }
-                        min="0"
-                        max="50"
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
-                      />
-                    </div>
+                    {Object.keys(margins).map((side) => (
+                      <div key={side}>
+                        <label className="block text-xs mb-1 capitalize" style={{ color: theme.textMuted }}>
+                          {side}
+                        </label>
+                        <input
+                          type="number"
+                          value={margins[side]}
+                          onChange={(e) => setMargins({ ...margins, [side]: Number(e.target.value) })}
+                          min="0"
+                          max="50"
+                          className="input text-sm py-1"
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
 
                 {/* Cut Marks */}
-                <div className="mb-6">
-                  <label className="flex items-center gap-2">
+                <div className="mb-8">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${showCutMarks ? 'bg-[var(--color-primary)] border-[var(--color-primary)]' : 'border-gray-400 group-hover:border-[var(--color-primary)]'}`}>
+                      {showCutMarks && <Check size={14} className="text-white" />}
+                    </div>
                     <input
                       type="checkbox"
                       checked={showCutMarks}
                       onChange={(e) => setShowCutMarks(e.target.checked)}
-                      className="rounded"
+                      className="hidden"
                     />
-                    <span className="text-sm font-medium">Show Cut Marks</span>
+                    <span className="text-sm font-medium" style={{ color: theme.text }}>Show Cut Marks</span>
                   </label>
                 </div>
 
                 {/* Quick Presets */}
-                <div className="mb-6">
-                  <h4 className="font-semibold text-sm mb-3">Quick Presets</h4>
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => {
-                        setHorizontalGap(3);
-                        setVerticalGap(3);
-                        setMargins({ left: 5, top: 5, right: 5, bottom: 5 });
-                      }}
-                      className="w-full px-3 py-2 bg-blue-50 hover:bg-blue-100 rounded-lg text-sm text-left"
-                    >
-                      Standard Spacing
-                    </button>
-                    <button
-                      onClick={() => {
-                        setHorizontalGap(0);
-                        setVerticalGap(0);
-                        setMargins({ left: 0, top: 0, right: 0, bottom: 0 });
-                      }}
-                      className="w-full px-3 py-2 bg-blue-50 hover:bg-blue-100 rounded-lg text-sm text-left"
-                    >
-                      No Gaps (Full Bleed)
-                    </button>
-                  </div>
-                </div>
-
-                {/* Info Box */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-xs text-blue-800">
-                    <strong>Note:</strong> Each label will be identical and
-                    contain all elements from your design. The design is
-                    replicated {cols * rows} times on this sheet.
-                  </p>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      setHorizontalGap(3);
+                      setVerticalGap(3);
+                      setMargins({ left: 5, top: 5, right: 5, bottom: 5 });
+                    }}
+                    className="w-full btn btn-outline py-2 text-xs justify-start"
+                  >
+                    Reset to Standard
+                  </button>
+                  <button
+                    onClick={() => {
+                      setHorizontalGap(0);
+                      setVerticalGap(0);
+                      setMargins({ left: 0, top: 0, right: 0, bottom: 0 });
+                    }}
+                    className="w-full btn btn-outline py-2 text-xs justify-start"
+                  >
+                    Reset to No Gaps
+                  </button>
                 </div>
               </div>
             )}
 
             {/* Preview Area */}
-            <div className="flex-1 flex flex-col items-center justify-center p-6 bg-gray-100 overflow-auto">
-              <div className="mb-4 text-sm text-gray-600">
-                Sheet Size: {(sheetWidth / MM_TO_PX).toFixed(1)}mm ×{" "}
-                {(sheetHeight / MM_TO_PX).toFixed(1)}mm
+            <div className="flex-1 flex flex-col relative overflow-hidden bg-gray-100 dark:bg-gray-900/50">
+              {/* Toolbar */}
+              <div className="absolute top-4 right-4 z-10 bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-2 flex gap-2">
+                <button onClick={() => setShowSettings(!showSettings)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors" title={showSettings ? "Expand Preview" : "Show Settings"}>
+                  {showSettings ? <Maximize2 size={16} /> : <Minimize2 size={16} />}
+                </button>
               </div>
 
-              <div
-                className="bg-white shadow-2xl"
-                style={{
-                  transform: `scale(${previewScale})`,
-                  transformOrigin: "center",
-                }}
-              >
+              <div className="flex-1 overflow-auto flex items-center justify-center p-8">
                 <div
+                  className="bg-white shadow-2xl transition-all duration-300"
                   style={{
-                    width: sheetWidth,
-                    height: sheetHeight,
-                    display: "grid",
-                    gridTemplateColumns: `repeat(${cols}, ${labelW}px)`,
-                    gridTemplateRows: `repeat(${rows}, ${labelH}px)`,
-                    gap: `${verticalGap * MM_TO_PX}px ${horizontalGap * MM_TO_PX}px`,
-                    padding: `${margins.top * MM_TO_PX}px ${margins.right * MM_TO_PX}px ${margins.bottom * MM_TO_PX}px ${margins.left * MM_TO_PX}px`,
-                    background: "#fff",
-                    border: "2px dashed #93c5fd",
+                    transform: `scale(${previewScale})`,
+                    transformOrigin: "center",
                   }}
                 >
-                  {Array.from({ length: cols * rows }).map((_, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        width: labelW,
-                        height: labelH,
-                        position: "relative",
-                        background: "#fff",
-                        border: "1px solid #CBD5E1",
-                        overflow: "hidden",
-                        boxSizing: "border-box",
-                      }}
-                    >
-                      {showCutMarks && <CutMarks />}
-                      <RenderLabel label={label} />
-                    </div>
-                  ))}
+                  <div
+                    style={{
+                      width: sheetWidth,
+                      height: sheetHeight,
+                      display: "grid",
+                      gridTemplateColumns: `repeat(${cols}, ${labelW}px)`,
+                      gridTemplateRows: `repeat(${rows}, ${labelH}px)`,
+                      gap: `${verticalGap * MM_TO_PX}px ${horizontalGap * MM_TO_PX}px`,
+                      padding: `${margins.top * MM_TO_PX}px ${margins.right * MM_TO_PX}px ${margins.bottom * MM_TO_PX}px ${margins.left * MM_TO_PX}px`,
+                      backgroundColor: "#fff",
+                      backgroundImage: `
+                            linear-gradient(45deg, #f0f0f0 25%, transparent 25%), 
+                            linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), 
+                            linear-gradient(45deg, transparent 75%, #f0f0f0 75%), 
+                            linear-gradient(-45deg, transparent 75%, #f0f0f0 75%)
+                        `,
+                      backgroundSize: '20px 20px',
+                      backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
+                    }}
+                  >
+                    {Array.from({ length: cols * rows }).map((_, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          width: labelW,
+                          height: labelH,
+                          position: "relative",
+                          background: "#fff",
+                          border: "1px dashed #e2e8f0", // Light border for preview
+                          overflow: "hidden",
+                          boxSizing: "border-box",
+                        }}
+                      >
+                        {showCutMarks && <CutMarks />}
+                        <RenderLabel label={label} />
+                      </div>
+                    ))}
+                  </div>
                 </div>
+              </div>
+
+              <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-2 text-center text-xs text-gray-500">
+                Sheet Size: {(sheetWidth / MM_TO_PX).toFixed(1)}mm × {(sheetHeight / MM_TO_PX).toFixed(1)}mm
               </div>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex justify-between items-center border-t p-6 bg-gray-50">
-            <div className="text-sm text-gray-600">
-              {cols * rows} identical label{cols * rows > 1 ? "s" : ""} per
-              sheet
+          <div className="flex justify-between items-center border-t p-6" style={{ borderColor: theme.border, backgroundColor: theme.surface }}>
+            <div className="text-sm" style={{ color: theme.textMuted }}>
+              Ready to print {cols * rows} labels
             </div>
             <div className="flex gap-3">
               <button
                 onClick={onClose}
-                className="px-6 py-2.5 border-2 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                className="btn btn-ghost"
               >
                 Cancel
               </button>
               <button
                 onClick={handlePrint}
-                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:shadow-lg transition-all flex items-center gap-2 font-semibold"
+                className="btn btn-primary px-8"
               >
-                <Printer size={18} />
-                Print
+                <Printer size={18} className="mr-2" />
+                Print Labels
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ================= PRINT CONTENT ================= */}
+      {/* ================= PRINT CONTENT (HIDDEN FROM UI) ================= */}
       <div className="print-container">
         <div
           className="print-sheet"

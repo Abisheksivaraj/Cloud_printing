@@ -1,20 +1,23 @@
 import React, { useState } from "react";
-import { FileText, Minus, Table, Square } from "lucide-react";
-import { brandColors } from "../../brandColors";
+import { FileText, Minus, Table, Square, Image as ImageIcon } from "lucide-react";
+import { useTheme } from "../../ThemeContext";
 
 const ToolsPalette = ({
   onAddElement,
   onActivateLineDrawing,
   isDrawingLine,
+  onActivateTextDrawing,
+  isDrawingText,
   onDragStart,
   onToolSelect,
   onActivateBarcodeDrawing,
   isDrawingBarcode,
-  selectedBarcodeType, // Keep this for reference but don't display
+  selectedBarcodeType,
   onActivateShapeDrawing,
   isDrawingShape,
   currentShapeType,
 }) => {
+  const { theme, isDarkMode } = useTheme();
   const [selectedTool, setSelectedTool] = useState(null);
 
   const tools = [
@@ -23,23 +26,23 @@ const ToolsPalette = ({
       icon: FileText,
       label: "Text",
       type: "text",
-      draggable: true,
+      special: "text",   // ← now activates draw mode
     },
     { id: "line", icon: Minus, label: "Line", type: "line", special: "line" },
     { id: "table", icon: Table, label: "Table", type: "table" },
     {
       id: "barcode",
       emoji: "📊",
-      label: "Barcode", // ✅ ALWAYS show "Barcode" - not dynamic
+      label: "Barcode",
       type: "barcode",
       special: "barcode",
     },
     {
       id: "image",
-      emoji: "🖼️",
+      icon: ImageIcon,
       label: "Image",
       type: "image",
-      draggable: true,
+      draggable: false,
     },
     {
       id: "shape",
@@ -51,44 +54,42 @@ const ToolsPalette = ({
   ];
 
   const handleClick = (tool) => {
-    // ✅ Handle special tools (line, barcode, and shape)
+    if (tool.special === "text") {
+      if (onActivateTextDrawing) onActivateTextDrawing();
+      setSelectedTool("text");
+      if (onToolSelect) onToolSelect("text"); // expand properties panel
+      return;
+    }
+
     if (tool.special === "line") {
       onActivateLineDrawing();
-      setSelectedTool(null);
+      setSelectedTool("line"); // highlight the button only
+      // Do NOT expand properties panel — it opens after the line is drawn
       return;
     }
 
     if (tool.special === "barcode") {
-      onActivateBarcodeDrawing();
-      setSelectedTool(null);
+      setSelectedTool("barcode");
+      if (onToolSelect) onToolSelect("barcode");
       return;
     }
 
     if (tool.special === "shape") {
       setSelectedTool("shape");
-      if (onToolSelect) {
-        onToolSelect("shape");
-      }
+      if (onToolSelect) onToolSelect("shape");
       return;
     }
 
-    // Set selected tool for table
     if (tool.type === "table") {
       setSelectedTool(tool.type);
-      if (onToolSelect) {
-        onToolSelect(tool.type);
-      }
+      if (onToolSelect) onToolSelect(tool.type);
       return;
     }
 
-    // For draggable items, clicking also adds them
-    if (tool.draggable) {
-      onAddElement(tool.type);
-      setSelectedTool(null);
-      if (onToolSelect) {
-        onToolSelect(null);
-      }
-    }
+    // image — clicking adds directly, no need to keep panel open
+    onAddElement(tool.type);
+    setSelectedTool(null);
+    if (onToolSelect) onToolSelect(null);
   };
 
   const handleDragStart = (e, tool) => {
@@ -100,25 +101,25 @@ const ToolsPalette = ({
 
   return (
     <div
-      className="w-24 bg-white border-r flex flex-col py-6 shadow-lg"
+      className="w-20 border-r flex flex-col py-6 shadow-lg z-20 transition-colors duration-200"
       style={{
-        position: "sticky",
-        top: "64px",
+        backgroundColor: theme.surface,
+        borderColor: theme.border,
         height: "calc(100vh - 64px)",
-        overflow: "hidden",
       }}
     >
       <div
-        className="text-xs font-bold text-center mb-6 tracking-wider"
-        style={{ color: brandColors.darkGray }}
+        className="text-[10px] font-bold text-center mb-6 tracking-widest uppercase opacity-60"
+        style={{ color: theme.textMuted }}
       >
-        TOOLS
+        Tools
       </div>
 
-      <div className="flex flex-col space-y-3 px-2">
+      <div className="flex flex-col space-y-4 px-3 items-center">
         {tools.map((tool) => {
           const Icon = tool.icon;
           const isSelected =
+            (tool.special === "text" && isDrawingText) ||
             (tool.special === "line" && isDrawingLine) ||
             (tool.special === "barcode" && isDrawingBarcode) ||
             (tool.special === "shape" && isDrawingShape) ||
@@ -128,33 +129,30 @@ const ToolsPalette = ({
             <button
               key={tool.id}
               onClick={() => handleClick(tool)}
-              draggable={tool.draggable && !tool.special}
+              draggable={tool.draggable}
               onDragStart={(e) => handleDragStart(e, tool)}
-              className={`p-3 rounded-xl border-2 flex flex-col items-center space-y-2 transition-all hover:scale-105 ${
-                tool.draggable && !tool.special
-                  ? "cursor-grab active:cursor-grabbing"
-                  : "cursor-pointer"
-              }`}
-              style={{
-                borderColor: isSelected
-                  ? brandColors.primaryPink
-                  : brandColors.lightGray,
-                backgroundColor: isSelected
-                  ? brandColors.lightPink
-                  : brandColors.white,
-              }}
-              title={`${tool.special ? "Click to draw " : tool.draggable ? "Click or drag to add " : "Click to add "}${tool.label}`}
+              className={`
+                group relative w-14 flex flex-col items-center gap-1 py-2.5 rounded-xl transition-all duration-200
+                ${isSelected
+                  ? 'bg-[var(--color-primary)] text-white shadow-md scale-105'
+                  : 'hover:bg-[var(--color-bg-main)] hover:scale-105 text-gray-500 dark:text-gray-400'
+                }
+                ${tool.draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}
+              `}
+              title={tool.special === "text" ? "Click then drag on canvas to draw text box" : tool.special ? `Click to activate ${tool.label}` : `Click to add ${tool.label}`}
             >
               {Icon ? (
-                <Icon size={22} style={{ color: brandColors.darkGray }} />
+                <Icon size={18} strokeWidth={1.75} />
               ) : (
-                <div className="text-2xl">{tool.emoji}</div>
+                <span className="text-lg leading-none">{tool.emoji}</span>
               )}
+              <span className="text-[9px] font-bold leading-none opacity-80">{tool.label}</span>
 
-              <span
-                className="text-xs font-semibold text-center leading-tight"
-                style={{ color: brandColors.darkGray }}
-              >
+              {/* Tooltip */}
+              <span className={`
+                absolute left-16 px-2 py-1 rounded-lg bg-gray-900 text-white text-[10px] font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-xl
+                ${isSelected ? 'hidden' : ''}
+              `}>
                 {tool.label}
               </span>
             </button>

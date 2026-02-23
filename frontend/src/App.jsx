@@ -1,17 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Tag } from "lucide-react";
 import LabelLibrary from "./components/LabelLibrary";
-import {
-  AppHeader,
-  SystemSettingsModal,
-  AboutModal,
-} from "./components/HeaderActions";
+import { AppHeader } from "./components/HeaderActions";
 import LabelDesigner from "./components/LabelDesign";
 import Signup from "./components/admin/Signup";
 import Login from "./components/admin/Login";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import { useTheme } from "./ThemeContext";
-import { supabase } from "./supabaseClient";
+
 
 const App = () => {
   const { theme } = useTheme();
@@ -23,52 +19,36 @@ const App = () => {
 
   useEffect(() => {
     // Check for active session on mount
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+    const checkSession = () => {
+      const token = localStorage.getItem("authToken");
 
       // Handle invitation/profile completion route
       const isCompleteProfile = window.location.pathname === "/complete-profile";
 
       if (isCompleteProfile) {
         setCurrentView("signup");
-        setIsAuthenticated(!!session);
-      } else if (session) {
+        setIsAuthenticated(!!token);
+      } else if (token) {
         setIsAuthenticated(true);
         setCurrentView("admin_dashboard");
       } else {
         setIsAuthenticated(false);
-        setCurrentView("signup"); // Default to signup for new visitors
+        setCurrentView("login");
       }
       setIsLoading(false);
     };
 
     checkSession();
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      const isCompleteProfile = window.location.pathname === "/complete-profile";
-
-      if (session) {
-        setIsAuthenticated(true);
-        // Only redirect to dashboard if NOT in the middle of completing profile
-        if (!isCompleteProfile) {
-          setCurrentView("admin_dashboard");
-        }
-      } else {
-        setIsAuthenticated(false);
-        if (!isCompleteProfile) {
-          setCurrentView("login");
-        }
-      }
-    });
-
-    return () => subscription.unsubscribe();
   }, []);
 
   // Manage navigation
   const navigateTo = (view) => {
     if (view === "logout") {
-      supabase.auth.signOut();
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("userData");
+      localStorage.removeItem("companyName");
+      setIsAuthenticated(false);
+      setCurrentView("login");
       return;
     }
     setCurrentView(view);
@@ -76,12 +56,14 @@ const App = () => {
 
   const handleSignup = (user) => {
     console.log("Signup successful:", user);
-    // onAuthStateChange will handle the redirection
+    setIsAuthenticated(true);
+    setCurrentView("admin_dashboard");
   };
 
   const handleLogin = (user) => {
     console.log("Login successful:", user);
-    // onAuthStateChange will handle the redirection
+    setIsAuthenticated(true);
+    setCurrentView("admin_dashboard");
   };
 
   const handleCreateLabel = (labelData) => {

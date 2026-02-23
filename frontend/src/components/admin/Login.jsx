@@ -1,86 +1,144 @@
 import React, { useState } from "react";
-import { Mail, Lock, LogIn, ArrowRight, Loader2 } from "lucide-react";
+import { User, Lock, ArrowRight, LogIn, Loader2 } from "lucide-react";
 import { useTheme } from "../../ThemeContext";
 import { useLanguage } from "../../LanguageContext";
-import { supabase } from "../../supabaseClient";
 import { toast, Toaster } from "react-hot-toast";
+import { callEdgeFunction, API_URLS } from "../../supabaseClient";
 
 const Login = ({ onLogin, onSwitchToSignup }) => {
     const { isDarkMode, theme } = useTheme();
     const { t } = useLanguage();
     const [formData, setFormData] = useState({
-        email: "",
+        userName: "",
         password: "",
     });
+
+    const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+        setError("");
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setError("");
+
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email: formData.email,
+            const data = await callEdgeFunction(API_URLS.LOGIN, {
+                userName: formData.userName,
                 password: formData.password,
             });
 
-            if (error) throw error;
+            // Store auth token and user data
+            if (data.token) localStorage.setItem("authToken", data.token);
+            if (data.admin) localStorage.setItem("userData", JSON.stringify(data.admin));
+            if (data.user) localStorage.setItem("userData", JSON.stringify(data.user));
 
-            toast.success("Logged in successfully!");
-            onLogin(data.user);
-        } catch (error) {
-            toast.error(error.message || "Failed to login");
+            toast.success("Login successful!");
+            onLogin(data.admin || data.user);
+        } catch (err) {
+            console.error("Login error:", err);
+            const errorMessage = err.message || "Invalid username or password.";
+            setError(errorMessage);
+            toast.error(errorMessage);
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-[calc(100vh-64px)] flex items-center justify-center p-6 transition-colors duration-500">
+        <div
+            className="min-h-screen flex items-center justify-center p-6 transition-colors duration-500"
+            style={{ backgroundColor: theme.bg }}
+        >
             <div
-                className={`w-full max-w-md rounded-[2.5rem] shadow-2xl border overflow-hidden transition-all duration-500 ${isDarkMode ? 'shadow-blue-500/10' : 'shadow-black/5'}`}
+                className="w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in-95 duration-300"
                 style={{ backgroundColor: theme.surface, borderColor: theme.border }}
             >
-                {/* Header Branding */}
-                <div className="bg-gradient-to-br from-[#39A3DD] to-[#2E82B1] p-12 text-white flex flex-col items-center text-center relative overflow-hidden">
-                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl animate-pulse"></div>
-                    <div className="w-20 h-20 bg-white/20 backdrop-blur-xl rounded-2xl flex items-center justify-center mb-6 shadow-2xl border border-white/30 relative z-10">
-                        <LogIn size={40} />
+                {/* Left Side - Brand / Info */}
+                <div className="md:w-2/5 p-12 text-white flex flex-col relative overflow-hidden bg-[var(--color-primary)]">
+                    <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-hover)] opacity-90"></div>
+
+                    {/* Decorative Circles */}
+                    <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
+                    <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-black/10 rounded-full blur-3xl"></div>
+
+                    <div className="relative z-10 flex-1 flex flex-col justify-center">
+                        <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-8 shadow-lg">
+                            <LogIn size={32} className="text-white" />
+                        </div>
+
+                        <h2 className="text-3xl font-bold mb-4 tracking-tight">Welcome Back.</h2>
+                        <p className="text-white/80 text-lg leading-relaxed mb-8">
+                            Sign in to access your dashboard, manage labels, and monitor print jobs.
+                        </p>
+
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-3 text-white/90">
+                                <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                                <span className="text-sm font-semibold tracking-wide">Secure Access</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-white/90">
+                                <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                                <span className="text-sm font-semibold tracking-wide">Real-time Analytics</span>
+                            </div>
+                        </div>
                     </div>
-                    <h2 className="text-4xl font-black leading-tight relative z-10">{t.welcomeBack}.</h2>
-                    <p className="text-white/80 text-sm font-medium mt-3 relative z-10">Sign in to your premium dashboard.</p>
+
+                    <div className="relative z-10 mt-12 pt-8 border-t border-white/20">
+                        <p className="text-xs font-bold uppercase tracking-wider text-white/70 mb-3">New to the platform?</p>
+                        <button
+                            onClick={onSwitchToSignup}
+                            className="flex items-center gap-2 text-white font-bold hover:text-white/80 transition-colors group"
+                        >
+                            <span>Create an Account</span>
+                            <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                        </button>
+                    </div>
                 </div>
 
-                {/* Form Body */}
-                <div className="p-12">
+                {/* Right Side - Form */}
+                <div className="md:w-3/5 p-12 md:p-16 flex flex-col justify-center bg-white dark:bg-gray-900">
+                    <div className="mb-10">
+                        <h1 className="text-3xl font-bold tracking-tight mb-2" style={{ color: theme.text }}>{t.login}</h1>
+                        <p className="text-sm" style={{ color: theme.textMuted }}>
+                            Enter your credentials to access your account.
+                        </p>
+                    </div>
+
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-[0.2em] ml-1" style={{ color: theme.textMuted }}>{t.email}</label>
+                            <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>
+                                Username
+                            </label>
                             <div className="relative group">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#39A3DD]" style={{ color: isDarkMode ? '#475569' : '#CBD5E1' }} size={18} />
+                                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={18} />
                                 <input
                                     required
-                                    type="email"
-                                    name="email"
-                                    value={formData.email}
+                                    type="text"
+                                    name="userName"
+                                    value={formData.userName}
                                     onChange={handleChange}
-                                    placeholder="john@company.com"
-                                    className="w-full pl-12 pr-4 py-4 border-2 border-transparent rounded-2xl focus:outline-none transition-all text-sm font-bold"
-                                    style={{ backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC', color: theme.text, borderColor: isDarkMode ? '#334155' : 'transparent' }}
+                                    placeholder="Enter username"
+                                    className="input pl-11 py-3"
                                 />
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <div className="flex items-center justify-between ml-1">
-                                <label className="text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: theme.textMuted }}>{t.password}</label>
-                                <button type="button" className="text-[10px] font-black text-[#39A3DD] uppercase tracking-[0.2em] hover:underline">Forgot?</button>
+                            <div className="flex items-center justify-between">
+                                <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>
+                                    {t.password}
+                                </label>
+                                <button type="button" className="text-xs font-semibold text-[var(--color-primary)] hover:underline">
+                                    Forgot Password?
+                                </button>
                             </div>
                             <div className="relative group">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#39A3DD]" style={{ color: isDarkMode ? '#475569' : '#CBD5E1' }} size={18} />
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={18} />
                                 <input
                                     required
                                     type="password"
@@ -88,41 +146,35 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
                                     value={formData.password}
                                     onChange={handleChange}
                                     placeholder="••••••••"
-                                    className="w-full pl-12 pr-4 py-4 border-2 border-transparent rounded-2xl focus:outline-none transition-all text-sm font-bold"
-                                    style={{ backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC', color: theme.text, borderColor: isDarkMode ? '#334155' : 'transparent' }}
+                                    className="input pl-11 py-3"
                                 />
                             </div>
                         </div>
 
+                        {error && (
+                            <div className="p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-center gap-2 animate-in slide-in-from-left-2">
+                                <span className="font-bold">Error:</span> {error}
+                            </div>
+                        )}
+
                         <button
                             type="submit"
                             disabled={loading}
-                            className={`w-full py-5 text-white rounded-[1.25rem] font-black text-sm uppercase tracking-[0.2em] shadow-xl transition-all flex items-center justify-center space-x-3 group ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:scale-[1.02] active:scale-95'}`}
-                            style={{ backgroundColor: isDarkMode ? '#334155' : '#38474F' }}
+                            className="btn btn-primary w-full py-4 text-sm font-bold uppercase tracking-widest shadow-lg hover:shadow-primary/20 flex items-center justify-center gap-3 group"
                         >
                             {loading ? (
                                 <Loader2 className="animate-spin" size={20} />
                             ) : (
                                 <>
                                     <span>{t.login}</span>
-                                    <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                                 </>
                             )}
                         </button>
                     </form>
-
-                    <div className="mt-12 text-center">
-                        <p className="text-xs font-black uppercase tracking-[0.2em]" style={{ color: theme.textMuted }}>{t.dontHaveAccount}</p>
-                        <button
-                            onClick={onSwitchToSignup}
-                            className="text-[#E85874] text-sm font-black mt-3 hover:underline underline-offset-8 transition-all"
-                        >
-                            {t.createAccount}
-                        </button>
-                    </div>
+                    <Toaster position="top-right" />
                 </div>
             </div>
-            <Toaster position="top-right" />
         </div>
     );
 };

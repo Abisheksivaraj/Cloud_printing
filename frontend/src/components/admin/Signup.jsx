@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
-import { User, Mail, Phone, Lock, Building, ArrowRight, UserPlus, Loader2 } from "lucide-react";
+import React, { useState } from "react";
+import { User, Lock, ArrowRight, UserPlus, Loader2, Mail, Phone, Building2 } from "lucide-react";
 import { useTheme } from "../../ThemeContext";
 import { useLanguage } from "../../LanguageContext";
 import { toast, Toaster } from "react-hot-toast";
-import { supabase } from "../../supabaseClient";
+import { callEdgeFunction, API_URLS } from "../../supabaseClient";
 
 const Signup = ({ onSignup, onSwitchToLogin }) => {
     const { isDarkMode, theme } = useTheme();
@@ -20,38 +20,6 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
 
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
-    const [lockedFields, setLockedFields] = useState({
-        email: false,
-        companyName: false
-    });
-
-    useEffect(() => {
-        // Fetch parameters from both search (?) and hash (#)
-        const searchParams = new URLSearchParams(window.location.search);
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-
-        const email = searchParams.get('email') || hashParams.get('email');
-        const companyName = searchParams.get('companyName') || hashParams.get('companyName');
-        const errorDescription = searchParams.get('error_description') || hashParams.get('error_description');
-
-        if (errorDescription) {
-            setError(errorDescription);
-            toast.error(errorDescription);
-        }
-
-        if (email || companyName) {
-            setFormData(prev => ({
-                ...prev,
-                email: email || prev.email,
-                companyName: companyName || prev.companyName
-            }));
-
-            setLockedFields({
-                email: !!email,
-                companyName: !!companyName
-            });
-        }
-    }, []);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -70,28 +38,31 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
         setError("");
 
         try {
-            const { data, error: functionError } = await supabase.functions.invoke(
-                'users-complete-profile',
-                {
-                    body: {
-                        firstName: formData.firstName,
-                        lastName: formData.lastName,
-                        companyName: formData.companyName,
-                        email: formData.email,
-                        mobileNumber: formData.mobileNumber,
-                        password: formData.password,
-                        role: "admin"
-                    }
-                }
-            );
+            // Register via complete-profile edge function
+            await callEdgeFunction(API_URLS.COMPLETE_PROFILE, {
+                firstName: formData.firstName,
+                lastName: formData.lastName,
+                companyName: formData.companyName,
+                email: formData.email,
+                mobileNumber: formData.mobileNumber,
+                password: formData.password,
+            });
 
-            if (functionError) throw functionError;
+            toast.success("Account created successfully!");
 
-            // Store company name for other components (like AdminDashboard)
-            localStorage.setItem("companyName", formData.companyName);
+            // Auto login after registration
+            const loginData = await callEdgeFunction(API_URLS.LOGIN, {
+                userName: formData.email,
+                password: formData.password,
+            });
 
-            toast.success("Admin account created successfully!");
-            onSignup(formData);
+            // Store auth token and user data
+            if (loginData.token) localStorage.setItem("authToken", loginData.token);
+            if (loginData.admin) localStorage.setItem("userData", JSON.stringify(loginData.admin));
+            if (loginData.user) localStorage.setItem("userData", JSON.stringify(loginData.user));
+            if (formData.companyName) localStorage.setItem("companyName", formData.companyName);
+
+            onSignup(loginData.admin || loginData.user);
         } catch (err) {
             console.error("Signup error:", err);
             const errorMessage = err.message || "Something went wrong. Please try again.";
@@ -102,64 +73,86 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
         }
     };
 
+    // Reusable input field style
+    const inputStyle = {
+        backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#fff',
+        borderColor: theme.border,
+        color: theme.text,
+    };
+
     return (
-        <div className="min-h-[calc(100vh-64px)] flex items-center justify-center p-6 transition-colors duration-500">
+        <div
+            className="min-h-screen flex items-center justify-center p-6 transition-colors duration-500"
+            style={{ backgroundColor: theme.bg }}
+        >
             <div
-                className={`w-full max-w-4xl rounded-[2.5rem] shadow-2xl border overflow-hidden flex flex-col md:flex-row transition-all duration-500 ${isDarkMode ? 'shadow-pink-500/10' : 'shadow-black/5'}`}
+                className="w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in-95 duration-300"
                 style={{ backgroundColor: theme.surface, borderColor: theme.border }}
             >
-                {/* Left Side - Branding/Info */}
-                <div className="md:w-2/5 bg-gradient-to-br from-[#E85874] to-[#C4455D] p-12 flex flex-col justify-center text-white relative overflow-hidden">
-                    {/* Decorative elements */}
-                    <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
-                    <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-black/10 rounded-full blur-3xl"></div>
+                {/* Left Side - Brand / Info */}
+                <div className="md:w-2/5 p-10 md:p-12 text-white flex flex-col relative overflow-hidden bg-[var(--color-primary)]">
+                    <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-hover)] opacity-90"></div>
 
-                    <div className="relative z-10">
-                        <div className="w-20 h-20 bg-white/20 backdrop-blur-xl rounded-3xl flex items-center justify-center mb-8 shadow-2xl border border-white/30">
-                            <UserPlus size={40} className="text-white" />
+                    {/* Decorative Circles */}
+                    <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
+                    <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-black/10 rounded-full blur-3xl"></div>
+
+                    <div className="relative z-10 flex-1 flex flex-col justify-center">
+                        <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-8 shadow-lg">
+                            <UserPlus size={32} className="text-white" />
                         </div>
-                        <h2 className="text-4xl font-black leading-tight mb-6">Join the Printing Revolution.</h2>
-                        <p className="text-white/80 text-lg font-medium">Create your admin account to manage labels, users, and print jobs seamlessly.</p>
 
-                        <div className="mt-12 space-y-4">
-                            <div className="flex items-center space-x-3 text-white/70">
-                                <div className="w-2 h-2 bg-white rounded-full"></div>
-                                <span className="text-sm font-bold uppercase tracking-widest">Enterprise Ready</span>
+                        <h2 className="text-3xl font-bold mb-4 tracking-tight">Join the Platform.</h2>
+                        <p className="text-white/80 text-lg leading-relaxed mb-8">
+                            Create your account to manage labels, users, and print jobs seamlessly.
+                        </p>
+
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-3 text-white/90">
+                                <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                                <span className="text-sm font-semibold tracking-wide">Enterprise Grade Security</span>
                             </div>
-                            <div className="flex items-center space-x-3 text-white/70">
-                                <div className="w-2 h-2 bg-white rounded-full"></div>
-                                <span className="text-sm font-bold uppercase tracking-widest">Global Standards</span>
+                            <div className="flex items-center gap-3 text-white/90">
+                                <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                                <span className="text-sm font-semibold tracking-wide">Cloud-Native Architecture</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-white/90">
+                                <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                                <span className="text-sm font-semibold tracking-wide">Multi-User Collaboration</span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="mt-auto relative z-10">
-                        <p className="text-xs text-white/60 font-black uppercase tracking-[0.2em] mb-3">{t.alreadyHaveAccount}</p>
+                    <div className="relative z-10 mt-12 pt-8 border-t border-white/20">
+                        <p className="text-xs font-bold uppercase tracking-wider text-white/70 mb-3">Already have an account?</p>
                         <button
                             onClick={onSwitchToLogin}
-                            className="group flex items-center space-x-2 text-sm font-black text-white hover:text-white/80 transition-all underline underline-offset-8"
+                            className="flex items-center gap-2 text-white font-bold hover:text-white/80 transition-colors group"
                         >
-                            <span>{t.login}</span>
+                            <span>Back to Login</span>
                             <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                         </button>
                     </div>
                 </div>
 
                 {/* Right Side - Form */}
-                <div className="md:w-3/5 p-12 md:p-16">
-                    <div className="mb-12">
-                        <h1 className="text-4xl font-black tracking-tight mb-2" style={{ color: theme.text }}>{t.signup}</h1>
-                        <p className="font-medium text-sm" style={{ color: theme.textMuted }}>Fill in the details to set up your premium workspace.</p>
+                <div className="md:w-3/5 p-8 md:p-12 flex flex-col justify-center overflow-y-auto max-h-[90vh]" style={{ backgroundColor: isDarkMode ? theme.surface : '#fff' }}>
+                    <div className="mb-6">
+                        <h1 className="text-3xl font-bold tracking-tight mb-2" style={{ color: theme.text }}>{t.signup || "Create Account"}</h1>
+                        <p className="text-sm" style={{ color: theme.textMuted }}>
+                            Fill in your details to get started with your workspace.
+                        </p>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-[0.2em] ml-1" style={{ color: theme.textMuted }}>
-                                    First Name <span className="text-[#E85874]">*</span>
+                    <form onSubmit={handleSubmit} className="space-y-5">
+                        {/* First Name & Last Name - Side by side */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>
+                                    First Name
                                 </label>
                                 <div className="relative group">
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#E85874]" style={{ color: isDarkMode ? '#475569' : '#CBD5E1' }} size={18} />
+                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={16} />
                                     <input
                                         required
                                         type="text"
@@ -167,103 +160,96 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                                         value={formData.firstName}
                                         onChange={handleChange}
                                         placeholder="John"
-                                        className="w-full pl-12 pr-4 py-4 border-2 border-transparent rounded-2xl focus:outline-none transition-all text-sm font-bold"
-                                        style={{ backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC', color: theme.text, borderColor: isDarkMode ? '#334155' : 'transparent' }}
+                                        className="input pl-11 py-2.5 text-sm"
                                     />
                                 </div>
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-[0.2em] ml-1" style={{ color: theme.textMuted }}>Last Name</label>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>
+                                    Last Name
+                                </label>
                                 <div className="relative group">
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#E85874]" style={{ color: isDarkMode ? '#475569' : '#CBD5E1' }} size={18} />
+                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={16} />
                                     <input
+                                        required
                                         type="text"
                                         name="lastName"
                                         value={formData.lastName}
                                         onChange={handleChange}
                                         placeholder="Doe"
-                                        className="w-full pl-12 pr-4 py-4 border-2 border-transparent rounded-2xl focus:outline-none transition-all text-sm font-bold"
-                                        style={{ backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC', color: theme.text, borderColor: isDarkMode ? '#334155' : 'transparent' }}
+                                        className="input pl-11 py-2.5 text-sm"
                                     />
                                 </div>
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-[0.2em] ml-1" style={{ color: theme.textMuted }}>
-                                Company Name <span className="text-[#E85874]">*</span>
+                        {/* Company Name */}
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>
+                                Company Name
                             </label>
                             <div className="relative group">
-                                <Building className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#E85874]" style={{ color: isDarkMode ? '#475569' : '#CBD5E1' }} size={18} />
+                                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={16} />
                                 <input
                                     required
                                     type="text"
                                     name="companyName"
                                     value={formData.companyName}
                                     onChange={handleChange}
-                                    readOnly={lockedFields.companyName}
-                                    placeholder="Acme Printing Co."
-                                    className={`w-full pl-12 pr-4 py-4 border-2 border-transparent rounded-2xl focus:outline-none transition-all text-sm font-bold ${lockedFields.companyName ? 'opacity-70 cursor-not-allowed select-none' : ''}`}
-                                    style={{
-                                        backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
-                                        color: theme.text,
-                                        borderColor: isDarkMode ? '#334155' : 'transparent'
-                                    }}
+                                    placeholder="ATPL Cloud Printing"
+                                    className="input pl-11 py-2.5 text-sm"
                                 />
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-[0.2em] ml-1" style={{ color: theme.textMuted }}>
-                                    {t.email} <span className="text-[#E85874]">*</span>
+                        {/* Email & Mobile - Side by side */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>
+                                    Email
                                 </label>
                                 <div className="relative group">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#E85874]" style={{ color: isDarkMode ? '#475569' : '#CBD5E1' }} size={18} />
+                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={16} />
                                     <input
                                         required
                                         type="email"
                                         name="email"
                                         value={formData.email}
                                         onChange={handleChange}
-                                        readOnly={lockedFields.email}
                                         placeholder="john@company.com"
-                                        className={`w-full pl-12 pr-4 py-4 border-2 border-transparent rounded-2xl focus:outline-none transition-all text-sm font-bold ${lockedFields.email ? 'opacity-70 cursor-not-allowed select-none' : ''}`}
-                                        style={{
-                                            backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
-                                            color: theme.text,
-                                            borderColor: isDarkMode ? '#334155' : 'transparent'
-                                        }}
+                                        className="input pl-11 py-2.5 text-sm"
                                     />
                                 </div>
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-[0.2em] ml-1" style={{ color: theme.textMuted }}>
-                                    Mobile Number <span className="text-[#E85874]">*</span>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>
+                                    Mobile Number
                                 </label>
                                 <div className="relative group">
-                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#E85874]" style={{ color: isDarkMode ? '#475569' : '#CBD5E1' }} size={18} />
+                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={16} />
                                     <input
                                         required
                                         type="tel"
                                         name="mobileNumber"
                                         value={formData.mobileNumber}
                                         onChange={handleChange}
-                                        placeholder="+1 (555) 000-0000"
-                                        className="w-full pl-12 pr-4 py-4 border-2 border-transparent rounded-2xl focus:outline-none transition-all text-sm font-bold"
-                                        style={{ backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC', color: theme.text, borderColor: isDarkMode ? '#334155' : 'transparent' }}
+                                        placeholder="+91 98765 43210"
+                                        className="input pl-11 py-2.5 text-sm"
                                     />
                                 </div>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-[0.2em] ml-1" style={{ color: theme.textMuted }}>
-                                    {t.password} <span className="text-[#E85874]">*</span>
+                        {/* Password & Confirm Password - Side by side */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>
+                                    {t.password || "Password"}
                                 </label>
                                 <div className="relative group">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#E85874]" style={{ color: isDarkMode ? '#475569' : '#CBD5E1' }} size={18} />
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={16} />
                                     <input
                                         required
                                         type="password"
@@ -271,17 +257,18 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                                         value={formData.password}
                                         onChange={handleChange}
                                         placeholder="••••••••"
-                                        className="w-full pl-12 pr-4 py-4 border-2 border-transparent rounded-2xl focus:outline-none transition-all text-sm font-bold"
-                                        style={{ backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC', color: theme.text, borderColor: isDarkMode ? '#334155' : 'transparent' }}
+                                        className="input pl-11 py-2.5 text-sm"
+                                        minLength={6}
                                     />
                                 </div>
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-[0.2em] ml-1" style={{ color: theme.textMuted }}>
-                                    {t.confirmPassword} <span className="text-[#E85874]">*</span>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>
+                                    {t.confirmPassword || "Confirm Password"}
                                 </label>
                                 <div className="relative group">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#E85874]" style={{ color: isDarkMode ? '#475569' : '#CBD5E1' }} size={18} />
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={16} />
                                     <input
                                         required
                                         type="password"
@@ -289,31 +276,30 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                                         value={formData.confirmPassword}
                                         onChange={handleChange}
                                         placeholder="••••••••"
-                                        className="w-full pl-12 pr-4 py-4 border-2 border-transparent rounded-2xl focus:outline-none transition-all text-sm font-bold"
-                                        style={{ backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC', color: theme.text, borderColor: isDarkMode ? '#334155' : 'transparent' }}
+                                        className="input pl-11 py-2.5 text-sm"
+                                        minLength={6}
                                     />
                                 </div>
                             </div>
                         </div>
 
                         {error && (
-                            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 text-xs font-black uppercase tracking-widest text-center animate-shake">
-                                {error}
+                            <div className="p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-center gap-2 animate-in slide-in-from-left-2">
+                                <span className="font-bold">Error:</span> {error}
                             </div>
                         )}
 
                         <button
                             type="submit"
                             disabled={loading}
-                            className={`w-full py-5 text-white rounded-[1.25rem] font-black text-sm uppercase tracking-[0.2em] shadow-xl transition-all flex items-center justify-center space-x-3 group ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-black hover:scale-[1.02] active:scale-95'}`}
-                            style={{ backgroundColor: isDarkMode ? '#334155' : '#38474F' }}
+                            className="btn btn-primary w-full py-3.5 text-sm font-bold uppercase tracking-widest shadow-lg hover:shadow-primary/20 flex items-center justify-center gap-3 group"
                         >
                             {loading ? (
                                 <Loader2 className="animate-spin" size={20} />
                             ) : (
                                 <>
-                                    <span>{t.createAccount}</span>
-                                    <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                                    <span>{t.createAccount || "Create Account"}</span>
+                                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                                 </>
                             )}
                         </button>
