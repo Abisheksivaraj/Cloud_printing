@@ -9,7 +9,7 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
     const { isDarkMode, theme } = useTheme();
     const { t } = useLanguage();
     const [formData, setFormData] = useState({
-        userName: "",
+        email: "",
         password: "",
     });
 
@@ -28,7 +28,9 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
 
         try {
             const data = await callEdgeFunction(API_URLS.LOGIN, {
-                email: formData.userName,
+                email: formData.email,
+                user_name: formData.email,
+                userName: formData.email,
                 password: formData.password,
             });
 
@@ -41,7 +43,7 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
             onLogin(data.admin || data.user);
         } catch (err) {
             console.error("Login error:", err);
-            const errorMessage = err.message || "Invalid username or password.";
+            const errorMessage = err.message || "Invalid email or password.";
             setError(errorMessage);
             toast.error(errorMessage);
         } finally {
@@ -112,17 +114,17 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-2">
                             <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>
-                                Username
+                                {t.email}
                             </label>
                             <div className="relative group">
-                                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={18} />
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={18} />
                                 <input
                                     required
-                                    type="text"
-                                    name="userName"
-                                    value={formData.userName}
+                                    type="email"
+                                    name="email"
+                                    value={formData.email}
                                     onChange={handleChange}
-                                    placeholder="Enter username"
+                                    placeholder="Enter your email"
                                     className="input pl-11 py-3"
                                 />
                             </div>
