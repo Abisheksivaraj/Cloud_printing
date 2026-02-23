@@ -5,8 +5,13 @@
   --color-brand-blue: #39A3DD;
   --color-brand-pink: #E85874;
   --color-brand-dark: #38474F;
+  --color-primary-blue: #39A3DD;
+  --color-primary-pink: #E85874;
   --font-oswald: "Oswald", sans-serif;
   --font-inter: "Inter", sans-serif;
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --shadow-premium-blue: 0 10px 20px -10px rgba(57, 163, 221, 0.5);
+  --shadow-premium-pink: 0 10px 20px -10px rgba(232, 88, 116, 0.5);
 }
 
 @layer base {
@@ -74,15 +79,15 @@
   }
 
   .glass-card {
-    @apply bg-white/10 backdrop-blur-2xl border border-white/20 rounded-[2rem] shadow-[0_8px_32px_0_rgba(0, 0, 0, 0.37)];
+    @apply bg-white/10 backdrop-blur-2xl border border-white/20 rounded-[2rem] shadow-glass;
   }
 
   .btn-premium-blue {
-    @apply bg-gradient-to-br from-[#39A3DD] to-[#2A7FAF] hover:scale-[1.02] active:scale-[0.98] text-white font-black py-4 px-8 rounded-2xl transition-all shadow-[0_10px_20px_-10px_rgba(57, 163, 221, 0.5)] flex items-center justify-center gap-2 uppercase tracking-[0.2em] text-sm;
+    @apply bg-gradient-to-br from-[#39A3DD] to-[#2A7FAF] hover:scale-[1.02] active:scale-[0.98] text-white font-black py-4 px-8 rounded-2xl transition-all shadow-premium-blue flex items-center justify-center gap-2 uppercase tracking-[0.2em] text-sm;
   }
 
   .btn-premium-pink {
-    @apply bg-gradient-to-br from-[#E85874] to-[#C4455D] hover:scale-[1.02] active:scale-[0.98] text-white font-black py-4 px-8 rounded-2xl transition-all shadow-[0_10px_20px_-10px_rgba(232, 88, 116, 0.5)] flex items-center justify-center gap-2 uppercase tracking-[0.2em] text-sm;
+    @apply bg-gradient-to-br from-[#E85874] to-[#C4455D] hover:scale-[1.02] active:scale-[0.98] text-white font-black py-4 px-8 rounded-2xl transition-all shadow-premium-pink flex items-center justify-center gap-2 uppercase tracking-[0.2em] text-sm;
   }
 
   .input-glass {
