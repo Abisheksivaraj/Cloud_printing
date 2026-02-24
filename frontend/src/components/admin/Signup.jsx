@@ -25,33 +25,36 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
     const [error, setError] = useState("");
 
     React.useEffect(() => {
-        const hash = window.location.hash;
-        const queryParams = new URLSearchParams(window.location.search);
-        let email = queryParams.get('email');
-        let companyName = queryParams.get('companyName');
+        const handleAuth = async () => {
+            const hash = window.location.hash;
+            const queryParams = new URLSearchParams(window.location.search);
+            let email = queryParams.get('email');
+            let companyName = queryParams.get('companyName');
 
-        if (hash) {
-            const hashParams = new URLSearchParams(hash.replace('#', ''));
-            const access_token = hashParams.get('access_token');
-            const type = hashParams.get('type');
+            if (hash) {
+                const hashParams = new URLSearchParams(hash.replace('#', ''));
+                const access_token = hashParams.get('access_token');
+                const type = hashParams.get('type');
 
-            // Check hash for email/companyName as well
-            if (!email) email = hashParams.get('email');
-            if (!companyName) companyName = hashParams.get('companyName');
+                // Check hash for email/companyName as well
+                if (!email) email = hashParams.get('email');
+                if (!companyName) companyName = hashParams.get('companyName');
 
-            if (access_token && (type === 'invite' || type === 'signup')) {
-                setIsInvite(true);
-                supabase.auth.setSession({ access_token, refresh_token: "" });
+                if (access_token && (type === 'invite' || type === 'signup')) {
+                    setIsInvite(true);
+                    await supabase.auth.setSession({ access_token, refresh_token: "" });
+                }
             }
-        }
 
-        if (email || companyName) {
-            setFormData(prev => ({
-                ...prev,
-                email: email || prev.email,
-                companyName: companyName || prev.companyName
-            }));
-        }
+            if (email || companyName) {
+                setFormData(prev => ({
+                    ...prev,
+                    email: email || prev.email,
+                    companyName: companyName || prev.companyName
+                }));
+            }
+        };
+        handleAuth();
     }, []);
 
     const handleChange = (e) => {
