@@ -55,6 +55,16 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                 if (access_token && (type === 'invite' || type === 'signup')) {
                     setIsInvite(true);
                     await supabase.auth.setSession({ access_token, refresh_token: "" });
+
+                    try {
+                        const inviteData = await callEdgeFunction(API_URLS.GET_INVITATION, {});
+                        if (inviteData) {
+                            email = inviteData.email || email;
+                            companyName = inviteData.company_name || inviteData.companyName || companyName;
+                        }
+                    } catch (fetchErr) {
+                        console.error("Failed to fetch invitation details:", fetchErr);
+                    }
                 }
             }
 
@@ -87,14 +97,16 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
 
         setLoading(true);
         try {
-            await callEdgeFunction(API_URLS.COMPLETE_PROFILE, {
+            const payload = {
                 first_name: formData.firstName,
                 last_name: formData.lastName,
                 company_name: formData.companyName,
                 mobile_number: formData.mobileNumber,
                 email: formData.email,
                 password: formData.password,
-            });
+            };
+            console.log("Payload being sent:", payload);
+            await callEdgeFunction(API_URLS.COMPLETE_PROFILE, payload);
             toast.success("Identity Provisioned Successful!");
             const loginData = await callEdgeFunction(API_URLS.LOGIN, { email: formData.email, password: formData.password });
             onSignup(loginData.admin || loginData.user);
@@ -200,7 +212,7 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                             <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">Company Name</label>
                             <div className="relative group">
                                 <Building2 className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#39A3DD] transition-colors" size={16} />
-                                <input required name="companyName" value={formData.companyName} onChange={handleChange} placeholder="Global Prints Inc." className="w-full bg-transparent border-b-2 border-gray-200 py-3 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#39A3DD] transition-colors" />
+                                <input required name="companyName" value={formData.companyName} onChange={handleChange} readOnly={isInvite && !!formData.companyName} placeholder="Global Prints Inc." className={`w-full bg-transparent border-b-2 border-gray-200 py-3 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#39A3DD] transition-colors ${isInvite && formData.companyName ? 'opacity-70 bg-gray-50/30' : ''}`} />
                             </div>
                         </div>
 
@@ -209,7 +221,7 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                                 <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">E-mail</label>
                                 <div className="relative group">
                                     <Mail className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#39A3DD] transition-colors" size={16} />
-                                    <input required type="email" name="email" value={formData.email} onChange={handleChange} disabled={isInvite && !!formData.email} placeholder="john@company.com" className={`w-full bg-transparent border-b-2 border-gray-200 py-2.5 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#39A3DD] transition-colors ${isInvite && formData.email ? 'opacity-50' : ''}`} />
+                                    <input required type="email" name="email" value={formData.email} onChange={handleChange} readOnly={isInvite && !!formData.email} placeholder="john@company.com" className={`w-full bg-transparent border-b-2 border-gray-200 py-2.5 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#39A3DD] transition-colors ${isInvite && formData.email ? 'opacity-70 bg-gray-50/30' : ''}`} />
                                 </div>
                             </div>
                             <div className="space-y-1">

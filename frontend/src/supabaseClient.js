@@ -16,6 +16,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 export const API_URLS = {
     LOGIN: 'login',
     COMPLETE_PROFILE: 'complete-registration',
+    GET_INVITATION: 'get-invitation',
 };
 
 // Helper to call edge functions using the SDK
