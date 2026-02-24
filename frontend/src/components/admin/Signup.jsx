@@ -33,6 +33,18 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
 
             if (hash) {
                 const hashParams = new URLSearchParams(hash.replace('#', ''));
+
+                // 1. Check for errors first (e.g., otp_expired)
+                const errorParam = hashParams.get('error');
+                const errorDesc = hashParams.get('error_description');
+
+                if (errorParam) {
+                    const cleanMsg = errorDesc?.replace(/\+/g, ' ') || "Identity link has expired or is invalid.";
+                    setError(cleanMsg);
+                    toast.error(cleanMsg, { duration: 6000 });
+                    return;
+                }
+
                 const access_token = hashParams.get('access_token');
                 const type = hashParams.get('type');
 
