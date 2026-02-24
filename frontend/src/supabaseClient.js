@@ -20,9 +20,15 @@ export const API_URLS = {
 
 // Helper to call edge functions using the SDK
 export const callEdgeFunction = async (functionName, body) => {
-    const token = localStorage.getItem("authToken");
+    let token = localStorage.getItem("authToken");
 
-    // Skip Authorization header for login endpoint
+    // If no token in localStorage, try to get it from the current session
+    if (!token) {
+        const { data: { session } } = await supabase.auth.getSession();
+        token = session?.access_token;
+    }
+
+    // Skip Authorization header for login endpoint if no token is available
     const headers = {};
     if (token && functionName !== API_URLS.LOGIN) {
         headers.Authorization = `Bearer ${token}`;

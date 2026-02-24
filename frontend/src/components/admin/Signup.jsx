@@ -27,19 +27,30 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
     React.useEffect(() => {
         const hash = window.location.hash;
         const queryParams = new URLSearchParams(window.location.search);
+        let email = queryParams.get('email');
+        let companyName = queryParams.get('companyName');
+
         if (hash) {
             const hashParams = new URLSearchParams(hash.replace('#', ''));
             const access_token = hashParams.get('access_token');
             const type = hashParams.get('type');
+
+            // Check hash for email/companyName as well
+            if (!email) email = hashParams.get('email');
+            if (!companyName) companyName = hashParams.get('companyName');
+
             if (access_token && (type === 'invite' || type === 'signup')) {
                 setIsInvite(true);
                 supabase.auth.setSession({ access_token, refresh_token: "" });
             }
         }
-        const email = queryParams.get('email');
-        const companyName = queryParams.get('companyName');
+
         if (email || companyName) {
-            setFormData(prev => ({ ...prev, email: email || prev.email, companyName: companyName || prev.companyName }));
+            setFormData(prev => ({
+                ...prev,
+                email: email || prev.email,
+                companyName: companyName || prev.companyName
+            }));
         }
     }, []);
 
@@ -183,7 +194,7 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                                 <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">E-mail</label>
                                 <div className="relative group">
                                     <Mail className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#39A3DD] transition-colors" size={16} />
-                                    <input required type="email" name="email" value={formData.email} onChange={handleChange} disabled={isInvite} placeholder="john@company.com" className={`w-full bg-transparent border-b-2 border-gray-200 py-2.5 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#39A3DD] transition-colors ${isInvite ? 'opacity-50' : ''}`} />
+                                    <input required type="email" name="email" value={formData.email} onChange={handleChange} disabled={isInvite && !!formData.email} placeholder="john@company.com" className={`w-full bg-transparent border-b-2 border-gray-200 py-2.5 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#39A3DD] transition-colors ${isInvite && formData.email ? 'opacity-50' : ''}`} />
                                 </div>
                             </div>
                             <div className="space-y-1">
