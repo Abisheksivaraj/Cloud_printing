@@ -32,6 +32,7 @@ const DesignCanvas = forwardRef(
       updateElement,
       setSelectedBarcodeType,
       zoom = 100,
+      canEdit = true,
       onZoomChange,
       onInteraction,
       onElementCreated,
@@ -297,6 +298,7 @@ const DesignCanvas = forwardRef(
     const handleTextDoubleClick = useCallback(
       (e, element) => {
         e.stopPropagation();
+        if (!canEdit) return;
         if (isDrawingLine || isDrawingBarcode || isDrawingShape) return;
         if (!['text', 'placeholder'].includes(element.type)) return;
         setEditingElementId(element.id);
@@ -316,6 +318,12 @@ const DesignCanvas = forwardRef(
     const handleElementMouseDown = useCallback(
       (e, element) => {
         e.stopPropagation();
+
+        if (!canEdit) {
+          setSelectedElementId(element.id);
+          if (onElementSelected) onElementSelected();
+          return;
+        }
 
         // If editing another element, commit it first
         if (editingElementId && editingElementId !== element.id) {
@@ -366,6 +374,8 @@ const DesignCanvas = forwardRef(
       (e, element, point) => {
         e.stopPropagation();
 
+        if (!canEdit) return;
+
         if (isDrawingLine || isDrawingBarcode || isDrawingShape) {
           return;
         }
@@ -392,6 +402,8 @@ const DesignCanvas = forwardRef(
       (e, element, handle) => {
         e.stopPropagation();
 
+        if (!canEdit) return;
+
         if (isDrawingLine || isDrawingBarcode || isDrawingShape) {
           return;
         }
@@ -415,6 +427,7 @@ const DesignCanvas = forwardRef(
       (e, element) => {
         e.stopPropagation();
         e.preventDefault();
+        if (!canEdit) return;
         const cx = element.x + element.width / 2;
         const cy = element.y + element.height / 2;
         const rect = canvasRef.current.getBoundingClientRect();
@@ -721,6 +734,13 @@ const DesignCanvas = forwardRef(
     const handleCanvasMouseDown = useCallback(
       (e) => {
         if (!canvasRef.current) return;
+
+        if (!canEdit) {
+          // User clicked on empty canvas area — collapse properties panel
+          if (onInteraction) onInteraction();
+          setSelectedElementId(null);
+          return;
+        }
 
         const rect = canvasRef.current.getBoundingClientRect();
         const scale = displayZoom / 100;

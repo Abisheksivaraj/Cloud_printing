@@ -4,9 +4,11 @@ import { useTheme } from "../ThemeContext";
 import { useLanguage } from "../LanguageContext";
 import logo from "../assets/companyLogo.png";
 
-export const AppHeader = ({ onNavigate }) => {
+export const AppHeader = ({ onNavigate, currentView, userRole, userData }) => {
   const { isDarkMode, toggleTheme, theme } = useTheme();
   const { t } = useLanguage();
+
+  const isAdmin = userRole === 'admin';
 
   return (
     <header
@@ -21,7 +23,7 @@ export const AppHeader = ({ onNavigate }) => {
         {/* Brand Section */}
         <div
           className="flex items-center gap-4 cursor-pointer group"
-          onClick={() => onNavigate("dashboard")}
+          onClick={() => onNavigate("library")}
         >
           <div className="h-10 px-3 bg-white border border-gray-100 rounded shadow-sm flex items-center justify-center transition-transform group-hover:scale-105">
             <img src={logo} alt="Archery Technocrats" className="h-6 object-contain" />
@@ -35,6 +37,26 @@ export const AppHeader = ({ onNavigate }) => {
             </p>
           </div>
         </div>
+
+        {/* Primary Navigation */}
+        <nav className="hidden md:flex items-center gap-6 ml-10 flex-1">
+          <button
+            onClick={() => onNavigate("library")}
+            className={`text-xs font-black uppercase tracking-widest transition-colors ${currentView === "library" ? "text-[#39A3DD]" : "text-[#8A9BA5] hover:text-[#38474F]"}`}
+            style={{ color: currentView === "library" ? "#39A3DD" : theme.textMuted }}
+          >
+            Templates
+          </button>
+          {isAdmin && (
+            <button
+              onClick={() => onNavigate("admin_dashboard")}
+              className={`text-xs font-black uppercase tracking-widest transition-colors ${currentView === "admin_dashboard" ? "text-[#E85874]" : "text-[#8A9BA5] hover:text-[#38474F]"}`}
+              style={{ color: currentView === "admin_dashboard" ? "#E85874" : theme.textMuted }}
+            >
+              Admin Dashboard
+            </button>
+          )}
+        </nav>
 
         {/* Action Controls */}
         <div className="flex items-center gap-2 md:gap-4">
@@ -56,14 +78,18 @@ export const AppHeader = ({ onNavigate }) => {
 
           {/* User Profile / Logout */}
           <div className="flex items-center gap-3 ml-2 pl-4 border-l border-gray-100">
-            <div className="hidden md:block text-right">
-              <p className="text-xs font-black text-[#38474F] uppercase tracking-wider" style={{ color: theme.text }}>Admin User</p>
-              <p className="text-[10px] text-[#8A9BA5] font-bold">Project Manager</p>
+            <div className="hidden lg:block text-right">
+              <p className="text-xs font-black text-[#38474F] uppercase tracking-wider" style={{ color: theme.text }}>
+                {userData ? `${userData.first_name || userData.firstName || ''} ${userData.last_name || userData.lastName || ''}` : 'User'}
+              </p>
+              <p className="text-[10px] text-[#8A9BA5] font-black uppercase tracking-tighter">
+                {userRole || 'Member'}
+              </p>
             </div>
 
             <button
               onClick={() => onNavigate("logout")}
-              className="flex items-center justify-center h-10 w-10 bg-gray-50 hover:bg-red-50 text-[#8A9BA5] hover:text-red-500 rounded border border-gray-100 transition-all"
+              className="flex items-center justify-center h-10 w-10 bg-gray-50 hover:bg-red-50 text-[#8A9BA5] hover:text-red-500 rounded border border-gray-100 transition-all font-black"
               title="Logout"
             >
               <LogOut size={18} />

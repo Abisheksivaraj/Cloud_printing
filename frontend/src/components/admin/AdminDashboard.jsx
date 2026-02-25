@@ -21,8 +21,20 @@ import { useTheme } from "../../ThemeContext";
 
 import { API_URLS, callEdgeFunction } from "../../supabaseClient";
 
-const AdminDashboard = () => {
+const AdminDashboard = ({ userRole }) => {
     const { theme, isDarkMode } = useTheme();
+
+    if (userRole !== 'admin') {
+        return (
+            <div className="flex items-center justify-center h-full min-h-[calc(100vh-64px)]">
+                <div className="text-center p-10 card-premium">
+                    <h1 className="text-3xl font-black text-red-500 mb-4">ACCESS DENIED</h1>
+                    <p className="text-[#8A9BA5] font-bold">You do not have authorization to view this secure node.</p>
+                </div>
+            </div>
+        );
+    }
+
     const [users, setUsers] = useState([
         { id: 1, firstName: "Alice", lastName: "Smith", email: "alice@atpl.com", mobile: "+1 555-0101", role: "admin", status: "Active" },
         { id: 2, firstName: "Bob", lastName: "Jones", email: "bob@atpl.com", mobile: "+1 555-0102", role: "operator", status: "Active" },

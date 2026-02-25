@@ -10,9 +10,11 @@ import { useTheme } from "../ThemeContext";
 import { useLanguage } from "../LanguageContext";
 import AIChatbot from "./designer/AIChatbot";
 
-const LabelDesigner = ({ label, labels = [], onSave, onSelectLabel, onCreateLabel, onDeleteLabel, onNavigateToLibrary }) => {
+const LabelDesigner = ({ label, labels = [], userRole, onSave, onSelectLabel, onCreateLabel, onDeleteLabel, onNavigateToLibrary }) => {
   const { isDarkMode, theme } = useTheme();
   const { t } = useLanguage();
+
+  const canEdit = userRole === 'admin' || userRole === 'operator';
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [elements, setElements] = useState(label?.elements || []);
@@ -372,30 +374,32 @@ const LabelDesigner = ({ label, labels = [], onSave, onSelectLabel, onCreateLabe
       />
 
       {/* ─── Tools Palette ─── */}
-      <ToolsPalette
-        onAddElement={addElement}
-        onActivateLineDrawing={activateLineDrawing}
-        isDrawingLine={isDrawingLine}
-        onActivateTextDrawing={activateTextDrawing}
-        isDrawingText={isDrawingText}
-        onDragStart={(type) => canvasRef.current?.setDraggedElement(type)}
-        onToolSelect={(tool) => {
-          setSelectedTool(tool);
-          if (tool) setIsPropertiesExpanded(true);
-        }}
-        onActivateBarcodeDrawing={(type) => {
-          activateBarcodeDrawing(type);
-          setIsPropertiesExpanded(true);
-        }}
-        isDrawingBarcode={isDrawingBarcode}
-        selectedBarcodeType={selectedBarcodeType}
-        onActivateShapeDrawing={(type) => {
-          activateShapeDrawing(type);
-          setIsPropertiesExpanded(true);
-        }}
-        isDrawingShape={isDrawingShape}
-        currentShapeType={currentShapeType}
-      />
+      {canEdit && (
+        <ToolsPalette
+          onAddElement={addElement}
+          onActivateLineDrawing={activateLineDrawing}
+          isDrawingLine={isDrawingLine}
+          onActivateTextDrawing={activateTextDrawing}
+          isDrawingText={isDrawingText}
+          onDragStart={(type) => canvasRef.current?.setDraggedElement(type)}
+          onToolSelect={(tool) => {
+            setSelectedTool(tool);
+            if (tool) setIsPropertiesExpanded(true);
+          }}
+          onActivateBarcodeDrawing={(type) => {
+            activateBarcodeDrawing(type);
+            setIsPropertiesExpanded(true);
+          }}
+          isDrawingBarcode={isDrawingBarcode}
+          selectedBarcodeType={selectedBarcodeType}
+          onActivateShapeDrawing={(type) => {
+            activateShapeDrawing(type);
+            setIsPropertiesExpanded(true);
+          }}
+          isDrawingShape={isDrawingShape}
+          currentShapeType={currentShapeType}
+        />
+      )}
 
       {/* ─── Canvas Area ─── */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
@@ -494,14 +498,18 @@ const LabelDesigner = ({ label, labels = [], onSave, onSelectLabel, onCreateLabe
 
             {/* Save group */}
             <div className="flex items-center gap-1 bg-[var(--color-bg-main)] p-1 rounded-xl border border-[var(--color-border)]">
-              <button
-                onClick={handleSave}
-                className="btn-blue px-6 py-1.5 text-[9px] font-black uppercase tracking-[0.2em] shadow-sm transform-none h-auto rounded-md"
-              >
-                <Save size={14} />
-                Authorize Save
-              </button>
-              <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1"></div>
+              {canEdit && (
+                <>
+                  <button
+                    onClick={handleSave}
+                    className="btn-blue px-6 py-1.5 text-[9px] font-black uppercase tracking-[0.2em] shadow-sm transform-none h-auto rounded-md"
+                  >
+                    <Save size={14} />
+                    Authorize Save
+                  </button>
+                  <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1"></div>
+                </>
+              )}
               <button
                 onClick={() => { if (onNavigateToLibrary) onNavigateToLibrary(); }}
                 className="px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-1.5"
@@ -522,6 +530,7 @@ const LabelDesigner = ({ label, labels = [], onSave, onSelectLabel, onCreateLabe
           selectedElementId={selectedElementId}
           setSelectedElementId={setSelectedElementId}
           labelSize={labelSize}
+          canEdit={canEdit}
           showGrid={showGrid}
           isDrawingLine={isDrawingLine}
           setIsDrawingLine={setIsDrawingLine}
@@ -554,50 +563,52 @@ const LabelDesigner = ({ label, labels = [], onSave, onSelectLabel, onCreateLabe
       </div>
 
       {/* ─── Properties Panel (Expandable/Collapsible) ─── */}
-      <div
-        className={`fixed top-12 md:top-14 bottom-0 right-0 z-40 transition-transform duration-500 ease-in-out border-l shadow-2xl ${isPropertiesExpanded ? 'translate-x-0' : 'translate-x-full'
-          }`}
-        style={{ width: "320px", backgroundColor: theme.surface, borderColor: theme.border }}
-      >
-        <button
-          onClick={() => setIsPropertiesExpanded(!isPropertiesExpanded)}
-          className="absolute -left-8 top-1/2 -translate-y-1/2 w-8 h-16 bg-[var(--color-surface)] border-l border-t border-b rounded-l-xl flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-[-4px_0_10px_rgba(0,0,0,0.05)]"
-          style={{ borderColor: theme.border, backgroundColor: theme.surface }}
+      {canEdit && (
+        <div
+          className={`fixed top-12 md:top-14 bottom-0 right-0 z-40 transition-transform duration-500 ease-in-out border-l shadow-2xl ${isPropertiesExpanded ? 'translate-x-0' : 'translate-x-full'
+            }`}
+          style={{ width: "320px", backgroundColor: theme.surface, borderColor: theme.border }}
         >
-          <div className={`transition-transform duration-500 ${isPropertiesExpanded ? 'rotate-180' : ''}`} style={{ color: theme.textMuted }}>
-            <ArrowLeft size={16} />
-          </div>
-        </button>
+          <button
+            onClick={() => setIsPropertiesExpanded(!isPropertiesExpanded)}
+            className="absolute -left-8 top-1/2 -translate-y-1/2 w-8 h-16 bg-[var(--color-surface)] border-l border-t border-b rounded-l-xl flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-[-4px_0_10px_rgba(0,0,0,0.05)]"
+            style={{ borderColor: theme.border, backgroundColor: theme.surface }}
+          >
+            <div className={`transition-transform duration-500 ${isPropertiesExpanded ? 'rotate-180' : ''}`} style={{ color: theme.textMuted }}>
+              <ArrowLeft size={16} />
+            </div>
+          </button>
 
-        <div className="h-full overflow-y-auto custom-scrollbar">
-          <PropertiesPanel
-            selectedElement={selectedElement}
-            updateElement={updateElement}
-            deleteElement={deleteElement}
-            onBarcodeTypeChange={handleBarcodeTypeChange}
-            isDrawingLine={isDrawingLine}
-            isDrawingBarcode={isDrawingBarcode}
-            isDrawingShape={isDrawingShape}
-            onUndo={() => canvasRef.current?.handleUndo()}
-            onRedo={() => canvasRef.current?.handleRedo()}
-            onDuplicate={() => canvasRef.current?.handleDuplicate()}
-            canUndo={canvasRef.current?.canUndo || false}
-            canRedo={canvasRef.current?.canRedo || false}
-            onAddShape={handleAddShape}
-            onAddTable={handleAddTable}
-            onAddPlaceholder={handleAddPlaceholder}
-            onActivateShapeDrawing={activateShapeDrawing}
-            showShapeSelector={selectedTool === "shape"}
-            showTableCreator={selectedTool === "table"}
-            onActivateBarcodeDrawing={activateBarcodeDrawing}
-            showBarcodeSelector={selectedTool === "barcode"}
-            selectedBarcodeType={selectedBarcodeType}
-            setSelectedBarcodeType={setSelectedBarcodeType}
-            onBringForward={handleBringForward}
-            onSendBackward={handleSendBackward}
-          />
+          <div className="h-full overflow-y-auto custom-scrollbar">
+            <PropertiesPanel
+              selectedElement={selectedElement}
+              updateElement={updateElement}
+              deleteElement={deleteElement}
+              onBarcodeTypeChange={handleBarcodeTypeChange}
+              isDrawingLine={isDrawingLine}
+              isDrawingBarcode={isDrawingBarcode}
+              isDrawingShape={isDrawingShape}
+              onUndo={() => canvasRef.current?.handleUndo()}
+              onRedo={() => canvasRef.current?.handleRedo()}
+              onDuplicate={() => canvasRef.current?.handleDuplicate()}
+              canUndo={canvasRef.current?.canUndo || false}
+              canRedo={canvasRef.current?.canRedo || false}
+              onAddShape={handleAddShape}
+              onAddTable={handleAddTable}
+              onAddPlaceholder={handleAddPlaceholder}
+              onActivateShapeDrawing={activateShapeDrawing}
+              showShapeSelector={selectedTool === "shape"}
+              showTableCreator={selectedTool === "table"}
+              onActivateBarcodeDrawing={activateBarcodeDrawing}
+              showBarcodeSelector={selectedTool === "barcode"}
+              selectedBarcodeType={selectedBarcodeType}
+              setSelectedBarcodeType={setSelectedBarcodeType}
+              onBringForward={handleBringForward}
+              onSendBackward={handleSendBackward}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Barcode Modal */}
       {showBarcodeModal && (
@@ -619,18 +630,20 @@ const LabelDesigner = ({ label, labels = [], onSave, onSelectLabel, onCreateLabe
       )}
 
       {/* AI Assistant Chatbot */}
-      <AIChatbot
-        onGenerateElements={(newElements, nextLabelSize, isNewRequest) => {
-          if (nextLabelSize) setLabelSize(nextLabelSize);
-          if (isNewRequest) {
-            setElements(newElements);
-          } else {
-            setElements((prev) => [...prev, ...newElements]);
-          }
-        }}
-        labelSize={labelSize}
-        generateId={generateId}
-      />
+      {canEdit && (
+        <AIChatbot
+          onGenerateElements={(newElements, nextLabelSize, isNewRequest) => {
+            if (nextLabelSize) setLabelSize(nextLabelSize);
+            if (isNewRequest) {
+              setElements(newElements);
+            } else {
+              setElements((prev) => [...prev, ...newElements]);
+            }
+          }}
+          labelSize={labelSize}
+          generateId={generateId}
+        />
+      )}
     </div>
   );
 };

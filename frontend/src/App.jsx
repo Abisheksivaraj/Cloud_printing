@@ -17,6 +17,8 @@ const App = () => {
   const [currentLabel, setCurrentLabel] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [userRole, setUserRole] = useState(null);
+  const [userData, setUserData] = useState(null);
 
   useEffect(() => {
     // Check for active session on mount
@@ -25,6 +27,17 @@ const App = () => {
       await supabase.auth.getSession();
 
       const token = localStorage.getItem("authToken");
+      const storedUserData = localStorage.getItem("userData");
+      let parsedUserData = null;
+      if (storedUserData) {
+        try {
+          parsedUserData = JSON.parse(storedUserData);
+          setUserData(parsedUserData);
+          setUserRole(parsedUserData.role?.toLowerCase() || 'operator');
+        } catch (e) {
+          console.error("Failed to parse user data", e);
+        }
+      }
 
       // Handle invitation/profile completion route
       const isCompleteProfile = window.location.pathname === "/complete-profile" || window.location.pathname === "/accept-invite";
@@ -39,7 +52,13 @@ const App = () => {
           refresh_token: "" // We don't have this in storage yet, but access_token is enough for many cases
         });
         setIsAuthenticated(true);
-        setCurrentView("admin_dashboard");
+
+        // Redirect based on role
+        if (parsedUserData?.role?.toLowerCase() === 'admin') {
+          setCurrentView("admin_dashboard");
+        } else {
+          setCurrentView("library");
+        }
       } else {
         setIsAuthenticated(false);
         setCurrentView("login");
@@ -57,25 +76,39 @@ const App = () => {
       localStorage.removeItem("userData");
       localStorage.removeItem("companyName");
       setIsAuthenticated(false);
+      setUserRole(null);
+      setUserData(null);
       setCurrentView("login");
       return;
     }
+
+    // Safety check for admin dashboard
+    if (view === "admin_dashboard" && userRole !== 'admin') {
+      setCurrentView("library");
+      return;
+    }
+
     setCurrentView(view);
   };
 
   const handleSignup = (user) => {
     console.log("Signup successful:", user);
     setIsAuthenticated(true);
-    setCurrentView("admin_dashboard");
+    setUserData(user);
+    setUserRole(user.role?.toLowerCase() || 'admin'); // Signup usually creates an admin unless it's a profile completion
+    setCurrentView(user.role?.toLowerCase() === 'admin' ? "admin_dashboard" : "library");
   };
 
   const handleLogin = (user) => {
     console.log("Login successful:", user);
     setIsAuthenticated(true);
-    setCurrentView("admin_dashboard");
+    setUserData(user);
+    setUserRole(user.role?.toLowerCase() || 'operator');
+    setCurrentView(user.role?.toLowerCase() === 'admin' ? "admin_dashboard" : "library");
   };
 
   const handleCreateLabel = (labelData) => {
+    if (userRole === 'viewer') return;
     const newLabel = {
       id: `label_${Date.now()}`,
       ...labelData,
@@ -88,15 +121,22 @@ const App = () => {
   };
 
   const handleEditLabel = (label) => {
+    if (userRole === 'viewer') {
+      setCurrentLabel(label);
+      setCurrentView("designer"); // Designer should handle read-only mode or we just show preview
+      return;
+    }
     setCurrentLabel(label);
     setCurrentView("designer");
   };
 
   const handleDeleteLabel = (labelId) => {
+    if (userRole === 'viewer') return;
     setLabels(labels.filter((label) => label.id !== labelId));
   };
 
   const handleSaveLabel = (labelData) => {
+    if (userRole === 'viewer') return;
     const updatedLabels = labels.map((label) =>
       label.id === currentLabel.id
         ? {
@@ -123,7 +163,12 @@ const App = () => {
     <div className="h-screen w-screen transition-colors duration-300 flex flex-col overflow-hidden bg-white">
       {/* Navigation / Header - Only show for main app functionality */}
       {(isAuthenticated || currentView === "library" || currentView === "designer" || currentView === "admin_dashboard") && !isLoading && (
-        <AppHeader onNavigate={navigateTo} currentView={currentView} />
+        <AppHeader
+          onNavigate={navigateTo}
+          currentView={currentView}
+          userRole={userRole}
+          userData={userData}
+        />
       )}
 
       <main className="flex-1">
@@ -148,12 +193,13 @@ const App = () => {
             )}
 
             {currentView === "admin_dashboard" && (
-              <AdminDashboard />
+              <AdminDashboard userRole={userRole} />
             )}
 
             {currentView === "library" && (
               <LabelLibrary
                 labels={labels}
+                userRole={userRole}
                 onCreateLabel={handleCreateLabel}
                 onEditLabel={handleEditLabel}
                 onDeleteLabel={handleDeleteLabel}
@@ -163,6 +209,7 @@ const App = () => {
             {currentView === "designer" && (
               <LabelDesigner
                 label={currentLabel}
+                userRole={userRole}
                 onSave={handleSaveLabel}
                 onBack={handleBackToLibrary}
               />

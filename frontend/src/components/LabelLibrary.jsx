@@ -25,12 +25,18 @@ import { useTheme } from "../ThemeContext";
 
 const LabelLibrary = ({
   labels,
+  userRole,
   onCreateLabel,
   onEditLabel,
   onDeleteLabel,
 }) => {
   const { t } = useLanguage();
   const { theme, isDarkMode } = useTheme();
+
+  const isViewer = userRole === 'viewer';
+  const isAdmin = userRole === 'admin';
+  const isOperator = userRole === 'operator';
+  const canEdit = isAdmin || isOperator;
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -87,13 +93,15 @@ const LabelLibrary = ({
                 style={{ backgroundColor: theme.surface, color: theme.text }}
               />
             </div>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="btn-pink px-8 py-3.5 text-xs font-black uppercase tracking-widest"
-            >
-              <Plus size={16} />
-              <span>{t.createNewLabel || "New Template"}</span>
-            </button>
+            {canEdit && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="btn-pink px-8 py-3.5 text-xs font-black uppercase tracking-widest"
+              >
+                <Plus size={16} />
+                <span>{t.createNewLabel || "New Template"}</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -154,7 +162,9 @@ const LabelLibrary = ({
                   <div className="h-44 bg-[#F8FAFC] flex items-center justify-center relative border-b border-gray-50 overflow-hidden"
                     style={{ backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC' }}>
                     <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-[#38474F]/40 backdrop-blur-[2px] z-10 flex items-center justify-center transition-all">
-                      <button onClick={() => onEditLabel(label)} className="btn-blue py-2 px-6 text-[10px]">Open Architecture</button>
+                      <button onClick={() => onEditLabel(label)} className="btn-blue py-2 px-6 text-[10px]">
+                        {canEdit ? "Open Architecture" : "View Architecture"}
+                      </button>
                     </div>
                     {/* Abstract design representation */}
                     <div className="w-24 h-16 bg-white border border-gray-100 shadow-sm rounded flex flex-col gap-1 p-2">
@@ -177,9 +187,11 @@ const LabelLibrary = ({
                           {label.labelSize?.width || 100}W × {label.labelSize?.height || 80}H MILLIMETERS
                         </p>
                       </div>
-                      <div className="flex-shrink-0">
-                        <button onClick={() => onEditLabel(label)} className="p-2 text-[#8A9BA5] hover:text-[#39A3DD] transition-colors"><Edit2 size={14} /></button>
-                      </div>
+                      {canEdit && (
+                        <div className="flex-shrink-0">
+                          <button onClick={() => onEditLabel(label)} className="p-2 text-[#8A9BA5] hover:text-[#39A3DD] transition-colors"><Edit2 size={14} /></button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center justify-between gap-2 pt-4 border-t border-gray-50" style={{ borderColor: theme.border }}>
@@ -187,8 +199,10 @@ const LabelLibrary = ({
                         <button onClick={() => handleImportData(label)} className="p-2.5 bg-slate-50 hover:bg-blue-50 text-[#8A9BA5] hover:text-[#39A3DD] rounded transition-all" title="Source Data"><Upload size={14} /></button>
                         <button onClick={() => handlePrint(label)} className="p-2.5 bg-slate-50 hover:bg-pink-50 text-[#8A9BA5] hover:text-[#E85874] rounded transition-all" title="Authorize Print"><Printer size={14} /></button>
                       </div>
-                      <button onClick={() => { if (window.confirm('Delete template?')) onDeleteLabel(label.id) }}
-                        className="p-2.5 text-[#8A9BA5] hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
+                      {canEdit && (
+                        <button onClick={() => { if (window.confirm('Delete template?')) onDeleteLabel(label.id) }}
+                          className="p-2.5 text-[#8A9BA5] hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
+                      )}
                     </div>
                   </div>
                 </div>
