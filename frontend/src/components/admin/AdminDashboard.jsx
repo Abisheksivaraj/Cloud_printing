@@ -19,12 +19,14 @@ import {
 import { toast, Toaster } from "react-hot-toast";
 import { useTheme } from "../../ThemeContext";
 
+import { API_URLS, callEdgeFunction } from "../../supabaseClient";
+
 const AdminDashboard = () => {
     const { theme, isDarkMode } = useTheme();
     const [users, setUsers] = useState([
-        { id: 1, firstName: "Alice", lastName: "Smith", email: "alice@atpl.com", mobile: "+1 555-0101", role: "Manager", status: "Active" },
-        { id: 2, firstName: "Bob", lastName: "Jones", email: "bob@atpl.com", mobile: "+1 555-0102", role: "Designer", status: "Active" },
-        { id: 3, firstName: "Charlie", lastName: "Davis", email: "charlie@atpl.com", mobile: "+1 555-0103", role: "Operator", status: "Away" },
+        { id: 1, firstName: "Alice", lastName: "Smith", email: "alice@atpl.com", mobile: "+1 555-0101", role: "admin", status: "Active" },
+        { id: 2, firstName: "Bob", lastName: "Jones", email: "bob@atpl.com", mobile: "+1 555-0102", role: "operator", status: "Active" },
+        { id: 3, firstName: "Charlie", lastName: "Davis", email: "charlie@atpl.com", mobile: "+1 555-0103", role: "operator", status: "Away" },
     ]);
 
     const [showAddModal, setShowAddModal] = useState(false);
@@ -32,22 +34,40 @@ const AdminDashboard = () => {
     const [loading, setLoading] = useState(false);
 
     const [newUser, setNewUser] = useState({
-        firstName: "",
-        lastName: "",
         email: "",
-        mobile: "",
-        role: "Designer",
+        role: "operator",
     });
 
     const handleAddUser = async (e) => {
         e.preventDefault();
         setLoading(true);
         try {
-            const newUserEntry = { ...newUser, id: users.length + 1, status: "Invited" };
-            setUsers([...users, newUserEntry]);
-            toast.success("User invited successfully!");
+            const payload = {
+                email: newUser.email,
+                role: newUser.role.toLowerCase()
+            };
+
+            await callEdgeFunction(API_URLS.USER_INVITE, payload);
+
+            toast.success("Invitation sent successfully!");
             setShowAddModal(false);
-            setNewUser({ firstName: "", lastName: "", email: "", mobile: "", role: "Designer" });
+            setNewUser({ email: "", role: "operator" });
+
+            // Note: In a real app, we might want to refresh the user list here
+            // For now, let's add a placeholder to the list
+            const placeholderUser = {
+                id: Date.now(),
+                firstName: "Pending",
+                lastName: "User",
+                email: newUser.email,
+                mobile: "N/A",
+                role: newUser.role,
+                status: "Invited"
+            };
+            setUsers([placeholderUser, ...users]);
+        } catch (error) {
+            console.error("Failed to invite user:", error);
+            toast.error(error.message || "Failed to send invitation");
         } finally {
             setLoading(false);
         }
@@ -152,9 +172,9 @@ const AdminDashboard = () => {
                                             </div>
                                         </td>
                                         <td className="px-8 py-5">
-                                            <span className={`inline-block px-3 py-1.5 rounded-sm text-[9px] font-black uppercase tracking-widest border border-gray-100 ${user.role === 'Manager' ? 'bg-[#F59FB5]/10 text-[#E85874]' :
-                                                    user.role === 'Designer' ? 'bg-[#6BB9E5]/10 text-[#39A3DD]' :
-                                                        'bg-[#38474F]/5 text-[#38474F]'
+                                            <span className={`inline-block px-3 py-1.5 rounded-sm text-[9px] font-black uppercase tracking-widest border border-gray-100 ${user.role.toLowerCase() === 'admin' ? 'bg-[#F59FB5]/10 text-[#E85874]' :
+                                                user.role.toLowerCase() === 'operator' ? 'bg-[#6BB9E5]/10 text-[#39A3DD]' :
+                                                    'bg-[#38474F]/5 text-[#38474F]'
                                                 }`}>
                                                 {user.role}
                                             </span>
@@ -192,32 +212,23 @@ const AdminDashboard = () => {
                             </div>
 
                             <form onSubmit={handleAddUser} className="p-10 space-y-8">
-                                <div className="grid grid-cols-2 gap-8">
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">Identity: First</label>
-                                        <input required type="text" placeholder="John" name="firstName" className="input-premium py-3" onChange={(e) => setNewUser({ ...newUser, firstName: e.target.value })} />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">Identity: Last</label>
-                                        <input required type="text" placeholder="Doe" name="lastName" className="input-premium py-3" onChange={(e) => setNewUser({ ...newUser, lastName: e.target.value })} />
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-8">
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">Communication: Email</label>
-                                        <input required type="email" placeholder="john@atpl.com" className="input-premium py-3" onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">Communication: Mobile</label>
-                                        <input required type="tel" placeholder="+1..." className="input-premium py-3" onChange={(e) => setNewUser({ ...newUser, mobile: e.target.value })} />
-                                    </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">Communication: Email</label>
+                                    <input
+                                        required
+                                        type="email"
+                                        placeholder="operator@acmecorp.com"
+                                        className="input-premium py-3"
+                                        value={newUser.email}
+                                        onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                                        style={{ backgroundColor: theme.bg, color: theme.text }}
+                                    />
                                 </div>
 
                                 <div className="space-y-3">
                                     <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">Authorization Role</label>
                                     <div className="flex gap-4">
-                                        {["Manager", "Designer", "Operator"].map((role) => (
+                                        {["admin", "operator", "viewer"].map((role) => (
                                             <button
                                                 key={role}
                                                 type="button"
@@ -240,6 +251,7 @@ const AdminDashboard = () => {
                     </div>
                 )}
                 <Toaster position="top-right" />
+
             </div>
         </div>
     );

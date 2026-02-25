@@ -17,6 +17,7 @@ export const API_URLS = {
     LOGIN: 'login',
     COMPLETE_PROFILE: 'complete-registration',
     GET_INVITATION: 'get-invitation',
+    USER_INVITE: 'invite-user'
 };
 
 // Helper to call edge functions using the SDK
