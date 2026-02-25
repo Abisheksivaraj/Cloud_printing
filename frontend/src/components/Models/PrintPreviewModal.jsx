@@ -238,7 +238,37 @@ const PrintPreviewModal = ({ label, onClose }) => {
     1,
   );
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    try {
+      const { callEdgeFunction, API_URLS } = await import("../../supabaseClient");
+
+      const payload = {
+        jobId: Math.floor(10000 + Math.random() * 90000).toString(),
+        templateId: label.id || label._id,
+        documentName: label.name || "Untitled Label",
+        documentType: "Multi-Up Sheet",
+        printerName: "Standard PDF", // This could be selectable in a real app
+        totalRecords: cols * rows,
+        printedRecords: cols * rows,
+        printedLength: 0, // Not applicable for sheet printer
+        status: "completed",
+        createdAt: new Date().toISOString(),
+        metadata: {
+          config: multiUpConfig,
+          cols,
+          rows,
+          horizontalGap,
+          verticalGap,
+          margins
+        }
+      };
+
+      console.log("Creating print job:", payload);
+      await callEdgeFunction(API_URLS.CREATE_PRINT_JOB, payload);
+    } catch (err) {
+      console.error("Failed to track print job:", err);
+    }
+
     setTimeout(() => window.print(), 300);
   };
 

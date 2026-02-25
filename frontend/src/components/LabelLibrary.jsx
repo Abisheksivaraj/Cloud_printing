@@ -46,6 +46,8 @@ const LabelLibrary = ({
   const [generatedLabels, setGeneratedLabels] = useState([]);
   const [showGeneratedPreview, setShowGeneratedPreview] = useState(false);
 
+  const [printJobContext, setPrintJobContext] = useState(null);
+
   const filteredLabels = labels.filter((label) =>
     label.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
@@ -60,8 +62,12 @@ const LabelLibrary = ({
     setShowPrintPreview(true);
   };
 
-  const handleLabelsGenerated = (labels) => {
-    setGeneratedLabels(labels);
+  const handleLabelsGenerated = (newLabels, context) => {
+    setGeneratedLabels(newLabels);
+    setPrintJobContext({
+      template: selectedLabelForImport,
+      ...context
+    });
     setShowImportModal(false);
     setShowGeneratedPreview(true);
   };
@@ -216,7 +222,17 @@ const LabelLibrary = ({
       {showCreateModal && <CreateLabelModal onClose={() => setShowCreateModal(false)} onCreate={onCreateLabel} />}
       {showImportModal && selectedLabelForImport && <ImportDataModal label={selectedLabelForImport} onClose={() => { setShowImportModal(false); setSelectedLabelForImport(null); }} onLabelsGenerated={handleLabelsGenerated} />}
       {showPrintPreview && labelToPrint && <PrintPreviewModal label={labelToPrint} onClose={() => { setShowPrintPreview(false); setLabelToPrint(null); }} />}
-      {showGeneratedPreview && generatedLabels.length > 0 && <GeneratedLabelsPreview labels={generatedLabels} onClose={() => { setShowGeneratedPreview(false); setGeneratedLabels([]); }} />}
+      {showGeneratedPreview && generatedLabels.length > 0 && (
+        <GeneratedLabelsPreview
+          labels={generatedLabels}
+          jobContext={printJobContext}
+          onClose={() => {
+            setShowGeneratedPreview(false);
+            setGeneratedLabels([]);
+            setPrintJobContext(null);
+          }}
+        />
+      )}
 
       <AIChatbot
         onGenerateElements={(newElements, nextLabelSize) => {

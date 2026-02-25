@@ -6,6 +6,7 @@ import LabelDesigner from "./components/LabelDesign";
 import Signup from "./components/admin/Signup";
 import Login from "./components/admin/Login";
 import AdminDashboard from "./components/admin/AdminDashboard";
+import PrintHistory from "./components/PrintHistory";
 import { useTheme } from "./ThemeContext";
 import { supabase } from "./supabaseClient";
 
@@ -213,6 +214,9 @@ const App = () => {
                 onSave={handleSaveLabel}
                 onBack={handleBackToLibrary}
               />
+            )}
+            {currentView === "print_history" && (
+              <PrintHistory labels={labels} />
             )}
           </>
         )}

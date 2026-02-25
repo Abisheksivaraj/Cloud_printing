@@ -260,13 +260,14 @@ const RenderLabel = ({ label }) => {
   );
 };
 
-const RollPrinterPreview = ({ labels, labelSettings, onClose }) => {
+const RollPrinterPreview = ({ labels, jobContext, onClose }) => {
   const [showSettings, setShowSettings] = useState(true);
   const [showCutMarks, setShowCutMarks] = useState(false);
 
-  const labelSize = labels[0]?.labelSize ||
-    labelSettings?.labelSize || { width: 100, height: 80 };
-  const advancedSettings = labelSettings?.advancedSettings || {};
+  const labelSize = labels[0]?.labelSize || { width: 100, height: 80 };
+
+  // Use jobContext if available
+  const advancedSettings = jobContext?.template?.advancedSettings || {};
 
   const [columns, setColumns] = useState(advancedSettings.columns || 2);
 
@@ -310,7 +311,37 @@ const RollPrinterPreview = ({ labels, labelSettings, onClose }) => {
     1,
   );
 
-  const handlePrintAll = () => {
+  const handlePrintAll = async () => {
+    try {
+      const { callEdgeFunction, API_URLS } = await import("../../supabaseClient");
+
+      const payload = {
+        jobId: Math.floor(10000 + Math.random() * 90000).toString(),
+        templateId: jobContext?.template?.id || jobContext?.template?._id,
+        documentName: jobContext?.template?.name || "Bulk Print",
+        documentType: "Roll Printer",
+        printerName: "Roll Printer L1",
+        totalRecords: labels.length,
+        printedRecords: labels.length,
+        printedLength: Math.round(rollHeight / MM_TO_PX),
+        status: "completed",
+        createdAt: new Date().toISOString(),
+        sourceData: jobContext?.sourceData || [],
+        metadata: {
+          mappings: jobContext?.mappings || {},
+          columns,
+          horizontalSpacing,
+          verticalSpacing,
+          margins
+        }
+      };
+
+      console.log("Creating bulk print job:", payload);
+      await callEdgeFunction(API_URLS.CREATE_PRINT_JOB, payload);
+    } catch (err) {
+      console.error("Failed to track bulk print job:", err);
+    }
+
     setTimeout(() => {
       window.print();
     }, 500);

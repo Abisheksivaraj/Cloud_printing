@@ -17,7 +17,9 @@ export const API_URLS = {
     LOGIN: 'login',
     COMPLETE_PROFILE: 'complete-registration',
     GET_INVITATION: 'get-invitation',
-    USER_INVITE: 'invite-user'
+    USER_INVITE: 'invite-user',
+    LIST_PRINT_JOBS: 'list-print-jobs',
+    CREATE_PRINT_JOB: 'create-print-job'
 };
 
 // Helper to call edge functions using the SDK
@@ -53,18 +55,14 @@ export const callEdgeFunction = async (functionName, body) => {
         // Supabase FunctionsHttpError usually includes context
         if (error.context) {
             try {
-                // Try to get response text/json if available
                 const response = error.context;
-                if (response.json) {
-                    errorMessage = response.json.error || response.json.message || response.json.msg || errorMessage;
-                } else if (response.text) {
-                    const text = await response.text();
-                    try {
-                        const parsed = JSON.parse(text);
-                        errorMessage = parsed.error || parsed.message || parsed.msg || errorMessage;
-                    } catch (e) {
-                        errorMessage = text || errorMessage;
-                    }
+                // error.context is a Response object
+                const text = await response.text();
+                try {
+                    const parsed = JSON.parse(text);
+                    errorMessage = parsed.error || parsed.message || parsed.msg || parsed.error_description || errorMessage;
+                } catch (e) {
+                    errorMessage = text || errorMessage;
                 }
             } catch (e) {
                 console.error("Error parsing error response:", e);

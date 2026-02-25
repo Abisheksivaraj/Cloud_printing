@@ -47,6 +47,13 @@ export const AppHeader = ({ onNavigate, currentView, userRole, userData }) => {
           >
             Templates
           </button>
+          <button
+            onClick={() => onNavigate("print_history")}
+            className={`text-xs font-black uppercase tracking-widest transition-colors ${currentView === "print_history" ? "text-[#39A3DD]" : "text-[#8A9BA5] hover:text-[#38474F]"}`}
+            style={{ color: currentView === "print_history" ? "#39A3DD" : theme.textMuted }}
+          >
+            Print History
+          </button>
           {isAdmin && (
             <button
               onClick={() => onNavigate("admin_dashboard")}

@@ -73,6 +73,7 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                 const access_token = hashParams.get('access_token');
                 if (access_token) {
                     setIsInvite(true);
+                    setInviteToken(access_token); // Ensure token is captured for payload
                     await supabase.auth.setSession({ access_token, refresh_token: "" });
                     try {
                         const inviteData = await callEdgeFunction(API_URLS.GET_INVITATION, {});
@@ -116,11 +117,12 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
         console.log("Signup: Form validated, processing registration...");
         setLoading(true);
         try {
+            const { data: { session } } = await supabase.auth.getSession();
             const payload = {
-                invite_token: inviteToken,
-                first_name: formData.firstName,
-                last_name: formData.lastName,
-                phone: formData.mobileNumber,
+                invite_token: inviteToken || session?.access_token || "",
+                first_name: formData.firstName.trim(),
+                last_name: formData.lastName.trim(),
+                phone: formData.mobileNumber.trim().replace(/\s/g, ''),
                 password: formData.password,
             };
             console.log("Signup: Sending registration payload:", payload);

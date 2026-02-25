@@ -26,23 +26,23 @@ import { useTheme } from "../../ThemeContext";
   Handles CSV/Excel import, data mapping, and row selection.
 */
 
-const ImportDataModal = ({ label, onClose, onLabelsGenerated }) => {
+const ImportDataModal = ({ label, onClose, onLabelsGenerated, initialData = null, initialMappings = null }) => {
   const { theme, isDarkMode } = useTheme();
 
-  const [importFile, setImportFile] = useState(null);
-  const [importedData, setImportedData] = useState([]);
-  const [filteredData, setFilteredData] = useState([]);
+  const [importFile, setImportFile] = useState(initialData ? { name: "Resumed Print Data", type: "JSON", size: JSON.stringify(initialData).length } : null);
+  const [importedData, setImportedData] = useState(initialData || []);
+  const [filteredData, setFilteredData] = useState(initialData || []);
   const [isImporting, setIsImporting] = useState(false);
-  const [columnMapping, setColumnMapping] = useState({});
-  const [barcodeMultiMapping, setBarcodeMultiMapping] = useState({});
-  const [barcodeSeparators, setBarcodeSeparators] = useState({});
-  const [availableColumns, setAvailableColumns] = useState([]);
+  const [columnMapping, setColumnMapping] = useState(initialMappings?.columnMapping || {});
+  const [barcodeMultiMapping, setBarcodeMultiMapping] = useState(initialMappings?.barcodeMultiMapping || {});
+  const [barcodeSeparators, setBarcodeSeparators] = useState(initialMappings?.barcodeSeparators || {});
+  const [availableColumns, setAvailableColumns] = useState(initialData && initialData.length > 0 ? Object.keys(initialData[0]) : []);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRows, setSelectedRows] = useState(new Set());
-  const [selectMode, setSelectMode] = useState("all"); // "all", "search", "range", "selected"
+  const [selectMode, setSelectMode] = useState(initialData ? "all" : "all");
   const [rangeStart, setRangeStart] = useState(1);
-  const [rangeEnd, setRangeEnd] = useState(1);
-  const [showDataTable, setShowDataTable] = useState(false);
+  const [rangeEnd, setRangeEnd] = useState(initialData ? initialData.length : 1);
+  const [showDataTable, setShowDataTable] = useState(!!initialData);
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
   const fileInputRef = useRef(null);
@@ -396,7 +396,10 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated }) => {
       };
     });
 
-    onLabelsGenerated(newLabels);
+    onLabelsGenerated(newLabels, {
+      sourceData: dataToGenerate,
+      mappings: { columnMapping, barcodeMultiMapping, barcodeSeparators }
+    });
   };
 
   const hasValidMapping = () => {
