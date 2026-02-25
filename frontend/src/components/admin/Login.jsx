@@ -30,7 +30,7 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
 
         try {
             const data = await callEdgeFunction(API_URLS.LOGIN, {
-                email: formData.email,
+                email: formData.email.trim().toLowerCase(),
                 password: formData.password,
             });
 

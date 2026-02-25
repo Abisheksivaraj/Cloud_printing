@@ -124,16 +124,43 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                 password: formData.password,
             };
             console.log("Signup: Sending registration payload:", payload);
-            await callEdgeFunction(API_URLS.COMPLETE_PROFILE, payload);
-            console.log("Signup: Profile completion successful");
-            toast.success("Identity Provisioned Successful!");
+            const regData = await callEdgeFunction(API_URLS.COMPLETE_PROFILE, payload);
+            console.log("Signup: Registration response:", regData);
 
-            console.log("Signup: Initiating auto-login...");
-            const loginData = await callEdgeFunction(API_URLS.LOGIN, { email: formData.email, password: formData.password });
-            console.log("Signup: Auto-login successful:", loginData);
-            onSignup(loginData.admin || loginData.user);
+            let authData = regData;
+
+            // If registration didn't return tokens, attempt auto-login
+            if (!regData || (!regData.access_token && !regData.token)) {
+                console.log("Signup: No tokens in registration response, initiating auto-login...");
+                console.log("Signup: Login payload:", { email: formData.email, password: " [REDACTED]" });
+                authData = await callEdgeFunction(API_URLS.LOGIN, {
+                    email: formData.email.trim().toLowerCase(),
+                    password: formData.password
+                });
+                console.log("Signup: Auto-login successful:", authData);
+            } else {
+                console.log("Signup: Using tokens from registration response");
+            }
+
+            const token = authData.access_token || authData.token;
+            if (token) {
+                localStorage.setItem("authToken", token);
+                await supabase.auth.setSession({
+                    access_token: token,
+                    refresh_token: authData.refresh_token || ""
+                });
+                console.log("Signup: Session established");
+            }
+
+            const userData = authData.admin || authData.user;
+            if (userData) {
+                localStorage.setItem("userData", JSON.stringify(userData));
+            }
+
+            toast.success("Identity Provisioned and Verified!");
+            onSignup(userData);
         } catch (err) {
-            console.error("Signup: Registration process failed:", err);
+            console.error("Signup: Registration/Login process failed:", err);
             const errorMessage = err.message || "Credential verification failed.";
             setError(errorMessage);
             toast.error(errorMessage);

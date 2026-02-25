@@ -30,12 +30,15 @@ export const callEdgeFunction = async (functionName, body) => {
         token = localStorage.getItem("authToken");
     }
 
-    // Skip Authorization header for login endpoint if no token is available
+    // Skip Authorization header for auth-related endpoints if no session is active 
+    // or to avoid sending stale tokens from localStorage during signup/login
+    const authEndpoints = [API_URLS.LOGIN, API_URLS.COMPLETE_PROFILE, API_URLS.GET_INVITATION];
     const headers = {};
-    if (token && functionName !== API_URLS.LOGIN) {
+    if (token && !authEndpoints.includes(functionName)) {
         headers.Authorization = `Bearer ${token}`;
     }
 
+    console.log(`Calling Edge Function: ${functionName}`, body);
     const { data, error } = await supabase.functions.invoke(functionName, {
         body: body,
         headers: headers,
@@ -46,14 +49,30 @@ export const callEdgeFunction = async (functionName, body) => {
 
         let errorMessage = 'Request failed';
 
-        // Supabase FunctionsHttpError usually has the message in the error object itself,
-        // or we can try to extract from the response if it's available.
-        if (error.context && error.context.json) {
-            errorMessage = error.context.json.error || error.context.json.message || errorMessage;
+        // Supabase FunctionsHttpError usually includes context
+        if (error.context) {
+            try {
+                // Try to get response text/json if available
+                const response = error.context;
+                if (response.json) {
+                    errorMessage = response.json.error || response.json.message || response.json.msg || errorMessage;
+                } else if (response.text) {
+                    const text = await response.text();
+                    try {
+                        const parsed = JSON.parse(text);
+                        errorMessage = parsed.error || parsed.message || parsed.msg || errorMessage;
+                    } catch (e) {
+                        errorMessage = text || errorMessage;
+                    }
+                }
+            } catch (e) {
+                console.error("Error parsing error response:", e);
+            }
         } else if (error.message && !error.message.includes("non-2xx")) {
             errorMessage = error.message;
         }
 
+        console.error(`Detailed error for ${functionName}:`, errorMessage);
         throw new Error(errorMessage);
     }
 
