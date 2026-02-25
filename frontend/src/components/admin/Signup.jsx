@@ -146,7 +146,7 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
 
             const token = authData.access_token || authData.token;
             if (token) {
-                localStorage.setItem("authToken", token);
+                sessionStorage.setItem("authToken", token);
                 await supabase.auth.setSession({
                     access_token: token,
                     refresh_token: authData.refresh_token || ""
@@ -156,7 +156,7 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
 
             const userData = authData.admin || authData.user;
             if (userData) {
-                localStorage.setItem("userData", JSON.stringify(userData));
+                sessionStorage.setItem("userData", JSON.stringify(userData));
             }
 
             toast.success("Identity Provisioned and Verified!");
@@ -249,14 +249,14 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                                 <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">First Name</label>
                                 <div className="relative group">
                                     <User className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#E85874] transition-colors" size={16} />
-                                    <input required name="firstName" value={formData.firstName} onChange={handleChange} placeholder="John" className="w-full bg-transparent border-b-2 border-gray-200 py-2.5 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#E85874] transition-colors" />
+                                    <input required name="firstName" value={formData.firstName} onChange={handleChange} placeholder="" className="w-full bg-transparent border-b-2 border-gray-200 py-2.5 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#E85874] transition-colors" />
                                 </div>
                             </div>
                             <div className="space-y-1">
                                 <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">Last Name</label>
                                 <div className="relative group">
                                     <User className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#E85874] transition-colors" size={16} />
-                                    <input required name="lastName" value={formData.lastName} onChange={handleChange} placeholder="Doe" className="w-full bg-transparent border-b-2 border-gray-200 py-2.5 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#E85874] transition-colors" />
+                                    <input required name="lastName" value={formData.lastName} onChange={handleChange} placeholder="" className="w-full bg-transparent border-b-2 border-gray-200 py-2.5 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#E85874] transition-colors" />
                                 </div>
                             </div>
                         </div>
@@ -265,7 +265,7 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                             <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">Company Name</label>
                             <div className="relative group">
                                 <Building2 className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#39A3DD] transition-colors" size={16} />
-                                <input required name="companyName" value={formData.companyName} onChange={handleChange} readOnly={isInvite && !!formData.companyName} placeholder="Global Prints Inc." className={`w-full bg-transparent border-b-2 border-gray-200 py-3 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#39A3DD] transition-colors ${isInvite && formData.companyName ? 'opacity-70 bg-gray-50/30' : ''}`} />
+                                <input required name="companyName" value={formData.companyName} onChange={handleChange} readOnly={isInvite && !!formData.companyName} placeholder="" className={`w-full bg-transparent border-b-2 border-gray-200 py-3 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#39A3DD] transition-colors ${isInvite && formData.companyName ? 'opacity-70 bg-gray-50/30' : ''}`} />
                             </div>
                         </div>
 
@@ -274,14 +274,14 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                                 <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">E-mail</label>
                                 <div className="relative group">
                                     <Mail className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#39A3DD] transition-colors" size={16} />
-                                    <input required type="email" name="email" value={formData.email} onChange={handleChange} readOnly={isInvite && !!formData.email} placeholder="john@company.com" className={`w-full bg-transparent border-b-2 border-gray-200 py-2.5 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#39A3DD] transition-colors ${isInvite && formData.email ? 'opacity-70 bg-gray-50/30' : ''}`} />
+                                    <input required type="email" name="email" value={formData.email} onChange={handleChange} readOnly={isInvite && !!formData.email} placeholder="" className={`w-full bg-transparent border-b-2 border-gray-200 py-2.5 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#39A3DD] transition-colors ${isInvite && formData.email ? 'opacity-70 bg-gray-50/30' : ''}`} />
                                 </div>
                             </div>
                             <div className="space-y-1">
                                 <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">Mobile</label>
                                 <div className="relative group">
                                     <Phone className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#39A3DD] transition-colors" size={16} />
-                                    <input required type="tel" name="mobileNumber" value={formData.mobileNumber} onChange={handleChange} placeholder="+91 00000 00000" className="w-full bg-transparent border-b-2 border-gray-100 py-2.5 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#39A3DD] transition-colors" />
+                                    <input required type="tel" name="mobileNumber" value={formData.mobileNumber} onChange={handleChange} placeholder="" className="w-full bg-transparent border-b-2 border-gray-100 py-2.5 pl-8 text-base text-[#38474F] font-bold outline-none focus:border-[#39A3DD] transition-colors" />
                                 </div>
                             </div>
                         </div>
@@ -291,14 +291,14 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                                 <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">Password</label>
                                 <div className="relative group">
                                     <Lock className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#38474F] transition-colors" size={16} />
-                                    <input required type="password" name="password" value={formData.password} onChange={handleChange} placeholder="••••••••" className="w-full bg-transparent border-b-2 border-gray-200 py-2.5 text-base text-[#38474F] font-bold outline-none focus:border-[#38474F] transition-colors pl-8" />
+                                    <input required type="password" name="password" value={formData.password} onChange={handleChange} placeholder="" className="w-full bg-transparent border-b-2 border-gray-200 py-2.5 text-base text-[#38474F] font-bold outline-none focus:border-[#38474F] transition-colors pl-8" />
                                 </div>
                             </div>
                             <div className="space-y-1">
                                 <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">Confirm Password</label>
                                 <div className="relative group">
                                     <Lock className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#38474F] transition-colors" size={16} />
-                                    <input required type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} placeholder="••••••••" className="w-full bg-transparent border-b-2 border-gray-100 py-2.5 text-base text-[#38474F] font-bold outline-none focus:border-[#38474F] transition-colors pl-8" />
+                                    <input required type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} placeholder="" className="w-full bg-transparent border-b-2 border-gray-100 py-2.5 text-base text-[#38474F] font-bold outline-none focus:border-[#38474F] transition-colors pl-8" />
                                 </div>
                             </div>
                         </div>

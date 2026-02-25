@@ -15,7 +15,8 @@ import {
   Table,
   Columns,
   Barcode,
-  ArrowDown
+  ArrowDown,
+  Info
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useTheme } from "../../ThemeContext";

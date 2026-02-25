@@ -27,8 +27,8 @@ const App = () => {
       // ✅ Handle session detection from URL hash (invites/resets)
       await supabase.auth.getSession();
 
-      const token = localStorage.getItem("authToken");
-      const storedUserData = localStorage.getItem("userData");
+      const token = sessionStorage.getItem("authToken");
+      const storedUserData = sessionStorage.getItem("userData");
       let parsedUserData = null;
       if (storedUserData) {
         try {
@@ -44,7 +44,7 @@ const App = () => {
       const isCompleteProfile = window.location.pathname === "/complete-profile" || window.location.pathname === "/accept-invite";
 
       if (isCompleteProfile) {
-        setCurrentView("signup");
+        setCurrentView("login");
         setIsAuthenticated(!!token);
       } else if (token) {
         // Sync session with Supabase client
@@ -73,9 +73,9 @@ const App = () => {
   // Manage navigation
   const navigateTo = (view) => {
     if (view === "logout") {
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("userData");
-      localStorage.removeItem("companyName");
+      sessionStorage.removeItem("authToken");
+      sessionStorage.removeItem("userData");
+      sessionStorage.removeItem("companyName");
       setIsAuthenticated(false);
       setUserRole(null);
       setUserData(null);

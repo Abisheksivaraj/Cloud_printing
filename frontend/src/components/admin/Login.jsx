@@ -36,14 +36,14 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
 
             const token = data.access_token || data.token;
             if (token) {
-                localStorage.setItem("authToken", token);
+                sessionStorage.setItem("authToken", token);
                 await supabase.auth.setSession({
                     access_token: token,
                     refresh_token: data.refresh_token || ""
                 });
             }
-            if (data.admin) localStorage.setItem("userData", JSON.stringify(data.admin));
-            if (data.user) localStorage.setItem("userData", JSON.stringify(data.user));
+            if (data.admin) sessionStorage.setItem("userData", JSON.stringify(data.admin));
+            if (data.user) sessionStorage.setItem("userData", JSON.stringify(data.user));
 
             toast.success("Identity Verified. Welcome back!");
             onLogin(data.admin || data.user);

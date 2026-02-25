@@ -13,7 +13,9 @@ import {
   LayoutGrid,
   Filter,
   ArrowRight,
-  Monitor
+  Monitor,
+  CheckCircle,
+  Activity
 } from "lucide-react";
 import CreateLabelModal from "../components/Models/CreateLabelModal";
 import ImportDataModal from "../components/Models/ImportDataModal";

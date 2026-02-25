@@ -6,7 +6,7 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
         detectSessionInUrl: true,
-        persistSession: true,
+        persistSession: false, // Don't persist session in localStorage
         autoRefreshToken: true,
         flowType: "pkce",
     }
@@ -28,9 +28,9 @@ export const callEdgeFunction = async (functionName, body) => {
     const { data: { session } } = await supabase.auth.getSession();
     let token = session?.access_token;
 
-    // 2. Fallback to localStorage if no session
+    // 2. Fallback to sessionStorage if no session
     if (!token) {
-        token = localStorage.getItem("authToken");
+        token = sessionStorage.getItem("authToken");
     }
 
     // Skip Authorization header for auth-related endpoints if no session is active 
