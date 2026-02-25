@@ -235,7 +235,7 @@ const AdminDashboard = () => {
                                                 onClick={() => setNewUser({ ...newUser, role })}
                                                 className={`flex-1 py-4 border-2 transition-all font-black uppercase tracking-widest text-[10px] ${newUser.role === role ? 'border-[#39A3DD] text-[#39A3DD] bg-blue-50' : 'border-gray-100 text-[#8A9BA5] hover:border-gray-200'}`}
                                             >
-                                                {role}
+                                                {role.charAt(0).toUpperCase() + role.slice(1)}
                                             </button>
                                         ))}
                                     </div>

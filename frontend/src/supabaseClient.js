@@ -33,7 +33,7 @@ export const callEdgeFunction = async (functionName, body) => {
 
     // Skip Authorization header for auth-related endpoints if no session is active 
     // or to avoid sending stale tokens from localStorage during signup/login
-    const authEndpoints = [API_URLS.LOGIN, API_URLS.COMPLETE_PROFILE, API_URLS.GET_INVITATION];
+    const authEndpoints = [API_URLS.LOGIN, API_URLS.COMPLETE_PROFILE, API_URLS.GET_INVITATION, API_URLS.USER_INVITE];
     const headers = {};
     if (token && !authEndpoints.includes(functionName)) {
         headers.Authorization = `Bearer ${token}`;
