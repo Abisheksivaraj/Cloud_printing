@@ -22,63 +22,69 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
 
     const [loading, setLoading] = useState(false);
     const [isInvite, setIsInvite] = useState(false);
+    const [inviteToken, setInviteToken] = useState("");
     const [error, setError] = useState("");
 
     React.useEffect(() => {
         const handleAuth = async () => {
             console.log("Signup: handleAuth effect triggered");
-            const hash = window.location.hash;
             const queryParams = new URLSearchParams(window.location.search);
+            const token = queryParams.get('token');
+            console.log("Signup: URL token parameter:", token);
+
+            if (token) {
+                setInviteToken(token);
+                setIsInvite(true);
+                try {
+                    console.log("Signup: Fetching invitation details for token:", token);
+                    const inviteData = await callEdgeFunction(API_URLS.GET_INVITATION, { invite_token: token });
+                    console.log("Signup: Invitation data received:", inviteData);
+
+                    if (inviteData) {
+                        setFormData(prev => ({
+                            ...prev,
+                            email: inviteData.email || "",
+                            companyName: inviteData.company_name || ""
+                        }));
+                    }
+                } catch (fetchErr) {
+                    console.error("Signup: Failed to fetch invitation details:", fetchErr);
+                    setError("Invalid or expired invitation link.");
+                    toast.error("Invalid or expired invitation link.");
+                }
+                return; // Prioritize token-based flow
+            }
+
+            // Fallback to legacy hash/query param logic if needed, 
+            // but the user's "Full Flow" specifically uses ?token=
+            const hash = window.location.hash;
             let email = queryParams.get('email');
             let companyName = queryParams.get('companyName');
-            console.log("Signup: URL params - email:", email, "companyName:", companyName);
 
             if (hash) {
-                console.log("Signup: Hash detected in URL:", hash);
                 const hashParams = new URLSearchParams(hash.replace('#', ''));
-
-                // 1. Check for errors first (e.g., otp_expired)
                 const errorParam = hashParams.get('error');
-                const errorDesc = hashParams.get('error_description');
-
                 if (errorParam) {
-                    const cleanMsg = errorDesc?.replace(/\+/g, ' ') || "Identity link has expired or is invalid.";
-                    console.error("Signup: Auth link error:", errorParam, cleanMsg);
+                    const cleanMsg = hashParams.get('error_description')?.replace(/\+/g, ' ') || "Identity link has expired.";
                     setError(cleanMsg);
-                    toast.error(cleanMsg, { duration: 6000 });
+                    toast.error(cleanMsg);
                     return;
                 }
-
                 const access_token = hashParams.get('access_token');
-                const type = hashParams.get('type');
-                console.log("Signup: Token extracted - type:", type, "token length:", access_token?.length);
-
-                // Check hash for email/companyName as well
-                if (!email) email = hashParams.get('email');
-                if (!companyName) companyName = hashParams.get('companyName');
-
-                if (access_token && (type === 'invite' || type === 'signup')) {
-                    console.log("Signup: Invitation/Signup session setup started");
+                if (access_token) {
                     setIsInvite(true);
                     await supabase.auth.setSession({ access_token, refresh_token: "" });
-
                     try {
-                        console.log("Signup: Fetching invitation details via Edge Function...");
                         const inviteData = await callEdgeFunction(API_URLS.GET_INVITATION, {});
-                        console.log("Signup: Invitation data received:", inviteData);
                         if (inviteData) {
                             email = inviteData.email || email;
                             companyName = inviteData.company_name || inviteData.companyName || companyName;
-                            console.log("Signup: Updated info from invite - email:", email, "companyName:", companyName);
                         }
-                    } catch (fetchErr) {
-                        console.error("Signup: Failed to fetch invitation details:", fetchErr);
-                    }
+                    } catch (e) { }
                 }
             }
 
             if (email || companyName) {
-                console.log("Signup: Pre-filling form with:", { email, companyName });
                 setFormData(prev => ({
                     ...prev,
                     email: email || prev.email,
@@ -111,11 +117,10 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
         setLoading(true);
         try {
             const payload = {
+                invite_token: inviteToken,
                 first_name: formData.firstName,
                 last_name: formData.lastName,
-                company_name: formData.companyName,
-                mobile_number: formData.mobileNumber,
-                email: formData.email,
+                phone: formData.mobileNumber,
                 password: formData.password,
             };
             console.log("Signup: Sending registration payload:", payload);
