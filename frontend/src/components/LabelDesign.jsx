@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { ArrowLeft, Save, Minus, X, Grid, ZoomIn, ZoomOut, RefreshCw, Search, Plus, Trash2, LayoutGrid } from "lucide-react";
+import { ArrowLeft, Save, Minus, X, Grid, ZoomIn, ZoomOut, RefreshCw, Search, Plus, Trash2, LayoutGrid, Check } from "lucide-react";
 
 import DesignCanvas from "./DesignCanvas";
 import ToolsPalette from "./designer/ToolsPalette";
@@ -9,17 +9,16 @@ import CreateLabelModal from "../components/Models/CreateLabelModal";
 import { useTheme } from "../ThemeContext";
 import { useLanguage } from "../LanguageContext";
 import AIChatbot from "./designer/AIChatbot";
+import { callEdgeFunction, API_URLS } from "../supabaseClient";
 
-const LabelDesigner = ({ label, labels = [], userRole, onSave, onSelectLabel, onCreateLabel, onDeleteLabel, onNavigateToLibrary }) => {
+const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCreateLabel, onDeleteLabel, onNavigateToLibrary, userRole }) => {
   const { isDarkMode, theme } = useTheme();
   const { t } = useLanguage();
-
-  const canEdit = userRole === 'admin' || userRole === 'operator';
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [elements, setElements] = useState(label?.elements || []);
   const [selectedElementId, setSelectedElementId] = useState(null);
-  const [labelSize, setLabelSize] = useState(label?.labelSize || { width: 100, height: 80 });
+  const [labelSize, setLabelSize] = useState(label?.labelSize || label?.dimensions || { width: 100, height: 80 });
   const [showGrid, setShowGrid] = useState(true);
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [barcodeValue, setBarcodeValue] = useState("");
@@ -33,14 +32,37 @@ const LabelDesigner = ({ label, labels = [], userRole, onSave, onSelectLabel, on
   const [zoom, setZoom] = useState(100);
   const [isPropertiesExpanded, setIsPropertiesExpanded] = useState(false);
 
-  // Sync state when selected label changes
+  // Sync state and fetch full elements when selected label changes
   React.useEffect(() => {
-    if (label) {
-      setElements(label.elements || []);
-      setLabelSize(label.labelSize || { width: 100, height: 80 });
+    const syncAndFetch = async () => {
+      const designId = label?.design_id || label?.id;
+      if (!designId) return;
+
+      // Initial sync from prop
+      let currentElements = label.elements || [];
+
+      // If no elements in prop or to ensure freshness, fetch full element list
+      try {
+        const fetchedElements = await callEdgeFunction(API_URLS.GET_ELEMENTS, { design_id: designId });
+        if (fetchedElements && Array.isArray(fetchedElements)) {
+          currentElements = fetchedElements;
+        }
+      } catch (error) {
+        console.error("Failed to fetch elements:", error);
+      }
+
+      // Map elements if they are in backend format
+      const mappedElements = currentElements.map(el =>
+        el.position_x !== undefined || el.element_type !== undefined ? mapPayloadToElement(el) : el
+      );
+
+      setElements(mappedElements);
+      setLabelSize(label.labelSize || label.dimensions || { width: 100, height: 80 });
       setSelectedElementId(null);
-    }
-  }, [label?.id]);
+    };
+
+    syncAndFetch();
+  }, [label?.design_id, label?.id]);
 
   const elementIdCounter = useRef(0);
   const canvasRef = useRef(null);
@@ -92,124 +114,131 @@ const LabelDesigner = ({ label, labels = [], userRole, onSave, onSelectLabel, on
   };
 
   // ─── Save ───────────────────────────────────────────────────────────────
-  const handleSave = async () => {
-    if (onSave) await onSave({ elements, labelSize });
+  const handleSave = async (status = null) => {
+    if (userRole === 'viewer') return;
+    if (onSave) await onSave({ elements, labelSize, status: status || label?.status });
     // Navigation to library is handled by App.jsx's handleSaveLabel after successful API call
+  };
+
+  // ─── Backend Mappers ──────────────────────────────────────────────────
+  const mapElementToPayload = (el) => {
+    const designId = label.design_id || label.id;
+    let content = el.content || "";
+
+    // For images, the src is the content
+    if (el.type === "image") content = el.src || "";
+    // For lines and shapes, provide a placeholder if empty to satisfy API requirements
+    if (!content && ["line", "rectangle", "circle", "shape"].includes(el.type)) {
+      content = el.type.toUpperCase();
+    }
+
+    return {
+      design_id: designId,
+      version_major: label.version_major || 0,
+      version_minor: label.version_minor || 1,
+      element_type: el.type,
+      position_x: el.x,
+      position_y: el.y,
+      width: el.width,
+      height: el.height,
+      binding_type: el.binding_type || "static",
+      static_content: content || " ", // Ensure at least a space if still empty
+      properties: { ...el }, // Store full state in JSON properties
+      sort_order: el.zIndex || elements.length
+    };
+  };
+
+  const mapPayloadToElement = (payload) => {
+    return {
+      ...(payload.properties || {}),
+      id: payload.id,
+      type: payload.element_type,
+      x: payload.position_x,
+      y: payload.position_y,
+      width: payload.width,
+      height: payload.height,
+      content: payload.static_content,
+      zIndex: payload.sort_order
+    };
   };
 
   // ─── Zoom ───────────────────────────────────────────────────────────────
   const handleZoomChange = (newZoom) => setZoom(newZoom);
 
   // ─── Add element ────────────────────────────────────────────────────────
-  const addElement = (type, extra = {}) => {
-    const MM_TO_PX = 3.7795275591;
-
-    if (type === "table") {
-      const rows = extra.rows || 2;
-      const cols = extra.cols || 2;
-      const cellWidth = 60;
-      const cellHeight = 25;
-      const tableData = Array.from({ length: rows }, () =>
-        Array.from({ length: cols }, () => "")
-      );
-      const table = {
-        id: generateId(),
-        type: "table",
-        x: 20,
-        y: 20,
-        rows,
-        cols,
-        cellWidth,
-        cellHeight,
-        width: cols * cellWidth,
-        height: rows * cellHeight,
-        tableData,
-        borderColor: "#000000",
-        borderWidth: 1,
-        borderStyle: "solid",
-        backgroundColor: "transparent",
-        fontSize: 11,
-        fontFamily: "Arial",
-        rotation: 0,
-        zIndex: elements.length,
-      };
-      setElements((prev) => [...prev, table]);
-      setSelectedElementId(table.id);
-      setSelectedTool(null);
-      return;
-    }
-
-    if (type === "rectangle" || type === "circle") {
-      const shape = {
-        id: generateId(),
-        type,
-        x: 20,
-        y: 20,
-        width: 80,
-        height: 60,
-        borderWidth: 2,
-        borderColor: "#000000",
-        borderStyle: "solid",
-        borderRadius: 0,
-        backgroundColor: "transparent",
-        rotation: 0,
-        zIndex: elements.length,
-      };
-      setElements((prev) => [...prev, shape]);
-      setSelectedElementId(shape.id);
-      setSelectedTool(null);
-      return;
-    }
-
-    if (type === "line") {
-      setIsDrawingLine(true);
-      setSelectedElementId(null);
-      // Properties panel will open AFTER line is drawn (via onElementCreated)
-      return;
-    }
-
-    if (type === "image") {
-      // Trigger file input
-      if (imageInputRef.current) imageInputRef.current.click();
-      return;
-    }
-
-    const element = {
+  const addElement = async (type, extra = {}) => {
+    let newElement = {
       id: generateId(),
       type,
       x: 50,
       y: 50,
-      width: type === "text" ? 120 : type === "barcode" ? 200 : 100,
-      height: type === "text" ? 30 : type === "barcode" ? 80 : 100,
-      content:
-        type === "text" ? "Sample Text" : type === "barcode" ? "123456789" : "",
-      barcodeType: type === "barcode" ? "CODE128" : undefined,
-      barcodeWidth: 2,
-      barcodeBarHeight: 70,
-      showBarcodeText: true,
-      fontSize: 14,
-      fontFamily: "Arial",
-      fontWeight: "normal",
-      fontStyle: "normal",
-      textDecoration: "none",
-      textAlign: "left",
-      letterSpacing: 0,
-      lineHeight: 1.2,
-      color: "#000000",
-      backgroundColor: "transparent",
-      borderWidth: 0,
-      borderColor: "#000000",
-      borderStyle: "solid",
-      borderRadius: 0,
-      rotation: 0,
-      opacity: 1,
-      lockAspectRatio: true,
+      width: 100,
+      height: 100,
       zIndex: elements.length,
+      rotation: 0,
+      ...extra
     };
 
-    setElements((prev) => [...prev, element]);
-    setSelectedElementId(element.id);
-    setSelectedTool(null);
+    // Type-specific defaults
+    if (type === "table") {
+      const rows = extra.rows || 2;
+      const cols = extra.cols || 2;
+      const cellWidth = 60, cellHeight = 25;
+      newElement = {
+        ...newElement,
+        rows, cols, cellWidth, cellHeight,
+        width: cols * cellWidth, height: rows * cellHeight,
+        tableData: Array.from({ length: rows }, () => Array.from({ length: cols }, () => "")),
+        borderColor: "#000000", borderWidth: 1, borderStyle: "solid", fontSize: 11,
+      };
+    } else if (type === "rectangle" || type === "circle") {
+      newElement = {
+        ...newElement,
+        width: 80, height: 60,
+        borderWidth: 2, borderColor: "#000000", borderStyle: "solid",
+        backgroundColor: "transparent",
+      };
+    } else if (type === "text" || type === "barcode") {
+      newElement = {
+        ...newElement,
+        width: type === "text" ? 120 : 200,
+        height: type === "text" ? 30 : 80,
+        content: type === "text" ? "Sample Text" : "123456789",
+        barcodeType: type === "barcode" ? "CODE128" : undefined,
+        fontSize: 14, fontFamily: "Arial",
+      };
+    } else if (type === "line" && Object.keys(extra).length === 0) {
+      // If we're just triggering the tool, don't create yet
+      setIsDrawingLine(true);
+      return;
+    }
+
+    // Only sync to backend if we have a design_id
+    const designId = label?.design_id || label?.id;
+    if (!designId) {
+      // No design saved yet — add locally only
+      setElements((prev) => [...prev, newElement]);
+      setSelectedElementId(newElement.id);
+      setSelectedTool(null);
+      return;
+    }
+
+    try {
+      const payload = mapElementToPayload(newElement);
+      const result = await callEdgeFunction(API_URLS.ADD_ELEMENT, payload);
+      if (result) {
+        const synced = mapPayloadToElement(result);
+        setElements((prev) => [...prev, synced]);
+        setSelectedElementId(synced.id);
+        setSelectedTool(null);
+      }
+    } catch (error) {
+      console.error("Failed to sync add-element:", error);
+      // Still add locally so user can keep working
+      setElements((prev) => [...prev, newElement]);
+      setSelectedElementId(newElement.id);
+      setSelectedTool(null);
+    }
   };
 
   // ─── Image upload handler ────────────────────────────────────────────────
@@ -220,7 +249,7 @@ const LabelDesigner = ({ label, labels = [], userRole, onSave, onSelectLabel, on
     reader.onload = (ev) => {
       const dataUrl = ev.target.result;
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         const maxW = 200;
         const ratio = img.height / img.width;
         const w = Math.min(maxW, img.width);
@@ -228,68 +257,130 @@ const LabelDesigner = ({ label, labels = [], userRole, onSave, onSelectLabel, on
         const element = {
           id: generateId(),
           type: "image",
-          x: 50,
-          y: 50,
-          width: w,
-          height: h,
+          x: 50, y: 50,
+          width: w, height: h,
           src: dataUrl,
           opacity: 1,
           lockAspectRatio: true,
           rotation: 0,
           zIndex: elements.length,
         };
-        setElements((prev) => [...prev, element]);
-        setSelectedElementId(element.id);
-        setSelectedTool(null);
+
+        try {
+          const designId = label?.design_id || label?.id;
+          if (!designId) {
+            // No design saved yet — add locally only
+            setElements((prev) => [...prev, element]);
+            setSelectedElementId(element.id);
+          } else {
+            const payload = mapElementToPayload(element);
+            const result = await callEdgeFunction(API_URLS.ADD_ELEMENT, payload);
+            if (result) {
+              const synced = mapPayloadToElement(result);
+              setElements((prev) => [...prev, synced]);
+              setSelectedElementId(synced.id);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to sync image:", error);
+          setElements((prev) => [...prev, element]);
+          setSelectedElementId(element.id);
+        }
       };
       img.src = dataUrl;
     };
     reader.readAsDataURL(file);
-    e.target.value = ""; // reset so same file can be reuploaded
-  }, [elements.length]);
+    e.target.value = "";
+  }, [elements.length, label?.design_id, label?.id]);
 
   // ─── Placeholder ─────────────────────────────────────────────────────────
-  const handleAddPlaceholder = (placeholderName) => {
+  const handleAddPlaceholder = async (placeholderName) => {
     const element = {
       id: generateId(),
       type: "placeholder",
-      x: 50,
-      y: 50,
-      width: 150,
-      height: 35,
+      x: 50, y: 50, width: 150, height: 35,
       content: placeholderName,
-      fontSize: 14,
-      fontFamily: "Arial",
-      fontWeight: "normal",
-      fontStyle: "normal",
-      textDecoration: "none",
-      textAlign: "left",
-      color: "#000000",
-      backgroundColor: "transparent",
-      borderWidth: 0,
-      borderColor: "transparent",
-      borderStyle: "solid",
-      rotation: 0,
-      zIndex: elements.length,
+      fontSize: 14, fontFamily: "Arial",
+      rotation: 0, zIndex: elements.length,
     };
-    setElements((prev) => [...prev, element]);
-    setSelectedElementId(element.id);
+
+    try {
+      const designId = label?.design_id || label?.id;
+      if (!designId) {
+        setElements((prev) => [...prev, element]);
+        setSelectedElementId(element.id);
+        return;
+      }
+      const payload = mapElementToPayload(element);
+      payload.binding_type = "placeholder";
+      const result = await callEdgeFunction(API_URLS.ADD_ELEMENT, payload);
+      if (result) {
+        setElements((prev) => [...prev, mapPayloadToElement(result)]);
+        setSelectedElementId(result.id);
+      }
+    } catch (error) {
+      console.error("Failed to sync placeholder:", error);
+      setElements((prev) => [...prev, element]);
+      setSelectedElementId(element.id);
+    }
   };
 
   const handleAddTable = (rows, cols) => addElement("table", { rows, cols });
   const handleAddShape = (shapeType) => addElement(shapeType);
 
   // ─── Update / Delete ─────────────────────────────────────────────────────
-  const updateElement = (id, updates) => {
-    setElements((prev) =>
-      prev.map((el) => (el.id === id ? { ...el, ...updates } : el))
-    );
+  const updateElementLocal = (id, updates) => {
+    const currentEl = elements.find(el => el.id === id);
+    if (!currentEl) return;
+    const updatedEl = { ...currentEl, ...updates };
+    setElements((prev) => prev.map((el) => (el.id === id ? updatedEl : el)));
+    return updatedEl;
   };
 
-  const deleteElement = () => {
+  const syncElementUpdate = async (id, fullElement = null) => {
+    if (userRole === 'viewer') return;
+    const designId = label?.design_id || label?.id;
+    if (!designId) return; // No design saved yet — skip sync
+    const targetEl = fullElement || elements.find(el => el.id === id);
+    if (!targetEl) return;
+
+    try {
+      const payload = mapElementToPayload(targetEl);
+      payload.element_id = id; // Required for update
+      await callEdgeFunction(API_URLS.UPDATE_ELEMENT, payload);
+    } catch (error) {
+      console.error("Failed to sync element update:", error);
+    }
+  };
+
+  const updateElement = async (id, updates, shouldSync = true) => {
+    const updatedEl = updateElementLocal(id, updates);
+    if (shouldSync && updatedEl) {
+      await syncElementUpdate(id, updatedEl);
+    }
+  };
+
+  const deleteElement = async () => {
     if (selectedElementId) {
-      setElements((prev) => prev.filter((el) => el.id !== selectedElementId));
+      const idToDelete = selectedElementId;
+      // Remove locally
+      setElements((prev) => prev.filter((el) => el.id !== idToDelete));
       setSelectedElementId(null);
+
+      // Only sync to backend if we have a design ID
+      const designId = label?.design_id || label?.id;
+      if (designId) {
+        try {
+          await callEdgeFunction(API_URLS.DELETE_ELEMENT, {
+            element_id: idToDelete,
+            design_id: designId,
+            version_major: label.version_major || 0,
+            version_minor: label.version_minor || 1
+          });
+        } catch (error) {
+          console.error("Failed to sync delete-element:", error);
+        }
+      }
     }
   };
 
@@ -374,32 +465,30 @@ const LabelDesigner = ({ label, labels = [], userRole, onSave, onSelectLabel, on
       />
 
       {/* ─── Tools Palette ─── */}
-      {canEdit && (
-        <ToolsPalette
-          onAddElement={addElement}
-          onActivateLineDrawing={activateLineDrawing}
-          isDrawingLine={isDrawingLine}
-          onActivateTextDrawing={activateTextDrawing}
-          isDrawingText={isDrawingText}
-          onDragStart={(type) => canvasRef.current?.setDraggedElement(type)}
-          onToolSelect={(tool) => {
-            setSelectedTool(tool);
-            if (tool) setIsPropertiesExpanded(true);
-          }}
-          onActivateBarcodeDrawing={(type) => {
-            activateBarcodeDrawing(type);
-            setIsPropertiesExpanded(true);
-          }}
-          isDrawingBarcode={isDrawingBarcode}
-          selectedBarcodeType={selectedBarcodeType}
-          onActivateShapeDrawing={(type) => {
-            activateShapeDrawing(type);
-            setIsPropertiesExpanded(true);
-          }}
-          isDrawingShape={isDrawingShape}
-          currentShapeType={currentShapeType}
-        />
-      )}
+      <ToolsPalette
+        onAddElement={addElement}
+        onActivateLineDrawing={activateLineDrawing}
+        isDrawingLine={isDrawingLine}
+        onActivateTextDrawing={activateTextDrawing}
+        isDrawingText={isDrawingText}
+        onDragStart={(type) => canvasRef.current?.setDraggedElement(type)}
+        onToolSelect={(tool) => {
+          setSelectedTool(tool);
+          if (tool) setIsPropertiesExpanded(true);
+        }}
+        onActivateBarcodeDrawing={(type) => {
+          activateBarcodeDrawing(type);
+          setIsPropertiesExpanded(true);
+        }}
+        isDrawingBarcode={isDrawingBarcode}
+        selectedBarcodeType={selectedBarcodeType}
+        onActivateShapeDrawing={(type) => {
+          activateShapeDrawing(type);
+          setIsPropertiesExpanded(true);
+        }}
+        isDrawingShape={isDrawingShape}
+        currentShapeType={currentShapeType}
+      />
 
       {/* ─── Canvas Area ─── */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
@@ -409,11 +498,20 @@ const LabelDesigner = ({ label, labels = [], userRole, onSave, onSelectLabel, on
           className="border-b px-4 py-2 shadow-sm z-10 flex items-center justify-between gap-3"
           style={{ backgroundColor: theme.surface, borderColor: theme.border }}
         >
-          {/* Left: label info */}
+          {/* Left: back button + label info */}
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => onBack && onBack()}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all active:scale-90 group"
+              title="Back to Library"
+              style={{ color: theme.textMuted }}
+            >
+              <ArrowLeft size={18} className="group-hover:text-[var(--color-primary)] transition-colors" />
+            </button>
+            <div className="h-6 w-px bg-gray-200 dark:bg-gray-700"></div>
             <div>
-              <h2 className="text-sm font-black tracking-tight uppercase font-oswald" style={{ color: theme.text }}>
-                {label?.name || "Untitled Label Template"}
+              <h2 className="text-sm font-black tracking-tight" style={{ color: theme.text }}>
+                {label?.name || "Untitled Label"}
               </h2>
               <div
                 className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider opacity-60"
@@ -498,18 +596,25 @@ const LabelDesigner = ({ label, labels = [], userRole, onSave, onSelectLabel, on
 
             {/* Save group */}
             <div className="flex items-center gap-1 bg-[var(--color-bg-main)] p-1 rounded-xl border border-[var(--color-border)]">
-              {canEdit && (
-                <>
-                  <button
-                    onClick={handleSave}
-                    className="btn-blue px-6 py-1.5 text-[9px] font-black uppercase tracking-[0.2em] shadow-sm transform-none h-auto rounded-md"
-                  >
-                    <Save size={14} />
-                    Authorize Save
-                  </button>
-                  <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1"></div>
-                </>
+              <button
+                onClick={() => handleSave()}
+                className="px-4 py-1.5 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
+                title="Save changes"
+              >
+                <Save size={14} />
+                Save
+              </button>
+              {label?.status === 'draft' && (
+                <button
+                  onClick={() => handleSave('published')}
+                  className="px-4 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
+                  title="Save and publish for printing"
+                >
+                  <Check size={14} />
+                  Publish
+                </button>
               )}
+              <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1"></div>
               <button
                 onClick={() => { if (onNavigateToLibrary) onNavigateToLibrary(); }}
                 className="px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-1.5"
@@ -530,7 +635,6 @@ const LabelDesigner = ({ label, labels = [], userRole, onSave, onSelectLabel, on
           selectedElementId={selectedElementId}
           setSelectedElementId={setSelectedElementId}
           labelSize={labelSize}
-          canEdit={canEdit}
           showGrid={showGrid}
           isDrawingLine={isDrawingLine}
           setIsDrawingLine={setIsDrawingLine}
@@ -543,7 +647,9 @@ const LabelDesigner = ({ label, labels = [], userRole, onSave, onSelectLabel, on
           setIsDrawingText={setIsDrawingText}
           generateId={generateId}
           selectedBarcodeType={selectedBarcodeType}
-          updateElement={updateElement}
+          updateElement={updateElementLocal}
+          onUpdateEnd={syncElementUpdate}
+          onAddElement={addElement}
           setSelectedBarcodeType={setSelectedBarcodeType}
           zoom={zoom}
           onZoomChange={handleZoomChange}
@@ -563,52 +669,50 @@ const LabelDesigner = ({ label, labels = [], userRole, onSave, onSelectLabel, on
       </div>
 
       {/* ─── Properties Panel (Expandable/Collapsible) ─── */}
-      {canEdit && (
-        <div
-          className={`fixed top-12 md:top-14 bottom-0 right-0 z-40 transition-transform duration-500 ease-in-out border-l shadow-2xl ${isPropertiesExpanded ? 'translate-x-0' : 'translate-x-full'
-            }`}
-          style={{ width: "320px", backgroundColor: theme.surface, borderColor: theme.border }}
+      <div
+        className={`fixed top-12 md:top-14 bottom-0 right-0 z-40 transition-transform duration-500 ease-in-out border-l shadow-2xl ${isPropertiesExpanded ? 'translate-x-0' : 'translate-x-full'
+          }`}
+        style={{ width: "320px", backgroundColor: theme.surface, borderColor: theme.border }}
+      >
+        <button
+          onClick={() => setIsPropertiesExpanded(!isPropertiesExpanded)}
+          className="absolute -left-8 top-1/2 -translate-y-1/2 w-8 h-16 bg-[var(--color-surface)] border-l border-t border-b rounded-l-xl flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-[-4px_0_10px_rgba(0,0,0,0.05)]"
+          style={{ borderColor: theme.border, backgroundColor: theme.surface }}
         >
-          <button
-            onClick={() => setIsPropertiesExpanded(!isPropertiesExpanded)}
-            className="absolute -left-8 top-1/2 -translate-y-1/2 w-8 h-16 bg-[var(--color-surface)] border-l border-t border-b rounded-l-xl flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-[-4px_0_10px_rgba(0,0,0,0.05)]"
-            style={{ borderColor: theme.border, backgroundColor: theme.surface }}
-          >
-            <div className={`transition-transform duration-500 ${isPropertiesExpanded ? 'rotate-180' : ''}`} style={{ color: theme.textMuted }}>
-              <ArrowLeft size={16} />
-            </div>
-          </button>
-
-          <div className="h-full overflow-y-auto custom-scrollbar">
-            <PropertiesPanel
-              selectedElement={selectedElement}
-              updateElement={updateElement}
-              deleteElement={deleteElement}
-              onBarcodeTypeChange={handleBarcodeTypeChange}
-              isDrawingLine={isDrawingLine}
-              isDrawingBarcode={isDrawingBarcode}
-              isDrawingShape={isDrawingShape}
-              onUndo={() => canvasRef.current?.handleUndo()}
-              onRedo={() => canvasRef.current?.handleRedo()}
-              onDuplicate={() => canvasRef.current?.handleDuplicate()}
-              canUndo={canvasRef.current?.canUndo || false}
-              canRedo={canvasRef.current?.canRedo || false}
-              onAddShape={handleAddShape}
-              onAddTable={handleAddTable}
-              onAddPlaceholder={handleAddPlaceholder}
-              onActivateShapeDrawing={activateShapeDrawing}
-              showShapeSelector={selectedTool === "shape"}
-              showTableCreator={selectedTool === "table"}
-              onActivateBarcodeDrawing={activateBarcodeDrawing}
-              showBarcodeSelector={selectedTool === "barcode"}
-              selectedBarcodeType={selectedBarcodeType}
-              setSelectedBarcodeType={setSelectedBarcodeType}
-              onBringForward={handleBringForward}
-              onSendBackward={handleSendBackward}
-            />
+          <div className={`transition-transform duration-500 ${isPropertiesExpanded ? 'rotate-180' : ''}`} style={{ color: theme.textMuted }}>
+            <ArrowLeft size={16} />
           </div>
+        </button>
+
+        <div className="h-full overflow-y-auto custom-scrollbar">
+          <PropertiesPanel
+            selectedElement={selectedElement}
+            updateElement={updateElement}
+            deleteElement={deleteElement}
+            onBarcodeTypeChange={handleBarcodeTypeChange}
+            isDrawingLine={isDrawingLine}
+            isDrawingBarcode={isDrawingBarcode}
+            isDrawingShape={isDrawingShape}
+            onUndo={() => canvasRef.current?.handleUndo()}
+            onRedo={() => canvasRef.current?.handleRedo()}
+            onDuplicate={() => canvasRef.current?.handleDuplicate()}
+            canUndo={canvasRef.current?.canUndo || false}
+            canRedo={canvasRef.current?.canRedo || false}
+            onAddShape={handleAddShape}
+            onAddTable={handleAddTable}
+            onAddPlaceholder={handleAddPlaceholder}
+            onActivateShapeDrawing={activateShapeDrawing}
+            showShapeSelector={selectedTool === "shape"}
+            showTableCreator={selectedTool === "table"}
+            onActivateBarcodeDrawing={activateBarcodeDrawing}
+            showBarcodeSelector={selectedTool === "barcode"}
+            selectedBarcodeType={selectedBarcodeType}
+            setSelectedBarcodeType={setSelectedBarcodeType}
+            onBringForward={handleBringForward}
+            onSendBackward={handleSendBackward}
+          />
         </div>
-      )}
+      </div>
 
       {/* Barcode Modal */}
       {showBarcodeModal && (
@@ -630,20 +734,18 @@ const LabelDesigner = ({ label, labels = [], userRole, onSave, onSelectLabel, on
       )}
 
       {/* AI Assistant Chatbot */}
-      {canEdit && (
-        <AIChatbot
-          onGenerateElements={(newElements, nextLabelSize, isNewRequest) => {
-            if (nextLabelSize) setLabelSize(nextLabelSize);
-            if (isNewRequest) {
-              setElements(newElements);
-            } else {
-              setElements((prev) => [...prev, ...newElements]);
-            }
-          }}
-          labelSize={labelSize}
-          generateId={generateId}
-        />
-      )}
+      <AIChatbot
+        onGenerateElements={(newElements, nextLabelSize, isNewRequest) => {
+          if (nextLabelSize) setLabelSize(nextLabelSize);
+          if (isNewRequest) {
+            setElements(newElements);
+          } else {
+            setElements((prev) => [...prev, ...newElements]);
+          }
+        }}
+        labelSize={labelSize}
+        generateId={generateId}
+      />
     </div>
   );
 };

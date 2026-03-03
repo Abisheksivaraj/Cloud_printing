@@ -32,11 +32,12 @@ const DesignCanvas = forwardRef(
       updateElement,
       setSelectedBarcodeType,
       zoom = 100,
-      canEdit = true,
       onZoomChange,
       onInteraction,
       onElementCreated,
       onElementSelected,
+      onAddElement,
+      onUpdateEnd,
     },
     ref,
   ) => {
@@ -138,18 +139,25 @@ const DesignCanvas = forwardRef(
       const element = elements.find((el) => el.id === selectedElementId);
       if (!element) return;
 
-      const newElement = {
+      const extraProps = {
         ...element,
-        id: generateId(),
         x: Math.min(element.x + 10, canvasPixelSize.width - element.width),
         y: Math.min(element.y + 10, canvasPixelSize.height - element.height),
-        zIndex: elements.length,
       };
 
-      const newElements = [...elements, newElement];
-      setElements(newElements);
-      setSelectedElementId(newElement.id);
-      saveToHistory(newElements);
+      if (onAddElement) {
+        onAddElement(element.type, extraProps);
+      } else {
+        const newElement = {
+          ...extraProps,
+          id: generateId(),
+          zIndex: elements.length,
+        };
+        const newElements = [...elements, newElement];
+        setElements(newElements);
+        setSelectedElementId(newElement.id);
+        saveToHistory(newElements);
+      }
     }, [
       selectedElementId,
       elements,
@@ -159,6 +167,7 @@ const DesignCanvas = forwardRef(
       setElements,
       setSelectedElementId,
       saveToHistory,
+      onAddElement
     ]);
 
     const handleZoomIn = useCallback(() => {
@@ -289,16 +298,24 @@ const DesignCanvas = forwardRef(
     const commitTextEdit = useCallback(() => {
       if (editingElementId) {
         updateElement(editingElementId, { content: editingTextValue });
+
+        // Sync to backend
+        if (onUpdateEnd) {
+          const el = elements.find((e) => e.id === editingElementId);
+          if (el) {
+            onUpdateEnd(editingElementId, { ...el, content: editingTextValue });
+          }
+        }
+
         setEditingElementId(null);
         setEditingTextValue("");
       }
-    }, [editingElementId, editingTextValue, updateElement]);
+    }, [editingElementId, editingTextValue, updateElement, onUpdateEnd, elements]);
 
     // Double-click to enter inline text editing
     const handleTextDoubleClick = useCallback(
       (e, element) => {
         e.stopPropagation();
-        if (!canEdit) return;
         if (isDrawingLine || isDrawingBarcode || isDrawingShape) return;
         if (!['text', 'placeholder'].includes(element.type)) return;
         setEditingElementId(element.id);
@@ -318,12 +335,6 @@ const DesignCanvas = forwardRef(
     const handleElementMouseDown = useCallback(
       (e, element) => {
         e.stopPropagation();
-
-        if (!canEdit) {
-          setSelectedElementId(element.id);
-          if (onElementSelected) onElementSelected();
-          return;
-        }
 
         // If editing another element, commit it first
         if (editingElementId && editingElementId !== element.id) {
@@ -374,8 +385,6 @@ const DesignCanvas = forwardRef(
       (e, element, point) => {
         e.stopPropagation();
 
-        if (!canEdit) return;
-
         if (isDrawingLine || isDrawingBarcode || isDrawingShape) {
           return;
         }
@@ -402,8 +411,6 @@ const DesignCanvas = forwardRef(
       (e, element, handle) => {
         e.stopPropagation();
 
-        if (!canEdit) return;
-
         if (isDrawingLine || isDrawingBarcode || isDrawingShape) {
           return;
         }
@@ -427,7 +434,6 @@ const DesignCanvas = forwardRef(
       (e, element) => {
         e.stopPropagation();
         e.preventDefault();
-        if (!canEdit) return;
         const cx = element.x + element.width / 2;
         const cy = element.y + element.height / 2;
         const rect = canvasRef.current.getBoundingClientRect();
@@ -721,6 +727,12 @@ const DesignCanvas = forwardRef(
     const handleMouseUp = useCallback(() => {
       if (isDragging || isResizing || isDraggingLinePoint || isRotating) {
         saveToHistory(elements);
+
+        // Sync final position/size to backend
+        if (selectedElementId && onUpdateEnd) {
+          const el = elements.find((e) => e.id === selectedElementId);
+          if (el) onUpdateEnd(selectedElementId, el);
+        }
       }
       setIsDragging(false);
       setIsResizing(false);
@@ -729,18 +741,20 @@ const DesignCanvas = forwardRef(
       setDraggedLinePoint(null);
       setIsRotating(false);
       setRotationStart(null);
-    }, [isDragging, isResizing, isDraggingLinePoint, isRotating, elements, saveToHistory]);
+    }, [
+      isDragging,
+      isResizing,
+      isDraggingLinePoint,
+      isRotating,
+      elements,
+      saveToHistory,
+      selectedElementId,
+      onUpdateEnd,
+    ]);
 
     const handleCanvasMouseDown = useCallback(
       (e) => {
         if (!canvasRef.current) return;
-
-        if (!canEdit) {
-          // User clicked on empty canvas area — collapse properties panel
-          if (onInteraction) onInteraction();
-          setSelectedElementId(null);
-          return;
-        }
 
         const rect = canvasRef.current.getBoundingClientRect();
         const scale = displayZoom / 100;
@@ -869,35 +883,23 @@ const DesignCanvas = forwardRef(
           const width = Math.abs(x - textDrawStart.x);
           const height = Math.abs(y - textDrawStart.y);
 
-          // Minimum size to create a text box
-          if (width < 20 || height < 10) {
-            // Very small drag — create a default-size text box at click point
-            const newElement = {
-              id: generateId(),
-              type: "text",
-              x: textDrawStart.x,
-              y: textDrawStart.y,
-              width: 120,
-              height: 30,
-              content: "",
-              fontSize: 14,
-              fontFamily: "Arial",
-              fontWeight: "normal",
-              fontStyle: "normal",
-              textDecoration: "none",
-              textAlign: "left",
-              letterSpacing: 0,
-              lineHeight: 1.2,
-              color: "#000000",
-              backgroundColor: "transparent",
-              borderWidth: 0,
-              borderColor: "#000000",
-              borderStyle: "solid",
-              borderRadius: 0,
-              rotation: 0,
-              opacity: 1,
-              zIndex: elements.length,
-            };
+          const props = {
+            x: Math.min(textDrawStart.x, x),
+            y: Math.min(textDrawStart.y, y),
+            width: width < 20 ? 120 : Math.max(width, 30),
+            height: height < 10 ? 30 : Math.max(height, 20),
+            content: "",
+          };
+
+          if (onAddElement) {
+            onAddElement("text", props);
+            setIsDrawingText(false);
+            setTextDrawStart(null);
+            setTempText(null);
+            // We can't auto-edit because onAddElement is async and we don't have the ID yet
+            // The user will have to click to edit.
+          } else {
+            const newElement = { ...props, id: generateId(), type: "text", zIndex: elements.length };
             const newElements = [...elements, newElement];
             setElements(newElements);
             setSelectedElementId(newElement.id);
@@ -905,53 +907,11 @@ const DesignCanvas = forwardRef(
             setTextDrawStart(null);
             setTempText(null);
             saveToHistory(newElements);
-            // Auto-enter edit mode
             setTimeout(() => {
               setEditingElementId(newElement.id);
               setEditingTextValue("");
             }, 20);
-            return;
           }
-
-          const newElement = {
-            id: generateId(),
-            type: "text",
-            x: Math.min(textDrawStart.x, x),
-            y: Math.min(textDrawStart.y, y),
-            width: Math.max(width, 30),
-            height: Math.max(height, 20),
-            content: "",
-            fontSize: 14,
-            fontFamily: "Arial",
-            fontWeight: "normal",
-            fontStyle: "normal",
-            textDecoration: "none",
-            textAlign: "left",
-            letterSpacing: 0,
-            lineHeight: 1.2,
-            color: "#000000",
-            backgroundColor: "transparent",
-            borderWidth: 0,
-            borderColor: "#000000",
-            borderStyle: "solid",
-            borderRadius: 0,
-            rotation: 0,
-            opacity: 1,
-            zIndex: elements.length,
-          };
-
-          const newElements = [...elements, newElement];
-          setElements(newElements);
-          setSelectedElementId(newElement.id);
-          setIsDrawingText(false);
-          setTextDrawStart(null);
-          setTempText(null);
-          saveToHistory(newElements);
-          // Auto-enter edit mode after placing
-          setTimeout(() => {
-            setEditingElementId(newElement.id);
-            setEditingTextValue("");
-          }, 20);
           return;
         }
 
@@ -978,9 +938,7 @@ const DesignCanvas = forwardRef(
             return;
           }
 
-          const newElement = {
-            id: generateId(),
-            type: "line",
+          const props = {
             x: Math.min(lineDrawStart.x, x),
             y: Math.min(lineDrawStart.y, y),
             width: Math.abs(dx),
@@ -989,28 +947,30 @@ const DesignCanvas = forwardRef(
             y1: lineDrawStart.y,
             x2: x,
             y2: y,
-            content: "",
-            fontSize: 14,
-            fontFamily: "Arial",
-            color: "#000000",
-            backgroundColor: "#000000",
             borderWidth: 1,
             borderColor: "#000000",
             borderStyle: "solid",
-            rotation: 0,
-            zIndex: elements.length,
           };
 
-          const newElements = [...elements, newElement];
-          setElements(newElements);
-          setSelectedElementId(newElement.id);
-          setIsDrawingLine(false);
-          setLineDrawStart(null);
-          setTempLine(null);
-          setLineMousePos(null);
-          saveToHistory(newElements);
-          // Open properties panel now that line is drawn
-          if (onElementCreated) onElementCreated();
+          if (onAddElement) {
+            onAddElement("line", props);
+            setIsDrawingLine(false);
+            setLineDrawStart(null);
+            setTempLine(null);
+            setLineMousePos(null);
+            if (onElementCreated) onElementCreated();
+          } else {
+            const newElement = { ...props, id: generateId(), type: "line", zIndex: elements.length };
+            const newElements = [...elements, newElement];
+            setElements(newElements);
+            setSelectedElementId(newElement.id);
+            setIsDrawingLine(false);
+            setLineDrawStart(null);
+            setTempLine(null);
+            setLineMousePos(null);
+            saveToHistory(newElements);
+            if (onElementCreated) onElementCreated();
+          }
         } else if (isDrawingBarcode && barcodeDrawStart) {
           const width = Math.abs(x - barcodeDrawStart.x);
           const height = Math.abs(y - barcodeDrawStart.y);
@@ -1022,33 +982,30 @@ const DesignCanvas = forwardRef(
             return;
           }
 
-          const newElement = {
-            id: generateId(),
-            type: "barcode",
+          const props = {
             x: Math.min(barcodeDrawStart.x, x),
             y: Math.min(barcodeDrawStart.y, y),
             width: Math.max(width, 100),
             height: Math.max(height, 50),
             content: "123456789",
             barcodeType: selectedBarcodeType || "CODE128",
-            fontSize: 14,
-            fontFamily: "Arial",
-            color: "#000000",
-            backgroundColor: "#ffffff",
-            borderWidth: 0,
-            borderColor: "#000000",
-            borderStyle: "solid",
-            rotation: 0,
-            zIndex: elements.length,
           };
 
-          const newElements = [...elements, newElement];
-          setElements(newElements);
-          setSelectedElementId(newElement.id);
-          setIsDrawingBarcode(false);
-          setBarcodeDrawStart(null);
-          setTempBarcode(null);
-          saveToHistory(newElements);
+          if (onAddElement) {
+            onAddElement("barcode", props);
+            setIsDrawingBarcode(false);
+            setBarcodeDrawStart(null);
+            setTempBarcode(null);
+          } else {
+            const newElement = { ...props, id: generateId(), type: "barcode", zIndex: elements.length };
+            const newElements = [...elements, newElement];
+            setElements(newElements);
+            setSelectedElementId(newElement.id);
+            setIsDrawingBarcode(false);
+            setBarcodeDrawStart(null);
+            setTempBarcode(null);
+            saveToHistory(newElements);
+          }
         } else if (isDrawingShape && shapeDrawStart && currentShapeType) {
           const width = Math.abs(x - shapeDrawStart.x);
           const height = Math.abs(y - shapeDrawStart.y);
@@ -1060,9 +1017,7 @@ const DesignCanvas = forwardRef(
             return;
           }
 
-          const newElement = {
-            id: generateId(),
-            type: currentShapeType,
+          const props = {
             x: Math.min(shapeDrawStart.x, x),
             y: Math.min(shapeDrawStart.y, y),
             width: Math.max(width, 30),
@@ -1072,17 +1027,23 @@ const DesignCanvas = forwardRef(
             borderStyle: "solid",
             borderRadius: currentShapeType === "rectangle" ? 0 : undefined,
             backgroundColor: "transparent",
-            rotation: 0,
-            zIndex: elements.length,
           };
 
-          const newElements = [...elements, newElement];
-          setElements(newElements);
-          setSelectedElementId(newElement.id);
-          setIsDrawingShape(false);
-          setShapeDrawStart(null);
-          setTempShape(null);
-          saveToHistory(newElements);
+          if (onAddElement) {
+            onAddElement(currentShapeType, props);
+            setIsDrawingShape(false);
+            setShapeDrawStart(null);
+            setTempShape(null);
+          } else {
+            const newElement = { ...props, id: generateId(), type: currentShapeType, zIndex: elements.length };
+            const newElements = [...elements, newElement];
+            setElements(newElements);
+            setSelectedElementId(newElement.id);
+            setIsDrawingShape(false);
+            setShapeDrawStart(null);
+            setTempShape(null);
+            saveToHistory(newElements);
+          }
         }
       },
       [
@@ -1124,45 +1085,36 @@ const DesignCanvas = forwardRef(
           const x = (e.clientX - rect.left) / scale;
           const y = (e.clientY - rect.top) / scale;
 
-          const newElement = {
-            id: generateId(),
-            type: draggedElement,
-            x: Math.max(0, Math.min(x - 50, canvasPixelSize.width - 100)),
-            y: Math.max(0, Math.min(y - 25, canvasPixelSize.height - 50)),
-            width:
-              draggedElement === "text"
-                ? 120
-                : draggedElement === "barcode"
-                  ? 200
-                  : 100,
-            height:
-              draggedElement === "text"
-                ? 30
-                : draggedElement === "barcode"
-                  ? 100
-                  : 100,
-            content:
-              draggedElement === "text"
-                ? "New Text"
-                : draggedElement === "barcode"
-                  ? "123456789"
-                  : "",
-            barcodeType: draggedElement === "barcode" ? "CODE128" : undefined,
-            fontSize: 14,
-            fontFamily: "Arial",
-            color: "#000000",
-            backgroundColor: "transparent",
-            borderWidth: 0,
-            borderColor: "#000000",
-            borderStyle: "solid",
-            rotation: 0,
-            zIndex: elements.length,
+          const defaultWidth = draggedElement === "barcode" ? 200 : 100;
+          const defaultHeight = draggedElement === "barcode" ? 80 : (draggedElement === "text" ? 30 : 100);
+
+          const extra = {
+            x: Math.max(0, Math.min(x - 50, canvasPixelSize.width - defaultWidth)),
+            y: Math.max(0, Math.min(y - 25, canvasPixelSize.height - defaultHeight)),
+            width: defaultWidth,
+            height: defaultHeight,
           };
-          const newElements = [...elements, newElement];
-          setElements(newElements);
-          setSelectedElementId(newElement.id);
-          setDraggedElement(null);
-          saveToHistory(newElements);
+
+          if (onAddElement) {
+            onAddElement(draggedElement, extra);
+            setDraggedElement(null);
+          } else {
+            const newElement = {
+              ...extra,
+              id: generateId(),
+              type: draggedElement,
+              content: draggedElement === "barcode" ? "123456789" : (draggedElement === "text" ? "New Text" : ""),
+              zIndex: elements.length,
+              fontSize: 14,
+              fontFamily: "Arial",
+              rotation: 0,
+            };
+            const newElements = [...elements, newElement];
+            setElements(newElements);
+            setSelectedElementId(newElement.id);
+            setDraggedElement(null);
+            saveToHistory(newElements);
+          }
         }
       },
       [
@@ -1175,6 +1127,7 @@ const DesignCanvas = forwardRef(
         setElements,
         setSelectedElementId,
         saveToHistory,
+        onAddElement
       ],
     );
 
@@ -1501,12 +1454,15 @@ const DesignCanvas = forwardRef(
             : isDrawingLine || isDrawingBarcode || isDrawingShape
               ? "crosshair"
               : "move",
-          border:
-            isSelected && !isDrawingLine && !isDrawingBarcode && !isDrawingShape
-              ? "2px solid var(--color-primary)"
-              : element.type === "barcode"
-                ? "none"
-                : "1px solid transparent",
+          borderWidth: isSelected && !isDrawingLine && !isDrawingBarcode && !isDrawingShape
+            ? 2
+            : (element.borderWidth > 0 ? element.borderWidth : (element.type === "barcode" ? 0 : 1)),
+          borderStyle: isSelected && !isDrawingLine && !isDrawingBarcode && !isDrawingShape
+            ? "solid"
+            : (element.borderWidth > 0 ? (element.borderStyle || "solid") : "solid"),
+          borderColor: isSelected && !isDrawingLine && !isDrawingBarcode && !isDrawingShape
+            ? "var(--color-primary)"
+            : (element.borderWidth > 0 ? element.borderColor : "transparent"),
           fontSize: element.fontSize,
           fontFamily: element.fontFamily,
           fontWeight: element.fontWeight,
@@ -1514,18 +1470,6 @@ const DesignCanvas = forwardRef(
           textAlign: element.textAlign,
           color: element.color,
           backgroundColor: element.backgroundColor,
-          borderWidth:
-            !isSelected && element.borderWidth > 0
-              ? element.borderWidth
-              : undefined,
-          borderColor:
-            !isSelected && element.borderWidth > 0
-              ? element.borderColor
-              : undefined,
-          borderStyle:
-            !isSelected && element.borderWidth > 0
-              ? element.borderStyle || "solid"
-              : undefined,
           borderRadius: element.borderRadius
             ? `${element.borderRadius}px`
             : element.type === "circle"

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-
 import {
     Clock, CheckCircle, XCircle, AlertCircle, RefreshCw,
     Search, Calendar, Printer, FileText, ChevronRight, Filter,
@@ -23,31 +22,16 @@ const PrintHistory = ({ labels = [] }) => {
     const [resumeTemplate, setResumeTemplate] = useState(null);
     const [generatedLabels, setGeneratedLabels] = useState([]);
     const [showGeneratedPreview, setShowGeneratedPreview] = useState(false);
-    const [printJobContext, setPrintJobContext] = useState(null);
-    const [error, setError] = useState(null);
 
     const fetchHistory = async () => {
         setIsLoading(true);
-        setError(null);
         try {
-            const { callEdgeFunction, API_URLS } = await import("../supabaseClient");
-            const data = await callEdgeFunction(API_URLS.LIST_PRINT_JOBS, {});
-            console.log("Fetched print history:", data);
-
-            // Expected format: array of job objects
-            if (Array.isArray(data)) {
-                setHistory(data);
-            } else if (data && Array.isArray(data.jobs)) {
+            const data = await printService.getHistory();
+            if (data.success) {
                 setHistory(data.jobs);
-            } else {
-                console.warn("Unexpected response format for print history:", data);
-                // Fallback to empty list or mock data for testing if needed
-                // setHistory([]); 
             }
-        } catch (err) {
-            console.error("Error fetching print history:", err);
-            setError("Failed to load print history. Please try again later.");
-            // toast.error("Failed to load print history."); // If toast is available
+        } catch (error) {
+            console.error("Failed to fetch print history", error);
         } finally {
             setIsLoading(false);
         }
@@ -104,12 +88,8 @@ const PrintHistory = ({ labels = [] }) => {
         setShowResumeModal(true);
     };
 
-    const handleLabelsGenerated = (newLabels, context) => {
-        setGeneratedLabels(newLabels);
-        setPrintJobContext({
-            template: resumeTemplate,
-            ...context
-        });
+    const handleLabelsGenerated = (labels) => {
+        setGeneratedLabels(labels);
         setShowResumeModal(false);
         setShowGeneratedPreview(true);
     };
@@ -311,11 +291,9 @@ const PrintHistory = ({ labels = [] }) => {
             {showGeneratedPreview && generatedLabels.length > 0 && (
                 <GeneratedLabelsPreview
                     labels={generatedLabels}
-                    jobContext={printJobContext}
                     onClose={() => {
                         setShowGeneratedPreview(false);
                         setGeneratedLabels([]);
-                        setPrintJobContext(null);
                     }}
                 />
             )}

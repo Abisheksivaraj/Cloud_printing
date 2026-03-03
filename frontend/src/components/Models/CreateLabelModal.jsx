@@ -1,55 +1,42 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { X, Printer, Settings, RefreshCw, Check, LayoutGrid, Ruler, Type, Move, Sliders } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { X, Printer, Settings, RefreshCw, Check, Ruler, Type, Sliders, Hash, Info, Target, Plus, Smartphone, AlignLeft, ChevronRight, ChevronLeft, Code } from "lucide-react";
 import { useTheme } from "../../ThemeContext";
+import { callEdgeFunction, API_URLS } from "../../supabaseClient";
 
-/*
-  CreateLabelModal Component
-  Refactored to align with the new design system.
-  Uses theme variables for consistent styling.
-*/
+const PRESETS = [
+  { id: "100x75", name: "ATPL 100x75", width: 100, height: 75 },
+  { id: "100x50", name: "ATPL 100x50", width: 100, height: 50 },
+  { id: "50x25", name: "ATPL 50x25 (2A)", width: 50, height: 25 },
+  { id: "100x100", name: "ATPL 100x100", width: 100, height: 100 },
+  { id: "custom", name: "Custom", width: 50.806, height: 39.952 }
+];
 
 const CreateLabelModal = ({ onClose, onCreate }) => {
   const { theme, isDarkMode } = useTheme();
-  const [activeTab, setActiveTab] = useState("settings");
+
+  // Basic Info
   const [labelName, setLabelName] = useState("");
-  const [width, setWidth] = useState(50);
-  const [height, setHeight] = useState(30);
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("custom");
+
+  // Dimensions
+  const [width, setWidth] = useState(50.806);
+  const [height, setHeight] = useState(39.952);
+  const [unit, setUnit] = useState("mm");
+  const [rotation, setRotation] = useState(90);
+  const [orientation, setOrientation] = useState("landscape");
+
+  // Settings
+  const [dpi, setDpi] = useState(300);
+  const [margin, setMargin] = useState(2);
+  const [defaultFont, setDefaultFont] = useState("Arial");
 
   // Printer states
   const [availablePrinters, setAvailablePrinters] = useState([]);
   const [selectedPrinter, setSelectedPrinter] = useState("");
   const [isLoadingPrinters, setIsLoadingPrinters] = useState(false);
-  const [printerSettings, setPrinterSettings] = useState({
-    paperSize: "A4",
-    orientation: "portrait",
-    quality: "normal",
-    copies: 1,
-    colorMode: "color",
-  });
-
-  // Advanced settings - Default to 2x2 grid
-  const [columns, setColumns] = useState(1);
-  const [rows, setRows] = useState(1);
-  const [horizontalSpacing, setHorizontalSpacing] = useState(1);
-  const [verticalSpacing, setVerticalSpacing] = useState(11);
-  const [marginLeft, setMarginLeft] = useState(2);
-  const [marginRight, setMarginRight] = useState(2);
-  const [marginTop, setMarginTop] = useState(2);
-  const [marginBottom, setMarginBottom] = useState(2);
-
-  // Shape settings
-  const [labelShape, setLabelShape] = useState("rectangle");
-  const [cornerRadius, setCornerRadius] = useState(2);
-  const [printDirection, setPrintDirection] = useState("horizontal");
-  const [startCorner, setStartCorner] = useState("top-left");
-  const [orientation, setOrientation] = useState(0);
-
-  // Relocation
-  const [relocateLeft, setRelocateLeft] = useState(0);
-  const [relocateTop, setRelocateTop] = useState(0);
-
-  // Predefined label sizes
-  const [selectedLabelSize, setSelectedLabelSize] = useState("custom");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPreviewJson, setIsPreviewJson] = useState(false);
 
   // Fetch available printers on component mount
   useEffect(() => {
@@ -59,7 +46,10 @@ const CreateLabelModal = ({ onClose, onCreate }) => {
   const fetchAvailablePrinters = async () => {
     setIsLoadingPrinters(true);
     try {
-      const response = await fetch("http://localhost:3001/api/printers");
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const response = await fetch("http://localhost:3001/api/printers", { signal: controller.signal });
+      clearTimeout(timeoutId);
       if (response.ok) {
         const data = await response.json();
         setAvailablePrinters(data.printers || []);
@@ -69,421 +59,390 @@ const CreateLabelModal = ({ onClose, onCreate }) => {
         }
       }
     } catch (error) {
-      console.error("Error fetching printers:", error);
+      // Local printer server not running — fail silently
+      console.warn("Printer server not available (localhost:3001). Skipping printer discovery.");
     } finally {
       setIsLoadingPrinters(false);
     }
   };
 
-  const handlePrinterChange = async (printerName) => {
-    setSelectedPrinter(printerName);
-  };
-
-  const labelSizePresets = [
-    { id: "ATPL-100x75", name: "ATPL 100x75", width: 100, height: 75, cols: 2, rows: 1 },
-    { id: "ATPL-100x50", name: "ATPL 100x50", width: 100, height: 50, cols: 2, rows: 1 },
-    { id: "ATPL-50x25-2a", name: "ATPL 50x25 (2A)", width: 50, height: 25, cols: 2, rows: 2 },
-    { id: "ATPL-100x100", name: "ATPL 100x100", width: 100, height: 100, cols: 1, rows: 1 },
-    { id: "custom", name: "Custom", width: 50, height: 30, cols: 2, rows: 2 },
-  ];
-
-  // Calculate label order based on settings
-  const getLabelOrder = useMemo(() => {
-    const totalLabels = Math.min(columns * rows, 25);
-    const order = [];
-
-    for (let i = 0; i < totalLabels; i++) {
-      let row, col;
-
-      if (printDirection === "horizontal") {
-        row = Math.floor(i / columns);
-        col = i % columns;
+  const handleCategoryChange = (catId) => {
+    setCategory(catId);
+    const preset = PRESETS.find(p => p.id === catId);
+    if (preset && catId !== "custom") {
+      if (orientation === "portrait") {
+        setWidth(Math.min(preset.width, preset.height));
+        setHeight(Math.max(preset.width, preset.height));
       } else {
-        col = Math.floor(i / rows);
-        row = i % rows;
+        setWidth(Math.max(preset.width, preset.height));
+        setHeight(Math.min(preset.width, preset.height));
       }
-
-      if (startCorner === "top-right") {
-        col = columns - 1 - col;
-      } else if (startCorner === "bottom-left") {
-        row = rows - 1 - row;
-      } else if (startCorner === "bottom-right") {
-        col = columns - 1 - col;
-        row = rows - 1 - row;
-      }
-
-      order.push({ row, col, number: i + 1 });
-    }
-
-    return order;
-  }, [columns, rows, printDirection, startCorner]);
-
-  const calculatePaperSize = () => {
-    let paperWidth = width * columns + marginLeft + marginRight + horizontalSpacing * (columns - 1);
-    let paperHeight = height * rows + marginTop + marginBottom + verticalSpacing * (rows - 1);
-
-    paperWidth += Math.abs(relocateLeft);
-    paperHeight += Math.abs(relocateTop);
-
-    if (orientation === 90 || orientation === 270) {
-      return { width: paperHeight, height: paperWidth };
-    }
-
-    return { width: paperWidth, height: paperHeight };
-  };
-
-  const paperSize = calculatePaperSize();
-
-  const handleSubmit = () => {
-    if (labelName.trim()) {
-      onCreate({
-        name: labelName.trim(),
-        elements: [],
-        labelSize: { width, height },
-        printer: {
-          name: selectedPrinter,
-          displayName: availablePrinters.find((p) => p.name === selectedPrinter)?.displayName || selectedPrinter,
-          settings: printerSettings,
-        },
-        advancedSettings: {
-          columns, rows, horizontalSpacing, verticalSpacing,
-          margins: { left: marginLeft, right: marginRight, top: marginTop, bottom: marginBottom },
-          shape: labelShape, cornerRadius, printDirection, startCorner, orientation,
-          relocation: { left: relocateLeft, top: relocateTop },
-        },
-      });
-      onClose();
     }
   };
 
-  const applyLabelSizePreset = (presetId) => {
-    const preset = labelSizePresets.find((p) => p.id === presetId);
-    if (preset) {
-      setSelectedLabelSize(presetId);
-      setWidth(preset.width);
-      setHeight(preset.height);
-      setColumns(preset.cols);
-      setRows(preset.rows);
+  const handleOrientationChange = (mode) => {
+    setOrientation(mode);
+    if (mode === "portrait" && width > height) {
+      setWidth(height);
+      setHeight(width);
+    } else if (mode === "landscape" && height > width) {
+      setWidth(height);
+      setHeight(width);
+    }
+  };
+
+  const currentPayload = {
+    name: labelName.trim(),
+    description,
+    category,
+    dimensions: { width, height, unit },
+    rotation,
+    orientation,
+    settings: {
+      dpi,
+      margin,
+      default_font: defaultFont
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!labelName.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      // Create design via Edge Function
+      const design = await callEdgeFunction(API_URLS.CREATE_DESIGN, currentPayload);
+
+      if (design) {
+        onCreate({
+          ...currentPayload,
+          ...design,
+          printer: {
+            name: selectedPrinter,
+            displayName: availablePrinters.find((p) => p.name === selectedPrinter)?.displayName || selectedPrinter,
+          }
+        });
+        onClose();
+      }
+    } catch (error) {
+      console.error("Failed to create design:", error);
+      alert(`Create failed: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-300">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-in fade-in duration-300">
       <div
-        className="w-full max-w-6xl h-full max-h-[90vh] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+        className="w-full max-w-6xl h-full max-h-[85vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
         style={{ backgroundColor: theme.surface }}
       >
-
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b shrink-0 bg-white dark:bg-gray-800" style={{ borderColor: theme.border }}>
-          <div>
-            <h2 className="text-2xl font-black tracking-tight" style={{ color: theme.text }}>Create New Label</h2>
-            <p className="text-xs font-bold uppercase tracking-wider mt-1" style={{ color: theme.textMuted }}>Configure template dimensions & layout</p>
+        {/* Header - Zebra Style */}
+        <div className="flex items-center justify-between px-8 py-5 border-b shrink-0 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm" style={{ borderColor: theme.border }}>
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl font-bold tracking-tight" style={{ color: theme.text }}>New Label Setup Wizard</h2>
           </div>
-          <button onClick={onClose} className="p-3 bg-gray-100 dark:bg-gray-700 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all active:scale-90">
             <X size={20} />
           </button>
         </div>
 
-        {/* Layout Container */}
+        {/* Sub-Header */}
+        <div className="px-10 py-4 bg-gray-50/50 dark:bg-black/10 border-b" style={{ borderColor: theme.border }}>
+          <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">Specify the Label Dimensions</h3>
+          <p className="text-xs text-gray-500 mt-1">These dimensions define the physical boundaries and output parameters of your print job.</p>
+        </div>
+
+        {/* Main Body - Layout Swapped */}
         <div className="flex flex-1 overflow-hidden">
 
-          {/* Left: Preview Panel */}
-          <div className="w-[40%] bg-gray-50 dark:bg-black/20 p-8 border-r flex flex-col overflow-y-auto custom-scrollbar" style={{ borderColor: theme.border }}>
-            <div className="flex-1 flex flex-col items-center justify-center min-h-[300px]">
-              <div
-                className="p-8 rounded-3xl w-full max-w-md shadow-xl aspect-square flex items-center justify-center relative transition-colors duration-300"
-                style={{ backgroundColor: theme.surface, borderColor: theme.border, borderWidth: 2 }}
-              >
-                <div
-                  className="grid gap-1 relative transition-all duration-300 w-full h-full"
-                  style={{
-                    gridTemplateColumns: `repeat(${columns}, 1fr)`,
-                    aspectRatio: `${paperSize.width} / ${paperSize.height}`,
-                    transform: `rotate(${orientation}deg)`,
-                  }}
+          {/* Left: Scrollable Configuration Panel */}
+          <div className="flex-1 overflow-y-auto p-10 space-y-8 custom-scrollbar" style={{ backgroundColor: theme.surface }}>
+
+            {/* Identity Group */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider ml-1">Template Name</label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={labelName}
+                  onChange={(e) => setLabelName(e.target.value)}
+                  placeholder="e.g. Product Label A"
+                  className="w-full px-4 py-3 rounded-xl border-2 font-medium outline-none transition-all focus:border-[var(--color-primary)]"
+                  style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider ml-1">Label Type (Category)</label>
+                <select
+                  value={category}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border-2 font-medium outline-none transition-all focus:border-[var(--color-primary)] appearance-none cursor-pointer"
+                  style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
                 >
-                  {getLabelOrder.map((labelInfo) => (
-                    <div
-                      key={labelInfo.number}
-                      className="border-2 border-dashed flex items-center justify-center text-xs font-black text-gray-400 relative transition-colors"
-                      style={{
-                        borderColor: isDarkMode ? '#334155' : '#E2E8F0',
-                        backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC',
-                        gridColumn: labelInfo.col + 1,
-                        gridRow: labelInfo.row + 1,
-                        borderRadius: labelShape === 'rounded' ? `${cornerRadius}px` : labelShape === 'ellipse' ? '50%' : '8px'
-                      }}
-                    >
-                      {labelInfo.number}
-                      {labelInfo.number === 1 && (
-                        <div className="absolute -top-2 -left-2 w-6 h-6 bg-[var(--color-primary)] rounded-full border-4 border-white dark:border-gray-900 shadow-md flex items-center justify-center">
-                          <Check size={10} className="text-white" />
-                        </div>
-                      )}
-                    </div>
+                  {PRESETS.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Description Area */}
+            <div className="space-y-2">
+              <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider ml-1">Description</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Main product label for inventory..."
+                className="w-full px-4 py-3 rounded-xl border-2 font-medium outline-none transition-all focus:border-[var(--color-primary)] min-h-[80px] resize-none"
+                style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
+              />
+            </div>
+
+            {/* Dimensions Group */}
+            <div className="space-y-4">
+              <h4 className="text-[10px] font-black uppercase text-[var(--color-primary)] tracking-[0.2em] border-b pb-2" style={{ borderColor: theme.border }}>Dimensions & Scaling</h4>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Width</label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    value={width}
+                    onChange={(e) => setWidth(Number(e.target.value))}
+                    className="w-full px-4 py-3 rounded-xl border-2 font-medium outline-none focus:border-[var(--color-primary)]"
+                    style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Height</label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    value={height}
+                    onChange={(e) => setHeight(Number(e.target.value))}
+                    className="w-full px-4 py-3 rounded-xl border-2 font-medium outline-none focus:border-[var(--color-primary)]"
+                    style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Unit</label>
+                  <select
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border-2 font-medium focus:border-[var(--color-primary)] appearance-none"
+                    style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
+                  >
+                    <option value="mm">mm</option>
+                    <option value="in">in</option>
+                    <option value="px">px</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Rotation</label>
+                  <select
+                    value={rotation}
+                    onChange={(e) => setRotation(Number(e.target.value))}
+                    className="w-full px-4 py-3 rounded-xl border-2 font-medium focus:border-[var(--color-primary)] appearance-none"
+                    style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
+                  >
+                    <option value={0}>0°</option>
+                    <option value={90}>90°</option>
+                    <option value={180}>180°</option>
+                    <option value={270}>270°</option>
+                  </select>
                 </div>
               </div>
             </div>
 
-            <div className="mt-8 grid grid-cols-2 gap-4">
-              <div className="p-4 rounded-2xl border text-center transition-colors" style={{ backgroundColor: theme.surface, borderColor: theme.border }}>
-                <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: theme.textMuted }}>Paper Size</p>
-                <p className="text-xl font-black" style={{ color: theme.text }}>{paperSize.width.toFixed(1)} × {paperSize.height.toFixed(1)} <span className="text-xs align-top">mm</span></p>
+            {/* Layout Options */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-3">
+                <label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Orientation</label>
+                <div className="flex p-1 bg-gray-100 dark:bg-white/5 rounded-xl w-fit gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleOrientationChange("portrait")}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${orientation === "portrait" ? "bg-white dark:bg-gray-800 shadow-sm text-[var(--color-primary)]" : "text-gray-400"}`}
+                  >
+                    <Smartphone size={16} />
+                    Portrait
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOrientationChange("landscape")}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${orientation === "landscape" ? "bg-white dark:bg-gray-800 shadow-sm text-[var(--color-primary)]" : "text-gray-400"}`}
+                  >
+                    <Smartphone size={16} className="rotate-90" />
+                    Landscape
+                  </button>
+                </div>
               </div>
-              <div className="p-4 rounded-2xl border text-center transition-colors" style={{ backgroundColor: theme.surface, borderColor: theme.border }}>
-                <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: theme.textMuted }}>Label Size</p>
-                <p className="text-xl font-black" style={{ color: theme.text }}>{width} × {height} <span className="text-xs align-top">mm</span></p>
+
+              <div className="space-y-3">
+                <label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Safe Margin ({unit})</label>
+                <input
+                  type="number"
+                  value={margin}
+                  onChange={(e) => setMargin(Number(e.target.value))}
+                  className="w-full px-4 py-3 rounded-xl border-2 font-medium outline-none focus:border-[var(--color-primary)]"
+                  style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
+                />
+              </div>
+            </div>
+
+            {/* Printer & DPI */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t" style={{ borderColor: theme.border }}>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Target Printer</label>
+                  <button type="button" onClick={fetchAvailablePrinters} className="text-[9px] font-black text-[var(--color-primary)] uppercase">Sync</button>
+                </div>
+                <select
+                  value={selectedPrinter}
+                  onChange={(e) => setSelectedPrinter(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border-2 font-medium focus:border-[var(--color-primary)]"
+                  style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
+                >
+                  {availablePrinters.length === 0 && <option>No printers found</option>}
+                  {availablePrinters.map(p => (
+                    <option key={p.name} value={p.name}>{p.displayName || p.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Output Resolution</label>
+                <select
+                  value={dpi}
+                  onChange={(e) => setDpi(Number(e.target.value))}
+                  className="w-full px-4 py-3 rounded-xl border-2 font-medium focus:border-[var(--color-primary)]"
+                  style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
+                >
+                  <option value={203}>203 DPI</option>
+                  <option value={300}>300 DPI</option>
+                  <option value={600}>600 DPI</option>
+                </select>
               </div>
             </div>
           </div>
 
-          {/* Right: Configuration Panel */}
-          <div className="flex-1 flex flex-col" style={{ backgroundColor: theme.surface }}>
-            {/* Tabs */}
-            <div className="flex border-b" style={{ borderColor: theme.border }}>
+          {/* Right: Small Fixed Preview Box like Image 3 */}
+          <div className="w-[32%] bg-gray-50/50 dark:bg-black/20 p-8 border-l flex flex-col items-center shrink-0" style={{ borderColor: theme.border }}>
+
+            {/* Toggle Preview Mode */}
+            <div className="w-full flex justify-end mb-4">
               <button
-                onClick={() => setActiveTab("settings")}
-                className={`flex-1 py-5 text-xs font-black uppercase tracking-widest transition-all border-b-4 ${activeTab === 'settings'
-                  ? 'border-[var(--color-primary)] text-[var(--color-primary)] bg-[var(--color-primary)]/5'
-                  : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                onClick={() => setIsPreviewJson(!isPreviewJson)}
+                className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-white/5 transition-colors text-gray-400 hover:text-[var(--color-primary)] flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"
+                title={isPreviewJson ? "Switch to Visual" : "Switch to JSON"}
               >
-                General Settings
-              </button>
-              <button
-                onClick={() => setActiveTab("layout")}
-                className={`flex-1 py-5 text-xs font-black uppercase tracking-widest transition-all border-b-4 ${activeTab === 'layout'
-                  ? 'border-[var(--color-primary)] text-[var(--color-primary)] bg-[var(--color-primary)]/5'
-                  : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:hover:bg-white/5'}`}
-              >
-                Layout & Grid
+                <Code size={14} />
+                {isPreviewJson ? "Visual" : "JSON"}
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
-              {activeTab === "settings" && (
-                <div className="space-y-6 animate-in slide-in-from-right-8 duration-300">
-                  <div className="space-y-3">
-                    <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>Template Name</label>
-                    <div className="relative group">
-                      <Type size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input
-                        autoFocus
-                        type="text"
-                        value={labelName}
-                        onChange={(e) => setLabelName(e.target.value)}
-                        placeholder="e.g. Shipping Label 4x6"
-                        className="w-full pl-12 pr-4 py-4 rounded-xl border-2 font-bold outline-none transition-all focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/10"
-                        style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>Target Printer</label>
-                      <button
-                        onClick={fetchAvailablePrinters}
-                        disabled={isLoadingPrinters}
-                        className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-primary)] hover:underline flex items-center gap-1"
-                      >
-                        <RefreshCw size={12} className={isLoadingPrinters ? "animate-spin" : ""} /> Refresh
-                      </button>
-                    </div>
-                    <div className="relative group">
-                      <Printer size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <select
-                        value={selectedPrinter}
-                        onChange={(e) => handlePrinterChange(e.target.value)}
-                        className="w-full pl-12 pr-4 py-4 rounded-xl border-2 font-bold outline-none transition-all focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/10 appearance-none cursor-pointer"
-                        style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
-                      >
-                        {availablePrinters.length === 0 && <option>No printers found</option>}
-                        {availablePrinters.map(p => (
-                          <option key={p.name} value={p.name}>{p.displayName || p.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>Preset Size</label>
-                    <div className="relative group">
-                      <Settings size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <select
-                        value={selectedLabelSize}
-                        onChange={(e) => applyLabelSizePreset(e.target.value)}
-                        className="w-full pl-12 pr-4 py-4 rounded-xl border-2 font-bold outline-none transition-all focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/10 appearance-none cursor-pointer"
-                        style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
-                      >
-                        {labelSizePresets.map(p => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-3">
-                      <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>Width (mm)</label>
-                      <div className="relative group">
-                        <Ruler size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                        <input
-                          type="number"
-                          value={width}
-                          onChange={(e) => setWidth(Number(e.target.value))}
-                          className="w-full pl-12 pr-4 py-4 rounded-xl border-2 font-bold outline-none transition-all focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/10"
-                          style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>Height (mm)</label>
-                      <div className="relative group">
-                        <Ruler size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 rotate-90" />
-                        <input
-                          type="number"
-                          value={height}
-                          onChange={(e) => setHeight(Number(e.target.value))}
-                          className="w-full pl-12 pr-4 py-4 rounded-xl border-2 font-bold outline-none transition-all focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/10"
-                          style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
-                        />
-                      </div>
-                    </div>
-                  </div>
+            {/* Warning/Status box like in Zebra Wizard */}
+            {!isPreviewJson && (
+              <div className="w-full p-4 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-lg mb-8">
+                <div className="flex gap-3 text-red-600 dark:text-red-400">
+                  <Info size={16} className="shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-relaxed">The dimensions specified will be used to initialize the design canvas. Ensure these match your physical media.</p>
                 </div>
-              )}
+              </div>
+            )}
 
-              {activeTab === "layout" && (
-                <div className="space-y-8 animate-in slide-in-from-right-8 duration-300">
-                  <div className="p-6 rounded-2xl border bg-gray-50/50 dark:bg-black/20" style={{ borderColor: theme.border }}>
-                    <div className="flex items-center gap-2 mb-4 text-[var(--color-primary)]">
-                      <LayoutGrid size={20} />
-                      <h4 className="text-xs font-black uppercase tracking-widest">Grid Layout</h4>
-                    </div>
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold uppercase text-gray-400">Columns</label>
-                        <input
-                          type="number"
-                          value={columns}
-                          onChange={(e) => setColumns(Number(e.target.value))}
-                          className="w-full px-4 py-3 rounded-xl border-2 font-bold outline-none transition-all focus:border-[var(--color-primary)]"
-                          style={{ backgroundColor: theme.surface, borderColor: theme.border, color: theme.text }}
-                          min="1" max="10"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold uppercase text-gray-400">Rows</label>
-                        <input
-                          type="number"
-                          value={rows}
-                          onChange={(e) => setRows(Number(e.target.value))}
-                          className="w-full px-4 py-3 rounded-xl border-2 font-bold outline-none transition-all focus:border-[var(--color-primary)]"
-                          style={{ backgroundColor: theme.surface, borderColor: theme.border, color: theme.text }}
-                          min="1" max="10"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-8">
-                    <div>
-                      <div className="flex items-center gap-2 mb-4 text-gray-400">
-                        <Move size={16} />
-                        <h4 className="text-xs font-black uppercase tracking-widest">Spacing (mm)</h4>
-                      </div>
-                      <div className="space-y-4">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase text-gray-400">Horizontal</label>
-                          <input
-                            type="number"
-                            value={horizontalSpacing}
-                            onChange={(e) => setHorizontalSpacing(Number(e.target.value))}
-                            className="w-full px-4 py-3 rounded-xl border-2 font-bold outline-none transition-all focus:border-[var(--color-primary)]"
-                            style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase text-gray-400">Vertical</label>
-                          <input
-                            type="number"
-                            value={verticalSpacing}
-                            onChange={(e) => setVerticalSpacing(Number(e.target.value))}
-                            className="w-full px-4 py-3 rounded-xl border-2 font-bold outline-none transition-all focus:border-[var(--color-primary)]"
-                            style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-4 text-gray-400">
-                        <Sliders size={16} />
-                        <h4 className="text-xs font-black uppercase tracking-widest">Margins (mm)</h4>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase text-gray-400">Left</label>
-                          <input
-                            type="number"
-                            value={marginLeft}
-                            onChange={(e) => setMarginLeft(Number(e.target.value))}
-                            className="w-full px-4 py-3 rounded-xl border-2 font-bold outline-none transition-all focus:border-[var(--color-primary)]"
-                            style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase text-gray-400">Top</label>
-                          <input
-                            type="number"
-                            value={marginTop}
-                            onChange={(e) => setMarginTop(Number(e.target.value))}
-                            className="w-full px-4 py-3 rounded-xl border-2 font-bold outline-none transition-all focus:border-[var(--color-primary)]"
-                            style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="text-xs font-black uppercase tracking-widest mb-4 text-gray-400">Label Shape</h4>
-                    <div className="flex gap-4 p-1 rounded-xl bg-gray-100 dark:bg-black/20 overflow-hidden">
-                      {['rectangle', 'rounded', 'ellipse'].map(shape => (
-                        <button
-                          key={shape}
-                          onClick={() => setLabelShape(shape)}
-                          className={`flex-1 py-3 px-4 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 ${labelShape === shape
-                            ? 'bg-white dark:bg-gray-800 text-[var(--color-primary)] shadow-sm scale-100'
-                            : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 scale-95'}`}
-                        >
-                          {shape}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+            <div className="flex-1 w-full flex flex-col items-center justify-start py-4 group overflow-hidden">
+              {isPreviewJson ? (
+                <div className="w-full h-full bg-gray-900 rounded-xl p-4 overflow-auto custom-scrollbar shadow-inner border border-white/5">
+                  <pre className="text-[10px] text-green-400 font-mono leading-relaxed">
+                    {JSON.stringify(currentPayload, null, 2)}
+                  </pre>
                 </div>
+              ) : (
+                <>
+                  <div
+                    className="relative bg-white shadow-[8px_8px_0px_rgba(0,0,0,0.1)] border-[4px] border-black transition-all duration-500 ease-out flex items-center justify-center overflow-hidden"
+                    style={{
+                      width: width >= height ? '100%' : 'auto',
+                      height: height > width ? '100%' : 'auto',
+                      aspectRatio: `${width}/${height}`,
+                      maxWidth: '100%',
+                      maxHeight: '260px',
+                      minHeight: '120px'
+                    }}
+                  >
+                    <div className="absolute inset-0 opacity-[0.05] pointer-events-none" style={{
+                      backgroundImage: `linear-gradient(90deg, #000 1px, transparent 1px), linear-gradient(#000 1px, transparent 1px)`,
+                      backgroundSize: '16px 16px'
+                    }}></div>
+
+                    <div
+                      className="font-black text-4xl tracking-tighter opacity-[0.2] select-none transition-transform duration-500"
+                      style={{
+                        color: '#000',
+                        transform: `rotate(${rotation}deg)`
+                      }}
+                    >
+                      ATPL
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex flex-col items-center gap-1">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Live Preview</span>
+                    <p className="text-xs font-bold" style={{ color: theme.textMuted }}>{width} x {height} {unit}</p>
+                  </div>
+                </>
               )}
             </div>
 
-            {/* Footer */}
-            <div className="p-6 border-t flex justify-end gap-3 bg-gray-50/30 dark:bg-black/10 shrink-0" style={{ borderColor: theme.border }}>
-              <button
-                onClick={onClose}
-                className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
-                style={{ color: theme.textMuted }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={!labelName.trim()}
-                className="px-8 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:shadow-primary/30 transition-all active:scale-95 text-xs uppercase tracking-wider disabled:opacity-50 disabled:scale-100 disabled:shadow-none"
-              >
-                Create Label
-              </button>
-            </div>
+            {!isPreviewJson && (
+              <div className="w-full pt-6 border-t" style={{ borderColor: theme.border }}>
+                <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
+                  <span>Orientation</span>
+                  <span className="text-[var(--color-primary)]">{orientation}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer - Zebra Wizard Style */}
+        <div className="px-8 py-6 border-t flex justify-between items-center bg-gray-50/50 dark:bg-black/20 shrink-0" style={{ borderColor: theme.border }}>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[var(--color-primary)]"></span>
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Configuration Step 1 of 1</span>
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-3 rounded-lg font-bold text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 transition-all"
+            >
+              Cancel
+            </button>
+            <div className="h-10 w-px bg-gray-200 dark:bg-gray-700 mx-1"></div>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!labelName.trim() || isSubmitting}
+              className="px-10 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white font-bold text-sm rounded-lg shadow-lg shadow-primary/20 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2 min-w-[120px] justify-center"
+            >
+              {isSubmitting ? (
+                <>
+                  <RefreshCw size={16} className="animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  Finish
+                  <Check size={16} />
+                </>
+              )}
+            </button>
           </div>
         </div>
       </div>

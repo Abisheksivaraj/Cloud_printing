@@ -118,10 +118,10 @@ const AdminDashboard = ({ userRole }) => {
                         </div>
                         <button
                             onClick={() => setShowAddModal(true)}
-                            className="btn-pink px-8 py-3.5 text-xs font-black uppercase tracking-widest shadow-lg shadow-pink-500/20"
+                            className="btn-pink px-8 py-3.5 text-xs flex gap-1   font-black uppercase tracking-widest shadow-lg shadow-pink-500/20"
                         >
                             <UserPlus size={16} />
-                            <span>Invite Resource</span>
+                            <span>Invite User</span>
                         </button>
                     </div>
                 </div>

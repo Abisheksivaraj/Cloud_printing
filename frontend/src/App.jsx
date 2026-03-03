@@ -8,7 +8,8 @@ import Login from "./components/admin/Login";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import PrintHistory from "./components/PrintHistory";
 import { useTheme } from "./ThemeContext";
-import { supabase } from "./supabaseClient";
+import { supabase, callEdgeFunction, API_URLS } from "./supabaseClient";
+import Toast from "./components/Toast";
 
 
 const App = () => {
@@ -20,6 +21,7 @@ const App = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState(null);
   const [userData, setUserData] = useState(null);
+  const [toast, setToast] = useState(null); // { message: string, type: 'success' | 'error' }
 
   useEffect(() => {
     // Check for active session on mount
@@ -70,6 +72,37 @@ const App = () => {
     checkSession();
   }, []);
 
+  // Helper: get the design_id for API calls (backend always uses design_id)
+  const getDesignId = (designObj) => {
+    if (!designObj) return null;
+    return designObj.design_id ||
+      designObj.id ||
+      designObj.design?.design_id ||
+      designObj.design?.id ||
+      designObj.data?.design_id ||
+      designObj.data?.id;
+  };
+
+  const fetchDesigns = async () => {
+    try {
+      const data = await callEdgeFunction(API_URLS.GET_DESIGNS, {});
+      console.log("fetchDesigns raw data:", data);
+      // Handle both array response and { designs: [...] } wrapper
+      const designsList = Array.isArray(data) ? data : (data?.designs || data?.data || []);
+      const normalized = designsList.map(l => normalizeDesign(l));
+      console.log("fetchDesigns normalized:", normalized);
+      setLabels(normalized);
+    } catch (error) {
+      console.error("Error fetching designs:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated && (currentView === "library" || currentView === "print_history")) {
+      fetchDesigns();
+    }
+  }, [currentView, isAuthenticated]);
+
   // Manage navigation
   const navigateTo = (view) => {
     if (view === "logout") {
@@ -108,47 +141,183 @@ const App = () => {
     setCurrentView(user.role?.toLowerCase() === 'admin' ? "admin_dashboard" : "library");
   };
 
-  const handleCreateLabel = (labelData) => {
-    if (userRole === 'viewer') return;
-    const newLabel = {
-      id: `label_${Date.now()}`,
-      ...labelData,
-      createdAt: new Date().toLocaleString(),
-      lastModified: new Date().toLocaleString(),
+  // Note: fetchDesigns above (line 73) already handles library + print_history fetching.
+  // The duplicate useEffect has been removed to avoid overwriting labels with non-array data.
+
+  // Normalize design objects from API: ensure both id and design_id are set
+  const normalizeDesign = (design) => {
+    if (!design) return design;
+
+    // Flatten nested design/data if present
+    const base = design.design || design.data || design;
+    const finalId = base.design_id || base.id || design.design_id || design.id;
+
+    return {
+      ...design,
+      ...base,
+      id: finalId,
+      design_id: finalId,
     };
-    setLabels([...labels, newLabel]);
-    setCurrentLabel(newLabel);
+  };
+
+  const handleCreateLabel = (newLabel) => {
+    if (userRole === 'viewer') return;
+
+    // The label is already created via API in the modal
+    const normalized = normalizeDesign(newLabel);
+    setLabels(prev => [...prev, normalized]);
+    setCurrentLabel(normalized);
     setCurrentView("designer");
   };
 
-  const handleEditLabel = (label) => {
+  const handleEditLabel = async (label) => {
     if (userRole === 'viewer') {
-      setCurrentLabel(label);
-      setCurrentView("designer"); // Designer should handle read-only mode or we just show preview
+      setCurrentLabel(normalizeDesign(label));
+      setCurrentView("designer");
       return;
     }
-    setCurrentLabel(label);
+
+    const designId = getDesignId(label);
+    try {
+      // Fetch the full design details (including elements)
+      const fullDesign = await callEdgeFunction(API_URLS.GET_DESIGN, { design_id: designId });
+      const normalizedFull = normalizeDesign(fullDesign);
+      const normalizedOriginal = normalizeDesign(label);
+      setCurrentLabel({ ...normalizedOriginal, ...normalizedFull });
+    } catch (error) {
+      console.error("Error fetching design details:", error);
+      setCurrentLabel(normalizeDesign(label));
+    }
+
     setCurrentView("designer");
   };
 
-  const handleDeleteLabel = (labelId) => {
+  const handleDeleteLabel = async (labelId) => {
     if (userRole === 'viewer') return;
-    setLabels(labels.filter((label) => label.id !== labelId));
+    const targetLabel = labels.find(l => l.id === labelId || l.design_id === labelId);
+    const actualDesignId = getDesignId(targetLabel) || labelId;
+    try {
+      await callEdgeFunction(API_URLS.DELETE_DESIGN, {
+        design_id: actualDesignId,
+        version_major: targetLabel?.version_major || 0,
+        version_minor: targetLabel?.version_minor || 1
+      });
+      setLabels(labels.map((l) => getDesignId(l) === actualDesignId ? { ...l, deleted_at: new Date().toISOString() } : l));
+      setToast({ message: "Label moved to Trash", type: "success" });
+    } catch (error) {
+      console.error("Failed to delete label:", error);
+      setToast({ message: `Delete failed: ${error.message}`, type: "error" });
+    }
   };
 
-  const handleSaveLabel = (labelData) => {
+  const handleUpdateStatus = async (labelId, status) => {
     if (userRole === 'viewer') return;
-    const updatedLabels = labels.map((label) =>
-      label.id === currentLabel.id
-        ? {
-          ...label,
-          ...labelData,
-          lastModified: new Date().toLocaleString(),
-        }
-        : label,
-    );
-    setLabels(updatedLabels);
-    setCurrentLabel({ ...currentLabel, ...labelData });
+    const targetLabel = labels.find(l => l.id === labelId || l.design_id === labelId);
+    const actualDesignId = getDesignId(targetLabel) || labelId;
+    try {
+      let endpoint;
+      let successMsg;
+
+      switch (status) {
+        case 'archived': endpoint = API_URLS.ARCHIVE_DESIGN; successMsg = "Label archived"; break;
+        case 'restored':
+        case 'draft': endpoint = API_URLS.RESTORE_DESIGN; successMsg = "Label restored"; break;
+        default: endpoint = API_URLS.UPDATE_DESIGN; successMsg = "Status updated";
+      }
+
+      console.log("handleUpdateStatus — targets:", { actualDesignId, version_major: targetLabel?.version_major, version_minor: targetLabel?.version_minor });
+
+      const result = await callEdgeFunction(endpoint, {
+        design_id: actualDesignId,
+        version_major: targetLabel?.version_major !== undefined ? targetLabel.version_major : 0,
+        version_minor: targetLabel?.version_minor !== undefined ? targetLabel.version_minor : 1
+      });
+
+      const updatedFromResult = normalizeDesign(result);
+
+      // Update local state: clear deleted_at on restoration, update status
+      // If status is 'restored', we usually move it back to 'draft'
+      const newStatus = status === 'restored' ? 'draft' : status;
+
+      setLabels(labels.map(l =>
+        getDesignId(l) === actualDesignId
+          ? {
+            ...l,
+            ...(updatedFromResult || {}),
+            status: newStatus,
+            deleted_at: status === 'restored' ? null : l.deleted_at
+          }
+          : l
+      ));
+      setToast({ message: successMsg, type: "success" });
+    } catch (error) {
+      console.error("Failed to update status:", error);
+      setToast({ message: `Failed to update status: ${error.message}`, type: "error" });
+    }
+  };
+
+  const handleSaveLabel = async (labelData) => {
+    if (userRole === 'viewer') return;
+    const designId = getDesignId(currentLabel);
+
+    if (!designId) {
+      setToast({ message: "Save failed: design has no ID", type: "error" });
+      return;
+    }
+
+    try {
+      const isPublishing = labelData.status === 'published';
+
+      // 1. Update design content (dimensions, name, etc.)
+      const updatePayload = {
+        design_id: designId,
+        version_major: currentLabel.version_major || 0,
+        version_minor: currentLabel.version_minor || 1,
+        name: labelData.name || currentLabel.name,
+        description: labelData.description || currentLabel.description,
+        dimensions: labelData.labelSize || currentLabel.dimensions || currentLabel.labelSize,
+        status: currentLabel.status, // Keep current status for update
+      };
+
+      const savedResult = await callEdgeFunction(API_URLS.UPDATE_DESIGN, updatePayload);
+      let updatedDesign = normalizeDesign(savedResult);
+
+      // 2. If publishing, call the publish endpoint
+      if (isPublishing) {
+        const publishResult = await callEdgeFunction(API_URLS.PUBLISH_DESIGN, {
+          design_id: designId,
+          version_major: updatedDesign.version_major !== undefined ? updatedDesign.version_major : 0,
+          version_minor: updatedDesign.version_minor !== undefined ? updatedDesign.version_minor : 1
+        });
+        // Important: Publishing might return a new version (e.g., 1.0)
+        const publishedDesign = normalizeDesign(publishResult);
+        if (publishedDesign) updatedDesign = { ...updatedDesign, ...publishedDesign };
+      }
+
+      setToast({
+        message: isPublishing ? "Label published successfully!" : "Label saved successfully!",
+        type: "success"
+      });
+
+      // Update local labels list
+      const updatedLabels = labels.map((label) =>
+        getDesignId(label) === designId
+          ? {
+            ...label,
+            ...updatedDesign,
+            status: isPublishing ? 'published' : (updatedDesign.status || label.status),
+            lastModified: new Date().toLocaleString(),
+          }
+          : label
+      );
+      setLabels(updatedLabels);
+
+      // Navigate back after successful save
+      handleBackToLibrary();
+    } catch (error) {
+      console.error("Failed to save label:", error);
+      setToast({ message: `Save failed: ${error.message}`, type: "error" });
+    }
   };
 
   const handleBackToLibrary = () => {
@@ -161,7 +330,7 @@ const App = () => {
   const showMainApp = isAuthenticated && (currentView === "library" || currentView === "designer");
 
   return (
-    <div className="h-screen w-screen transition-colors duration-300 flex flex-col overflow-hidden bg-white">
+    <div className="min-h-screen w-full transition-colors duration-300 flex flex-col bg-white">
       {/* Navigation / Header - Only show for main app functionality */}
       {(isAuthenticated || currentView === "library" || currentView === "designer" || currentView === "admin_dashboard") && !isLoading && (
         <AppHeader
@@ -172,7 +341,7 @@ const App = () => {
         />
       )}
 
-      <main className="flex-1">
+      <main className="flex-1 overflow-y-auto custom-scrollbar">
         {isLoading ? (
           <div className="flex items-center justify-center h-full min-h-[calc(100vh-64px)]">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#39A3DD]"></div>
@@ -199,11 +368,13 @@ const App = () => {
 
             {currentView === "library" && (
               <LabelLibrary
-                labels={labels}
+                labels={Array.isArray(labels) ? labels : []}
                 userRole={userRole}
                 onCreateLabel={handleCreateLabel}
                 onEditLabel={handleEditLabel}
                 onDeleteLabel={handleDeleteLabel}
+                onUpdateStatus={handleUpdateStatus}
+                onNavigate={navigateTo}
               />
             )}
 
@@ -221,6 +392,13 @@ const App = () => {
           </>
         )}
       </main>
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 };

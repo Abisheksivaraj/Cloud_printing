@@ -3,6 +3,7 @@ import { X, Printer, Settings, Maximize2, Minimize2, Check } from "lucide-react"
 import BarcodeElement from "../designer/code";
 import { useTheme } from "../../ThemeContext";
 
+
 const MM_TO_PX = 3.7795275591;
 
 /* =========================
@@ -240,36 +241,56 @@ const PrintPreviewModal = ({ label, onClose }) => {
 
   const handlePrint = async () => {
     try {
-      const { callEdgeFunction, API_URLS } = await import("../../supabaseClient");
+      // Get current printer info or default
+      let printerName = "System Default";
+      try {
+        const printersData = await apiCall(API_ENDPOINTS.PRINTERS);
+        if (printersData.printers?.length > 0) {
+          const defaultPrinter = printersData.printers.find(p => p.isDefault) || printersData.printers[0];
+          printerName = defaultPrinter.name;
+        }
+      } catch (e) {
+        console.warn("Could not fetch printer info, using default", e);
+      }
 
-      const payload = {
-        jobId: Math.floor(10000 + Math.random() * 90000).toString(),
-        templateId: label.id || label._id,
-        documentName: label.name || "Untitled Label",
-        documentType: "Multi-Up Sheet",
-        printerName: "Standard PDF", // This could be selectable in a real app
-        totalRecords: cols * rows,
-        printedRecords: cols * rows,
-        printedLength: 0, // Not applicable for sheet printer
-        status: "completed",
-        createdAt: new Date().toISOString(),
+      // Calculate print metrics
+      const printedLengthMm = (sheetHeight / MM_TO_PX).toFixed(1);
+
+      // Create print job record
+      const jobData = {
+        printerName,
+        documentName: label.name || "Unnamed Label",
+        templateId: label._id || label.id,
+        documentType: "label",
+        copies: cols * rows,
+        priority: "normal",
+        status: "pending",
+        totalRecords: 1,
+        printedRecords: 1,
+        printedLength: parseFloat(printedLengthMm),
         metadata: {
-          config: multiUpConfig,
+          labelWidth: labelSize.width,
+          labelHeight: labelSize.height,
           cols,
-          rows,
-          horizontalGap,
-          verticalGap,
-          margins
+          rows
         }
       };
 
-      console.log("Creating print job:", payload);
-      await callEdgeFunction(API_URLS.CREATE_PRINT_JOB, payload);
-    } catch (err) {
-      console.error("Failed to track print job:", err);
-    }
+      const { job } = await printService.createJob(jobData);
 
-    setTimeout(() => window.print(), 300);
+      // Trigger browser print
+      window.print();
+
+      // Update status to completed after a delay (since we can't truly know when browser print finishes)
+      setTimeout(() => {
+        printService.updateStatus(job._id, "completed");
+      }, 2000);
+
+    } catch (error) {
+      console.error("Print tracking failed:", error);
+      // Still show print dialog even if tracking fails
+      window.print();
+    }
   };
 
   return (

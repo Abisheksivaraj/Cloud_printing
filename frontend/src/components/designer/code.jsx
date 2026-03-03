@@ -23,9 +23,9 @@ export const BarcodeElement = ({ element }) => {
 
     const combinedValue = element.content
       ? element.content
-          .split("\n")
-          .filter((line) => line.trim())
-          .join(" ")
+        .split("\n")
+        .filter((line) => line.trim())
+        .join(" ")
       : "123456789";
 
     try {
@@ -47,17 +47,38 @@ export const BarcodeElement = ({ element }) => {
         const barcodeHeight = containerHeight * 0.7;
         const fontSize = Math.max(10, containerHeight * 0.12);
 
-        // Generate barcode
-        JsBarcode(svg, combinedValue, {
-          format: element.barcodeType || "CODE128",
-          width: element.barcodeWidth || 2,
-          height: barcodeHeight,
-          displayValue: true,
-          fontSize: fontSize,
-          margin: 0,
-          background: "transparent",
-          lineColor: "#000000",
-        });
+        // Generate barcode with fallback logic
+        const generateBarcode = (value, format) => {
+          try {
+            // Sanitize for CODE39 if needed
+            let finalValue = value;
+            if (format === "CODE39") {
+              finalValue = value.toUpperCase().replace(/[^0-9A-Z\-.$ \/+%]/g, " ");
+            }
+
+            JsBarcode(svg, finalValue, {
+              format: format || "CODE128",
+              width: element.barcodeWidth || 2,
+              height: barcodeHeight,
+              displayValue: true,
+              fontSize: fontSize,
+              margin: 0,
+              background: "transparent",
+              lineColor: "#000000",
+            });
+            return true;
+          } catch (e) {
+            return false;
+          }
+        };
+
+        const success = generateBarcode(combinedValue, element.barcodeType || "CODE128");
+
+        // If it failed, try CODE128 as fallback
+        if (!success && element.barcodeType !== "CODE128") {
+          console.warn(`Barcode format ${element.barcodeType} failed for value "${combinedValue}", falling back to CODE128`);
+          generateBarcode(combinedValue, "CODE128");
+        }
 
         // Get the generated barcode dimensions
         const bbox = svg.getBBox();
@@ -122,9 +143,9 @@ export const BarcodeElement = ({ element }) => {
   const barcodeType = barcodeTypes.find((t) => t.value === element.barcodeType);
   const combinedValue = element.content
     ? element.content
-        .split("\n")
-        .filter((line) => line.trim())
-        .join(" ")
+      .split("\n")
+      .filter((line) => line.trim())
+      .join(" ")
     : "123456789";
 
   if (barcodeType?.library === "qrcode") {

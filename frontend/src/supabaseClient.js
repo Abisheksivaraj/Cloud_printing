@@ -19,7 +19,19 @@ export const API_URLS = {
     GET_INVITATION: 'get-invitation',
     USER_INVITE: 'invite-user',
     LIST_PRINT_JOBS: 'list-print-jobs',
-    CREATE_PRINT_JOB: 'create-print-job'
+    CREATE_PRINT_JOB: 'create-print-job',
+    CREATE_DESIGN: 'create-design',
+    GET_DESIGNS: 'get-designs',
+    GET_DESIGN: 'get-design',
+    UPDATE_DESIGN: 'update-design',
+    PUBLISH_DESIGN: 'publish-design',
+    ARCHIVE_DESIGN: 'archive-design',
+    DELETE_DESIGN: 'delete-design',
+    RESTORE_DESIGN: 'restore-design',
+    ADD_ELEMENT: 'add-element',
+    UPDATE_ELEMENT: 'update-element',
+    DELETE_ELEMENT: 'delete-element',
+    GET_ELEMENTS: 'get-elements'
 };
 
 // Helper to call edge functions using the SDK

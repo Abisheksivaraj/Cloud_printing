@@ -30,20 +30,20 @@ import { useTheme } from "../../ThemeContext";
 const ImportDataModal = ({ label, onClose, onLabelsGenerated, initialData = null, initialMappings = null }) => {
   const { theme, isDarkMode } = useTheme();
 
-  const [importFile, setImportFile] = useState(initialData ? { name: "Resumed Print Data", type: "JSON", size: JSON.stringify(initialData).length } : null);
+  const [importFile, setImportFile] = useState(initialData ? { name: "Restored from History", size: 0, type: "history" } : null);
   const [importedData, setImportedData] = useState(initialData || []);
   const [filteredData, setFilteredData] = useState(initialData || []);
   const [isImporting, setIsImporting] = useState(false);
   const [columnMapping, setColumnMapping] = useState(initialMappings?.columnMapping || {});
   const [barcodeMultiMapping, setBarcodeMultiMapping] = useState(initialMappings?.barcodeMultiMapping || {});
   const [barcodeSeparators, setBarcodeSeparators] = useState(initialMappings?.barcodeSeparators || {});
-  const [availableColumns, setAvailableColumns] = useState(initialData && initialData.length > 0 ? Object.keys(initialData[0]) : []);
+  const [availableColumns, setAvailableColumns] = useState(initialData?.[0] ? Object.keys(initialData[0]) : []);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRows, setSelectedRows] = useState(new Set());
-  const [selectMode, setSelectMode] = useState(initialData ? "all" : "all");
+  const [selectMode, setSelectMode] = useState(initialData ? "range" : "all"); // "all", "search", "range", "selected"
   const [rangeStart, setRangeStart] = useState(1);
-  const [rangeEnd, setRangeEnd] = useState(initialData ? initialData.length : 1);
-  const [showDataTable, setShowDataTable] = useState(!!initialData);
+  const [rangeEnd, setRangeEnd] = useState(initialData?.length || 1);
+  const [showDataTable, setShowDataTable] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
   const fileInputRef = useRef(null);
@@ -62,6 +62,21 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated, initialData = null
       AZTEC: "Aztec Code",
     };
     return barcodeTypeNames[barcodeType] || "Barcode";
+  };
+
+  const getBarcodeIcon = (barcodeType) => {
+    const icons = {
+      QR: "📱",
+      DATAMATRIX: "🔳",
+      PDF417: "📄",
+      AZTEC: "💠",
+      CODE128: "|||",
+      CODE39: "|||",
+      EAN13: "|||",
+      EAN8: "|||",
+      UPC: "|||",
+    };
+    return icons[barcodeType] || "|||";
   };
 
   // Search functionality
@@ -394,13 +409,22 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated, initialData = null
         elements: clonedElements,
         value: row[Object.keys(row)[0]] || `Row ${index + 1}`,
         templateName: label.name,
+        importContext: {
+          totalAvailable: importedData.length,
+          totalSelected: dataToGenerate.length,
+          rowIndex: importedData.indexOf(row) + 1,
+          // Store these for re-printing from history
+          sourceData: importedData,
+          mappings: {
+            columnMapping,
+            barcodeMultiMapping,
+            barcodeSeparators
+          }
+        }
       };
     });
 
-    onLabelsGenerated(newLabels, {
-      sourceData: dataToGenerate,
-      mappings: { columnMapping, barcodeMultiMapping, barcodeSeparators }
-    });
+    onLabelsGenerated(newLabels);
   };
 
   const hasValidMapping = () => {
