@@ -7,8 +7,9 @@ import Signup from "./components/admin/Signup";
 import Login from "./components/admin/Login";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import PrintHistory from "./components/PrintHistory";
+import DeviceManagement from "./components/DeviceManagement";
 import { useTheme } from "./ThemeContext";
-import { supabase, callEdgeFunction, API_URLS } from "./supabaseClient";
+import { supabase, callEdgeFunction, API_URLS, normalizeDesign } from "./supabaseClient";
 import Toast from "./components/Toast";
 
 
@@ -90,7 +91,6 @@ const App = () => {
       // Handle both array response and { designs: [...] } wrapper
       const designsList = Array.isArray(data) ? data : (data?.designs || data?.data || []);
       const normalized = designsList.map(l => normalizeDesign(l));
-      console.log("fetchDesigns normalized:", normalized);
       setLabels(normalized);
     } catch (error) {
       console.error("Error fetching designs:", error);
@@ -144,20 +144,17 @@ const App = () => {
   // Note: fetchDesigns above (line 73) already handles library + print_history fetching.
   // The duplicate useEffect has been removed to avoid overwriting labels with non-array data.
 
-  // Normalize design objects from API: ensure both id and design_id are set
-  const normalizeDesign = (design) => {
-    if (!design) return design;
-
-    // Flatten nested design/data if present
-    const base = design.design || design.data || design;
-    const finalId = base.design_id || base.id || design.design_id || design.id;
-
-    return {
-      ...design,
-      ...base,
-      id: finalId,
-      design_id: finalId,
-    };
+  // Central normalization moved to supabaseClient.js
+  const fetchFullDesign = async (label) => {
+    const designId = getDesignId(label);
+    if (!designId) return label;
+    try {
+      const fullDesign = await callEdgeFunction(API_URLS.GET_DESIGN, { design_id: designId });
+      return normalizeDesign(fullDesign);
+    } catch (error) {
+      console.error("Error fetching full design:", error);
+      return normalizeDesign(label);
+    }
   };
 
   const handleCreateLabel = (newLabel) => {
@@ -375,6 +372,7 @@ const App = () => {
                 onDeleteLabel={handleDeleteLabel}
                 onUpdateStatus={handleUpdateStatus}
                 onNavigate={navigateTo}
+                fetchFullDesign={fetchFullDesign}
               />
             )}
 
@@ -384,10 +382,14 @@ const App = () => {
                 userRole={userRole}
                 onSave={handleSaveLabel}
                 onBack={handleBackToLibrary}
+                onCreateLabel={handleCreateLabel}
               />
             )}
             {currentView === "print_history" && (
-              <PrintHistory labels={labels} />
+              <PrintHistory labels={labels} fetchFullDesign={fetchFullDesign} />
+            )}
+            {currentView === "device_management" && (
+              <DeviceManagement />
             )}
           </>
         )}

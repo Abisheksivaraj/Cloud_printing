@@ -8,6 +8,7 @@ import {
   Target,
 } from "lucide-react";
 import BarcodeElement from "../designer/code";
+import { callEdgeFunction, API_URLS } from "../../supabaseClient";
 
 
 const MM_TO_PX = 3.7795275591;
@@ -118,7 +119,7 @@ const RenderLabel = ({ label }) => {
         backgroundColor: "#fff",
       }}
     >
-      {label.elements.map((element, elIndex) => {
+      {(label.elements || []).map((element, elIndex) => {
         const style = {
           position: "absolute",
           left: element.x,
@@ -315,15 +316,6 @@ const RollPrinterPreview = ({ labels, labelSettings, onClose }) => {
     try {
       // Get current printer info or default
       let printerName = "System Default";
-      try {
-        const printersData = await apiCall(API_ENDPOINTS.PRINTERS);
-        if (printersData.printers?.length > 0) {
-          const defaultPrinter = printersData.printers.find(p => p.isDefault) || printersData.printers[0];
-          printerName = defaultPrinter.name;
-        }
-      } catch (e) {
-        console.warn("Could not fetch printer info", e);
-      }
 
       // Calculate print metrics
       const totalAvailable = labels[0]?.importContext?.totalAvailable || labels.length;
@@ -332,34 +324,32 @@ const RollPrinterPreview = ({ labels, labelSettings, onClose }) => {
 
       // Create print job record
       const jobData = {
-        printerName,
-        documentName: labels[0]?.templateName ? `Bulk Print - ${labels[0].templateName}` : `Bulk Print - ${labels.length} Labels`,
-        documentType: "label",
-        copies: labels.length,
+        printer_name: printerName,
+        document_name: labels[0]?.templateName ? `Bulk Print - ${labels[0].templateName}` : `Bulk Print - ${labels.length} Labels`,
+        design_id: labels[0]?.design_id || labels[0]?.id || labels[0]?.importContext?.templateId,
+        version_major: labels[0]?.version_major || 1,
+        version_minor: labels[0]?.version_minor || 0,
+        document_type: "label",
+        volumes: labels.length,
         priority: "normal",
         status: "pending",
-        totalRecords: totalAvailable,
-        printedRecords: printedRecords,
-        printedLength: parseFloat(printedLengthMm),
-        sourceData: labels[0]?.importContext?.sourceData || [],
+        total_records: totalAvailable,
+        printed_records: printedRecords,
+        printed_length: parseFloat(printedLengthMm),
+        source_data: labels[0]?.importContext?.sourceData || [],
         metadata: {
-          labelWidth: labelSize.width,
-          labelHeight: labelSize.height,
+          label_width: labelSize.width,
+          label_height: labelSize.height,
           columns,
-          isBulk: true,
+          is_bulk: true,
           mappings: labels[0]?.importContext?.mappings || {}
         }
       };
 
-      const { job } = await printService.createJob(jobData);
+      await callEdgeFunction(API_URLS.CREATE_JOB, jobData);
 
       // Trigger browser print
       window.print();
-
-      // Update status to completed
-      setTimeout(() => {
-        printService.updateStatus(job._id, "completed");
-      }, 2000);
 
     } catch (error) {
       console.error("Print tracking failed:", error);

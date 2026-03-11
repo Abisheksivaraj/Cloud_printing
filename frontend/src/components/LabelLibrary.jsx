@@ -31,6 +31,7 @@ const LabelLibrary = ({
   onDeleteLabel,
   onUpdateStatus,
   onNavigate,
+  fetchFullDesign
 }) => {
   // Defensive: ensure labels is always an array
   labels = Array.isArray(labels) ? labels : [];
@@ -38,6 +39,7 @@ const LabelLibrary = ({
   const { t } = useLanguage();
   const { theme, isDarkMode } = useTheme();
   const [searchTerm, setSearchTerm] = useState("");
+  const [isLoadingDesign, setIsLoadingDesign] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedLabelForImport, setSelectedLabelForImport] = useState(null);
@@ -58,14 +60,26 @@ const LabelLibrary = ({
     return !isDeleted && matchesSearch;
   });
 
-  const handleImportData = (label) => {
-    setSelectedLabelForImport(label);
-    setShowImportModal(true);
+  const handleImportData = async (label) => {
+    setIsLoadingDesign(true);
+    try {
+      const fullLabel = await fetchFullDesign(label);
+      setSelectedLabelForImport(fullLabel);
+      setShowImportModal(true);
+    } finally {
+      setIsLoadingDesign(false);
+    }
   };
 
-  const handlePrint = (label) => {
-    setLabelToPrint(label);
-    setShowPrintPreview(true);
+  const handlePrint = async (label) => {
+    setIsLoadingDesign(true);
+    try {
+      const fullLabel = await fetchFullDesign(label);
+      setLabelToPrint(fullLabel);
+      setShowPrintPreview(true);
+    } finally {
+      setIsLoadingDesign(false);
+    }
   };
 
   const handleLabelsGenerated = (labels) => {
@@ -98,8 +112,8 @@ const LabelLibrary = ({
             <button
               onClick={() => setShowDeleted(!showDeleted)}
               className={`p-3 rounded-xl border-2 transition-all flex items-center gap-2 font-bold text-sm ${showDeleted
-                  ? "bg-red-500/10 text-red-500 border-red-500/20 shadow-lg shadow-red-500/5"
-                  : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-500 hover:border-red-500/30 hover:text-red-500"
+                ? "bg-red-500/10 text-red-500 border-red-500/20 shadow-lg shadow-red-500/5"
+                : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-500 hover:border-red-500/30 hover:text-red-500"
                 }`}
               title={showDeleted ? "Show Active Templates" : "View Trash"}
             >
@@ -157,7 +171,7 @@ const LabelLibrary = ({
               icon: Clock,
               color: "text-purple-500",
               bg: "bg-purple-50 dark:bg-purple-900/20",
-              onClick: () => onNavigate("history"),
+              onClick: () => onNavigate("print_history"),
               clickable: true
             },
             {
@@ -254,7 +268,7 @@ const LabelLibrary = ({
                         </h3>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-500">
-                            {label.labelSize?.width || 100} × {label.labelSize?.height || 80}mm
+                            {label.labelSize?.width || 100} × {label.labelSize?.height || 80} {label.labelSize?.unit || 'mm'}
                           </span>
                           <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${label.status === 'published' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
                             label.status === 'archived' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
@@ -345,8 +359,8 @@ const LabelLibrary = ({
                           <button
                             onClick={() => onUpdateStatus(label.id || label.design_id, label.status === 'archived' ? 'restored' : 'archived')}
                             className={`p-2 transition-colors rounded-lg ${label.status === 'archived'
-                                ? 'text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20'
-                                : 'text-gray-500 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                              ? 'text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20'
+                              : 'text-gray-500 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
                               }`}
                             title={label.status === 'archived' ? "Restore from Archive" : "Archive Template"}
                           >
@@ -425,6 +439,16 @@ const LabelLibrary = ({
         labelSize={{ width: 100, height: 80 }}
         generateId={() => `element_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`}
       />
+
+      {/* Loading Overlay for fetching full design details */}
+      {isLoadingDesign && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-[110] flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl flex flex-col items-center gap-4 border" style={{ borderColor: theme.border }}>
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[var(--color-primary)]"></div>
+            <p className="text-sm font-bold" style={{ color: theme.text }}>Preparing Design...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

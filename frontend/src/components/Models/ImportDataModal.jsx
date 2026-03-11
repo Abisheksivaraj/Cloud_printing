@@ -16,7 +16,8 @@ import {
   Columns,
   Barcode,
   ArrowDown,
-  Info
+  Info,
+  Edit2
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useTheme } from "../../ThemeContext";
@@ -45,6 +46,8 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated, initialData = null
   const [rangeEnd, setRangeEnd] = useState(initialData?.length || 1);
   const [showDataTable, setShowDataTable] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [importMethod, setImportMethod] = useState("upload"); // "upload" or "manual"
+  const [manualRows, setManualRows] = useState([{}]);
   const rowsPerPage = 10;
   const fileInputRef = useRef(null);
 
@@ -186,7 +189,7 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated, initialData = null
         const autoMapping = {};
         const autoMultiMapping = {};
         const autoSeparators = {};
-        const placeholders = label.elements.filter(
+        const placeholders = (label?.elements || []).filter(
           (el) => el.type === "placeholder",
         );
 
@@ -207,7 +210,7 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated, initialData = null
           }
         });
 
-        label.elements.forEach((element) => {
+        (label?.elements || []).forEach((element) => {
           if (element.type === "barcode") {
             autoMultiMapping[element.id] = [];
             autoSeparators[element.id] = " ";
@@ -361,20 +364,18 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated, initialData = null
   };
 
   const handleGenerateLabels = () => {
-    if (!label || importedData.length === 0) {
-      alert("No data imported");
-      return;
-    }
+    const dataToGenerate = importMethod === 'manual' ? manualRows : getDataToGenerate();
 
-    const dataToGenerate = getDataToGenerate();
-
-    if (dataToGenerate.length === 0) {
-      alert("No data selected for label generation");
+    if (!label || dataToGenerate.length === 0) {
+      alert("No data available");
       return;
     }
 
     const newLabels = dataToGenerate.map((row, index) => {
-      const clonedElements = label.elements.map((el) => {
+      const clonedElements = (label?.elements || []).map((el) => {
+        // Manual mode: match column by placeholder name directly if mapping is missing
+        const columnName = importMethod === 'manual' ? getFieldName(el.content) : columnMapping[el.id];
+
         if (el.type === "barcode" && barcodeMultiMapping[el.id]) {
           const selectedColumns = barcodeMultiMapping[el.id].filter(
             (col) => col !== "",
@@ -388,11 +389,14 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated, initialData = null
               .join(separator);
 
             return { ...el, content: combinedValue };
+          } else if (importMethod === 'manual') {
+            // Check if manual row has a direct match for a barcode if it's treated as a single field
+            const manualBarcodeVal = row['Barcode'] || row[el.content];
+            if (manualBarcodeVal) return { ...el, content: manualBarcodeVal };
           }
         }
 
-        if (el.type === "placeholder" && columnMapping[el.id]) {
-          const columnName = columnMapping[el.id];
+        if (el.type === "placeholder" && columnName) {
           const importedValue = row[columnName] || "";
           return {
             ...el,
@@ -410,11 +414,12 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated, initialData = null
         value: row[Object.keys(row)[0]] || `Row ${index + 1}`,
         templateName: label.name,
         importContext: {
-          totalAvailable: importedData.length,
+          templateId: label.id || label._id,
+          totalAvailable: dataToGenerate.length,
           totalSelected: dataToGenerate.length,
-          rowIndex: importedData.indexOf(row) + 1,
-          // Store these for re-printing from history
-          sourceData: importedData,
+          rowIndex: index + 1,
+          importMethod,
+          sourceData: dataToGenerate,
           mappings: {
             columnMapping,
             barcodeMultiMapping,
@@ -428,10 +433,11 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated, initialData = null
   };
 
   const hasValidMapping = () => {
-    const placeholders = label.elements.filter(
+    if (importMethod === 'manual') return true; // Always valid in manual mode for now
+    const placeholders = (label?.elements || []).filter(
       (el) => el.type === "placeholder",
     );
-    const barcodes = label.elements.filter((el) => el.type === "barcode");
+    const barcodes = (label?.elements || []).filter((el) => el.type === "barcode");
 
     const hasPlaceholderMapping = placeholders.every(
       (el) => columnMapping[el.id],
@@ -452,11 +458,11 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated, initialData = null
     return match ? match[1] : content;
   };
 
-  const placeholderElements = label.elements.filter(
+  const placeholderElements = (label?.elements || []).filter(
     (el) => el.type === "placeholder",
   );
 
-  const barcodeElements = label.elements.filter((el) => el.type === "barcode");
+  const barcodeElements = (label?.elements || []).filter((el) => el.type === "barcode");
 
   // Pagination
   const totalPages = Math.ceil(filteredData.length / rowsPerPage);
@@ -496,7 +502,108 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated, initialData = null
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar" style={{ backgroundColor: theme.bg }}>
-          {!importFile ? (
+          {/* Method Selector */}
+          <div className="flex justify-center mb-8">
+            <div className="inline-flex p-1.5 rounded-2xl bg-gray-100 dark:bg-gray-800 border" style={{ borderColor: theme.border }}>
+              <button
+                onClick={() => setImportMethod("upload")}
+                className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${importMethod === "upload" ? "bg-white dark:bg-gray-700 shadow-md text-[var(--color-primary)]" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                <Upload size={14} /> File Import
+              </button>
+              <button
+                onClick={() => {
+                  setImportMethod("manual");
+                  // Auto-populate columns for manual row 1 if empty
+                  if (Object.keys(manualRows[0]).length === 0) {
+                    const initialRow = {};
+                    placeholderElements.forEach(el => initialRow[getFieldName(el.content)] = "");
+                    setManualRows([initialRow]);
+                  }
+                }}
+                className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${importMethod === "manual" ? "bg-white dark:bg-gray-700 shadow-md text-[var(--color-primary)]" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                <Edit2 size={14} /> Manual Entry
+              </button>
+            </div>
+          </div>
+
+          {importMethod === 'manual' ? (
+            <div className="space-y-6 animate-in slide-in-from-bottom-8 duration-500">
+              <div className="p-6 rounded-3xl border bg-white dark:bg-gray-800 shadow-sm" style={{ borderColor: theme.border }}>
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h4 className="font-black text-lg flex items-center gap-2" style={{ color: theme.text }}>
+                      <Table size={20} className="text-[var(--color-primary)]" />
+                      Enter Label Details
+                    </h4>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-1">Fill in the fields to print</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const newRow = {};
+                      placeholderElements.forEach(el => newRow[getFieldName(el.content)] = "");
+                      setManualRows([...manualRows, newRow]);
+                    }}
+                    className="px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white rounded-lg text-xs font-bold uppercase tracking-wider shadow-md flex items-center gap-2 transition-all active:scale-95"
+                  >
+                    <Plus size={14} /> Add Label
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border" style={{ borderColor: theme.border }}>
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-100 dark:bg-gray-900 shadow-sm">
+                      <tr>
+                        <th className="p-4 font-black uppercase text-xs tracking-wider text-gray-500 w-12">#</th>
+                        {placeholderElements.map((el) => (
+                          <th key={el.id} className="p-4 font-black uppercase text-xs tracking-wider text-gray-500 whitespace-nowrap">
+                            {getFieldName(el.content)}
+                          </th>
+                        ))}
+                        <th className="p-4 font-black uppercase text-xs tracking-wider text-gray-500 w-12 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y" style={{ divideColor: theme.border }}>
+                      {manualRows.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/30">
+                          <td className="p-4 font-bold text-gray-400 text-xs">{idx + 1}</td>
+                          {placeholderElements.map((el) => {
+                            const field = getFieldName(el.content);
+                            return (
+                              <td key={el.id} className="p-2">
+                                <input
+                                  type="text"
+                                  value={row[field] || ""}
+                                  onChange={(e) => {
+                                    const updated = [...manualRows];
+                                    updated[idx][field] = e.target.value;
+                                    setManualRows(updated);
+                                  }}
+                                  placeholder={`Enter ${field}...`}
+                                  className="w-full p-2.5 rounded-lg border-2 font-medium text-sm outline-none transition-all focus:border-[var(--color-primary)]"
+                                  style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
+                                />
+                              </td>
+                            );
+                          })}
+                          <td className="p-4 text-center">
+                            <button
+                              onClick={() => idx > 0 && setManualRows(manualRows.filter((_, i) => i !== idx))}
+                              disabled={manualRows.length === 1}
+                              className="p-2 text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors disabled:opacity-30"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          ) : !importFile ? (
             <div className="h-full flex flex-col items-center justify-center">
               <div
                 className="w-full max-w-2xl border-4 border-dashed rounded-[3rem] p-16 text-center hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 transition-all group cursor-pointer flex flex-col items-center justify-center relative overflow-hidden"
@@ -927,7 +1034,7 @@ const ImportDataModal = ({ label, onClose, onLabelsGenerated, initialData = null
             </button>
             <button
               onClick={handleGenerateLabels}
-              disabled={importedData.length === 0 || !hasValidMapping()}
+              disabled={(importMethod === 'upload' ? importedData.length === 0 : manualRows.length === 0) || !hasValidMapping()}
               className="px-8 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:shadow-primary/30 transition-all active:scale-95 text-xs uppercase tracking-wider flex items-center gap-2 disabled:opacity-50 disabled:shadow-none disabled:active:scale-100"
             >
               <CheckCircle size={16} />

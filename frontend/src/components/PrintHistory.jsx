@@ -6,13 +6,15 @@ import {
 } from "lucide-react";
 
 import { useTheme } from "../ThemeContext";
+import { callEdgeFunction, API_URLS } from "../supabaseClient";
 import GeneratedLabelsPreview from "./Models/GeneratedLabelsPreview";
 import ImportDataModal from "./Models/ImportDataModal";
 
-const PrintHistory = ({ labels = [] }) => {
+const PrintHistory = ({ labels = [], fetchFullDesign }) => {
     const { theme, isDarkMode } = useTheme();
     const [history, setHistory] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isResuming, setIsResuming] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
 
@@ -26,9 +28,11 @@ const PrintHistory = ({ labels = [] }) => {
     const fetchHistory = async () => {
         setIsLoading(true);
         try {
-            const data = await printService.getHistory();
-            if (data.success) {
+            const data = await callEdgeFunction(API_URLS.LIST_JOBS);
+            if (data && data.jobs) {
                 setHistory(data.jobs);
+            } else if (Array.isArray(data)) {
+                setHistory(data);
             }
         } catch (error) {
             console.error("Failed to fetch print history", error);
@@ -67,25 +71,39 @@ const PrintHistory = ({ labels = [] }) => {
     };
 
     const filteredHistory = history.filter(job => {
-        const matchesSearch = job.documentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            job.printerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            job.jobId.toLowerCase().includes(searchTerm.toLowerCase());
+        const docName = job.document_name || job.documentName || "";
+        const prnName = job.printer_name || job.printerName || "";
+        const jId = job.job_id || job.jobId || "";
+
+        const matchesSearch = docName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            prnName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            jId.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = statusFilter === "all" || job.status === statusFilter;
         return matchesSearch && matchesStatus;
     });
 
-    const handleResumePrint = (job) => {
+    const handleResumePrint = async (job) => {
         // Find the template used for this job
-        const template = labels.find(l => (l.id === job.templateId || l._id === job.templateId));
+        const templateId = job.templateId || job.design_id || job.designId;
+        const template = labels.find(l => (l.id === templateId || l.design_id === templateId));
 
         if (!template) {
             alert("The original template for this job could not be found.");
             return;
         }
 
-        setResumeTemplate(template);
-        setResumeData(job);
-        setShowResumeModal(true);
+        setIsResuming(true);
+        try {
+            const fullTemplate = await fetchFullDesign(template);
+            setResumeTemplate(fullTemplate);
+            setResumeData(job);
+            setShowResumeModal(true);
+        } catch (error) {
+            console.error("Failed to fetch template for resume:", error);
+            alert("Failed to load design template.");
+        } finally {
+            setIsResuming(false);
+        }
     };
 
     const handleLabelsGenerated = (labels) => {
@@ -192,9 +210,9 @@ const PrintHistory = ({ labels = [] }) => {
                                 </tr>
                             ) : (
                                 filteredHistory.map((job) => (
-                                    <tr key={job._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors group">
+                                    <tr key={job.id || job._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors group">
                                         <td className="px-6 py-4 font-mono text-[10px] font-bold" style={{ color: theme.text }}>
-                                            {job.jobId}
+                                            {job.job_id || job.jobId}
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
@@ -202,32 +220,32 @@ const PrintHistory = ({ labels = [] }) => {
                                                     <FileText size={16} />
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p className="text-sm font-bold truncate" style={{ color: theme.text }}>{job.documentName}</p>
-                                                    <p className="text-[10px] uppercase font-black opacity-50 tracking-wider">Type: {job.documentType}</p>
+                                                    <p className="text-sm font-bold truncate" style={{ color: theme.text }}>{job.document_name || job.documentName}</p>
+                                                    <p className="text-[10px] uppercase font-black opacity-50 tracking-wider">Type: {job.document_type || job.documentType}</p>
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <p className="text-sm font-medium" style={{ color: theme.text }}>{job.printerName}</p>
+                                            <p className="text-sm font-medium" style={{ color: theme.text }}>{job.printer_name || job.printerName}</p>
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <div className="flex flex-col items-center">
                                                 <div className="flex items-center gap-1.5 font-black text-[11px] tracking-tight">
-                                                    <span className="text-blue-500">{job.printedRecords || 0}</span>
+                                                    <span className="text-blue-500">{job.printed_records ?? job.printedRecords ?? 0}</span>
                                                     <span className="opacity-30">/</span>
-                                                    <span style={{ color: theme.text }}>{job.totalRecords || 1}</span>
+                                                    <span style={{ color: theme.text }}>{job.total_records ?? job.totalRecords ?? 1}</span>
                                                     <span className="ml-1 opacity-50 text-[9px] uppercase">Labels</span>
                                                 </div>
-                                                {job.printedLength > 0 && (
+                                                {(job.printed_length > 0 || job.printedLength > 0) && (
                                                     <div className="mt-1 flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-[9px] font-bold opacity-60">
-                                                        <span>{job.printedLength} mm</span>
+                                                        <span>{job.printed_length || job.printedLength} mm</span>
                                                         <span className="opacity-40">|</span>
-                                                        <span>{(job.printedLength / 25.4).toFixed(2)} in</span>
+                                                        <span>{((job.printed_length || job.printedLength) / 25.4).toFixed(2)} in</span>
                                                     </div>
                                                 )}
-                                                {job.totalRecords > job.printedRecords && (
+                                                {(job.total_records > job.printed_records) && (
                                                     <div className="mt-1 text-[9px] font-bold text-amber-500 uppercase tracking-wider">
-                                                        Balance: {job.totalRecords - job.printedRecords}
+                                                        Balance: {job.total_records - (job.printed_records || 0)}
                                                     </div>
                                                 )}
                                             </div>
@@ -237,24 +255,24 @@ const PrintHistory = ({ labels = [] }) => {
                                                 {getStatusIcon(job.status)}
                                                 {job.status}
                                             </div>
-                                            {job.status === "failed" && job.errorMessage && (
-                                                <p className="text-[9px] text-red-500 mt-1 font-medium max-w-[150px] truncate" title={job.errorMessage}>
-                                                    {job.errorMessage}
+                                            {job.status === "failed" && (job.error_message || job.errorMessage) && (
+                                                <p className="text-[9px] text-red-500 mt-1 font-medium max-w-[150px] truncate" title={job.error_message || job.errorMessage}>
+                                                    {job.error_message || job.errorMessage}
                                                 </p>
                                             )}
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2 text-xs font-medium" style={{ color: theme.text }}>
                                                 <Calendar size={14} className="opacity-40" />
-                                                {new Date(job.createdAt).toLocaleDateString()}
+                                                {new Date(job.created_at || job.createdAt).toLocaleDateString()}
                                             </div>
                                             <p className="text-[10px] font-bold opacity-40 mt-0.5">
-                                                {new Date(job.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                {new Date(job.created_at || job.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </p>
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <div className="flex items-center justify-center gap-2">
-                                                {job.sourceData && job.sourceData.length > 0 && (
+                                                {(job.source_data || job.sourceData) && (job.source_data?.length > 0 || job.sourceData?.length > 0) && (
                                                     <button
                                                         onClick={() => handleResumePrint(job)}
                                                         className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-lg shadow-amber-500/20 active:scale-95"
@@ -281,7 +299,7 @@ const PrintHistory = ({ labels = [] }) => {
             {showResumeModal && resumeTemplate && (
                 <ImportDataModal
                     label={resumeTemplate}
-                    initialData={resumeData.sourceData}
+                    initialData={resumeData.source_data || resumeData.sourceData}
                     initialMappings={resumeData.metadata?.mappings}
                     onClose={() => setShowResumeModal(false)}
                     onLabelsGenerated={handleLabelsGenerated}
@@ -296,6 +314,16 @@ const PrintHistory = ({ labels = [] }) => {
                         setGeneratedLabels([]);
                     }}
                 />
+            )}
+
+            {/* Loading Overlay for resuming */}
+            {isResuming && (
+                <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-[110] flex items-center justify-center">
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl flex flex-col items-center gap-4 border" style={{ borderColor: theme.border }}>
+                        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+                        <p className="text-sm font-bold" style={{ color: theme.text }}>Loading Design...</p>
+                    </div>
+                </div>
             )}
         </div>
     );

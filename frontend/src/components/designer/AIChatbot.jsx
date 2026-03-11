@@ -2,9 +2,11 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
     Send, Sparkles, X, Minimize2, Maximize2,
     Cpu, Zap, RefreshCw, AlertCircle, CheckCircle2,
+    Save, FileText, Info
 } from "lucide-react";
 import { useTheme } from "../../ThemeContext";
 import { generateLabel, explainPrompt } from "./labelEngine";
+import { callEdgeFunction, API_URLS } from "../../supabaseClient";
 
 // ─── Quick prompts ────────────────────────────────────────────────────────────
 const QUICK_PROMPTS = [
@@ -22,7 +24,7 @@ let _mc = 0;
 const mid = () => `m_${Date.now()}_${++_mc}`;
 
 // ─── Component ────────────────────────────────────────────────────────────────
-const AIChatbot = ({ onGenerateElements, labelSize, generateId }) => {
+const AIChatbot = ({ onGenerateElements, labelSize, generateId, onCreateLabel }) => {
     const { theme } = useTheme();
     const [isOpen, setIsOpen] = useState(false);
     const [isMinimized, setIsMinimized] = useState(false);
@@ -32,6 +34,11 @@ const AIChatbot = ({ onGenerateElements, labelSize, generateId }) => {
         id: mid(), role: MSG.BOT, type: "welcome",
         content: "Hi! I'm your **offline AI Label Designer**. I generate professional labels without any internet connection or API key.\n\nJust describe what you need — *type, size, and any special requirements*.",
     }]);
+
+    const [pendingDesign, setPendingDesign] = useState(null); // { elements, dimensions, isNew, type }
+    const [designName, setDesignName] = useState("");
+    const [designDescription, setDesignDescription] = useState("");
+    const [isSaving, setIsSaving] = useState(false);
 
     const scrollRef = useRef(null);
     const inputRef = useRef(null);
@@ -79,28 +86,63 @@ const AIChatbot = ({ onGenerateElements, labelSize, generateId }) => {
                     lockAspectRatio: false,
                 }));
 
-                const newSize = { width: labelData.widthMm, height: labelData.heightMm };
+                const newSize = {
+                    width: Math.round(labelData.widthMm),
+                    height: Math.round(labelData.heightMm),
+                    unit: "mm"
+                };
 
                 // Determine if fresh canvas or additive
                 const isNew = /create|make|design|generate|build|new/i.test(text);
-                onGenerateElements(elements, newSize, isNew);
 
-                // Success reply
-                setMessages(prev => [...prev,
-                {
-                    id: mid(), role: MSG.BOT, type: "explain",
-                    content: explanation,
-                },
-                {
-                    id: mid(), role: MSG.BOT, type: "success",
-                    labelData: {
+                if (isNew) {
+                    // For new designs, we ask for metadata first
+                    setPendingDesign({
+                        elements,
+                        dimensions: newSize,
+                        isNew: true,
                         type: labelData.labelType,
-                        size: `${labelData.widthMm}×${labelData.heightMm}mm`,
-                        elementCount: elements.length,
-                        description: labelData.description,
+                        prompt: text,
+                        description: labelData.description
+                    });
+                    setDesignName(labelData.labelType || "AI Generated Label");
+                    setDesignDescription(labelData.description || "");
+
+                    setMessages(prev => [...prev,
+                    {
+                        id: mid(), role: MSG.BOT, type: "explain",
+                        content: explanation,
                     },
+                    {
+                        id: mid(), role: MSG.BOT, type: "save_prompt",
+                        labelData: {
+                            type: labelData.labelType,
+                            size: `${labelData.widthMm}×${labelData.heightMm}mm`,
+                            elementCount: elements.length,
+                        }
+                    }
+                    ]);
+                } else {
+                    // For additive changes, just apply immediately
+                    onGenerateElements(elements, newSize, false);
+
+                    // Success reply
+                    setMessages(prev => [...prev,
+                    {
+                        id: mid(), role: MSG.BOT, type: "explain",
+                        content: explanation,
+                    },
+                    {
+                        id: mid(), role: MSG.BOT, type: "success",
+                        labelData: {
+                            type: labelData.labelType,
+                            size: `${labelData.widthMm}×${labelData.heightMm}mm`,
+                            elementCount: elements.length,
+                            description: labelData.description,
+                        },
+                    }
+                    ]);
                 }
-                ]);
             } catch (err) {
                 console.error("Label engine error:", err);
                 setMessages(prev => [...prev, {
@@ -112,6 +154,88 @@ const AIChatbot = ({ onGenerateElements, labelSize, generateId }) => {
             }
         }, 600); // natural generation delay
     }, [isLoading, labelSize, generateId, onGenerateElements]);
+
+    // ─── Save Workflow ───────────────────────────────────────────────────────────
+    const handleSaveDesign = async () => {
+        if (!pendingDesign || !designName.trim() || isSaving) return;
+
+        setIsSaving(true);
+        try {
+            // 1. Create the design record
+            const createPayload = {
+                name: designName.trim(),
+                description: designDescription || pendingDesign.description,
+                dimensions: pendingDesign.dimensions,
+                status: "draft",
+                category: pendingDesign.type?.toLowerCase() || "custom",
+                binding_type: null
+            };
+
+            const designResult = await callEdgeFunction(API_URLS.CREATE_DESIGN, createPayload);
+
+            if (designResult) {
+                // Handle different response formats (raw object or {design: {}})
+                const design = designResult.design || designResult.data || designResult;
+                const designId = design.design_id || design.id;
+
+                if (!designId) throw new Error("Server did not return a design ID");
+
+                // 2. Add elements one by one
+                // We use a simple loop for now as there's no bulk endpoint
+                // We do this while the chatbot shows "Saving..."
+                for (let i = 0; i < pendingDesign.elements.length; i++) {
+                    const el = pendingDesign.elements[i];
+                    const elementPayload = {
+                        design_id: designId,
+                        version_major: 0,
+                        version_minor: 1,
+                        element_type: el.type,
+                        position_x: el.x,
+                        position_y: el.y,
+                        width: el.width,
+                        height: el.height,
+                        static_content: el.content || (el.type === "image" ? (el.src || el.content) : ""),
+                        properties: {
+                            ...el,
+                            id: undefined, // Don't send local ID to DB properties JSON
+                            fontStyle: el.fontStyle || "normal",
+                            textDecoration: el.textDecoration || "none",
+                            fontWeight: el.fontWeight || "normal"
+                        },
+                        sort_order: i
+                    };
+                    await callEdgeFunction(API_URLS.ADD_ELEMENT, elementPayload);
+                }
+
+                // 3. Complete process: Notify parent and switch to the new design
+                if (onCreateLabel) {
+                    // We pass the full design so App.jsx can normalize it
+                    onCreateLabel({ ...createPayload, ...design });
+                } else {
+                    // Fallback to local apply if top-level creation handler missing
+                    onGenerateElements(pendingDesign.elements, pendingDesign.dimensions, true);
+                }
+
+                setMessages(prev => [...prev, {
+                    id: mid(), role: MSG.BOT, type: "welcome",
+                    content: `✨ **Excellent!** The "${designName}" has been successfully generated and saved to your library. I've placed all ${pendingDesign.elements.length} components for you.`,
+                }]);
+
+                // Reset state
+                setPendingDesign(null);
+                setDesignName("");
+                setDesignDescription("");
+            }
+        } catch (error) {
+            console.error("AI Save error:", error);
+            setMessages(prev => [...prev, {
+                id: mid(), role: MSG.ERROR,
+                content: `Failed to save design: ${error.message || "Unknown error during persistence"}`,
+            }]);
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     const handleSend = () => processPrompt(input);
 
@@ -206,7 +330,17 @@ const AIChatbot = ({ onGenerateElements, labelSize, generateId }) => {
                         style={{ backgroundColor: theme.bg }}
                     >
                         {messages.map(msg => (
-                            <Bubble key={msg.id} msg={msg} theme={theme} />
+                            <Bubble
+                                key={msg.id}
+                                msg={msg}
+                                theme={theme}
+                                designName={designName}
+                                setDesignName={setDesignName}
+                                designDescription={designDescription}
+                                setDesignDescription={setDesignDescription}
+                                onSave={handleSaveDesign}
+                                isSaving={isSaving}
+                            />
                         ))}
 
                         {/* Generating indicator */}
@@ -290,7 +424,7 @@ const AIChatbot = ({ onGenerateElements, labelSize, generateId }) => {
 };
 
 // ─── Message Bubble ───────────────────────────────────────────────────────────
-const Bubble = ({ msg, theme }) => {
+const Bubble = ({ msg, theme, designName, setDesignName, designDescription, setDesignDescription, onSave, isSaving }) => {
     if (msg.role === MSG.USER) {
         return (
             <div className="flex justify-end">
@@ -313,6 +447,72 @@ const Bubble = ({ msg, theme }) => {
                         <span className="font-black text-[9px] uppercase tracking-wider">Error</span>
                     </div>
                     {msg.content}
+                </div>
+            </div>
+        );
+    }
+
+    if (msg.type === "save_prompt" && msg.labelData) {
+        return (
+            <div className="flex justify-start w-full">
+                <div className="w-full rounded-2xl rounded-tl-none border overflow-hidden shadow-lg animate-in slide-in-from-bottom-2 duration-300"
+                    style={{ borderColor: "var(--color-primary)", backgroundColor: theme.surface }}>
+                    <div className="flex items-center gap-2 px-4 py-3 bg-[var(--color-primary)]/10 border-b border-[var(--color-primary)]/20">
+                        <Sparkles size={14} className="text-[var(--color-primary)]" />
+                        <span className="text-[10px] font-black text-[var(--color-primary)] uppercase tracking-widest">New Design Found</span>
+                    </div>
+
+                    <div className="p-4 space-y-4">
+                        <div className="grid grid-cols-2 gap-2 text-[9px] mb-2">
+                            <Cell icon="📐" label="Size" value={msg.labelData.size} theme={theme} />
+                            <Cell icon="🔢" label="Objects" value={`${msg.labelData.elementCount}`} theme={theme} />
+                        </div>
+
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Label Name</label>
+                                <div className="relative">
+                                    <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={12} />
+                                    <input
+                                        type="text"
+                                        value={designName}
+                                        onChange={(e) => setDesignName(e.target.value)}
+                                        placeholder="e.g. My Premium Label"
+                                        className="w-full pl-9 pr-4 py-2 rounded-xl border text-xs font-medium outline-none focus:border-[var(--color-primary)] transition-all shadow-sm"
+                                        style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
+                                        disabled={isSaving}
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Description</label>
+                                <div className="relative">
+                                    <Info className="absolute left-3 top-3 text-gray-400" size={12} />
+                                    <textarea
+                                        value={designDescription}
+                                        onChange={(e) => setDesignDescription(e.target.value)}
+                                        placeholder="Briefly describe this layout..."
+                                        className="w-full pl-9 pr-4 py-2 rounded-xl border text-xs font-medium outline-none focus:border-[var(--color-primary)] transition-all min-h-[60px] resize-none shadow-sm"
+                                        style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
+                                        disabled={isSaving}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={onSave}
+                            disabled={!designName.trim() || isSaving}
+                            className="w-full py-3 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            {isSaving ? (
+                                <RefreshCw size={14} className="animate-spin" />
+                            ) : (
+                                <><Save size={14} /> Save & Create Design</>
+                            )}
+                        </button>
+                    </div>
                 </div>
             </div>
         );

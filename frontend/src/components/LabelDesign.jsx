@@ -9,16 +9,24 @@ import CreateLabelModal from "../components/Models/CreateLabelModal";
 import { useTheme } from "../ThemeContext";
 import { useLanguage } from "../LanguageContext";
 import AIChatbot from "./designer/AIChatbot";
-import { callEdgeFunction, API_URLS } from "../supabaseClient";
+import { callEdgeFunction, API_URLS, mapPayloadToElement, normalizeDesign } from "../supabaseClient";
 
 const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCreateLabel, onDeleteLabel, onNavigateToLibrary, userRole }) => {
   const { isDarkMode, theme } = useTheme();
   const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  // Helper to get dimensions from various possible formats
+  const getInitialDimensions = (l) => {
+    if (l?.labelSize) return l.labelSize;
+    if (l?.dimensions) return l.dimensions;
+    if (l?.width && l?.height) return { width: l.width, height: l.height };
+    return { width: 100, height: 80 };
+  };
+
   const [elements, setElements] = useState(label?.elements || []);
   const [selectedElementId, setSelectedElementId] = useState(null);
-  const [labelSize, setLabelSize] = useState(label?.labelSize || label?.dimensions || { width: 100, height: 80 });
+  const [labelSize, setLabelSize] = useState(getInitialDimensions(label));
   const [showGrid, setShowGrid] = useState(true);
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [barcodeValue, setBarcodeValue] = useState("");
@@ -38,26 +46,15 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
       const designId = label?.design_id || label?.id;
       if (!designId) return;
 
-      // Initial sync from prop
-      let currentElements = label.elements || [];
-
-      // If no elements in prop or to ensure freshness, fetch full element list
       try {
-        const fetchedElements = await callEdgeFunction(API_URLS.GET_ELEMENTS, { design_id: designId });
-        if (fetchedElements && Array.isArray(fetchedElements)) {
-          currentElements = fetchedElements;
-        }
+        const fullDesign = await callEdgeFunction(API_URLS.GET_DESIGN, { design_id: designId });
+        const normalized = normalizeDesign(fullDesign);
+        
+        setElements(normalized.elements || []);
+        setLabelSize(normalized.labelSize);
       } catch (error) {
         console.error("Failed to fetch elements:", error);
       }
-
-      // Map elements if they are in backend format
-      const mappedElements = currentElements.map(el =>
-        el.position_x !== undefined || el.element_type !== undefined ? mapPayloadToElement(el) : el
-      );
-
-      setElements(mappedElements);
-      setLabelSize(label.labelSize || label.dimensions || { width: 100, height: 80 });
       setSelectedElementId(null);
     };
 
@@ -121,6 +118,7 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
   };
 
   // ─── Backend Mappers ──────────────────────────────────────────────────
+  // Local mapElementToPayload handles outgoing sync logic
   const mapElementToPayload = (el) => {
     const designId = label.design_id || label.id;
     let content = el.content || "";
@@ -145,20 +143,6 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
       static_content: content || " ", // Ensure at least a space if still empty
       properties: { ...el }, // Store full state in JSON properties
       sort_order: el.zIndex || elements.length
-    };
-  };
-
-  const mapPayloadToElement = (payload) => {
-    return {
-      ...(payload.properties || {}),
-      id: payload.id,
-      type: payload.element_type,
-      x: payload.position_x,
-      y: payload.position_y,
-      width: payload.width,
-      height: payload.height,
-      content: payload.static_content,
-      zIndex: payload.sort_order
     };
   };
 
@@ -213,31 +197,27 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
       return;
     }
 
+    // Optimistically add locally first so it shows up immediately
+    setElements((prev) => [...prev, newElement]);
+    setSelectedElementId(newElement.id);
+    setSelectedTool(null);
+
     // Only sync to backend if we have a design_id
     const designId = label?.design_id || label?.id;
-    if (!designId) {
-      // No design saved yet — add locally only
-      setElements((prev) => [...prev, newElement]);
-      setSelectedElementId(newElement.id);
-      setSelectedTool(null);
-      return;
-    }
+    if (!designId) return;
 
     try {
       const payload = mapElementToPayload(newElement);
       const result = await callEdgeFunction(API_URLS.ADD_ELEMENT, payload);
       if (result) {
         const synced = mapPayloadToElement(result);
-        setElements((prev) => [...prev, synced]);
+        // Replace the optimistic element with the synced one (using backend ID)
+        setElements((prev) => prev.map(el => el.id === newElement.id ? synced : el));
         setSelectedElementId(synced.id);
-        setSelectedTool(null);
       }
     } catch (error) {
       console.error("Failed to sync add-element:", error);
-      // Still add locally so user can keep working
-      setElements((prev) => [...prev, newElement]);
-      setSelectedElementId(newElement.id);
-      setSelectedTool(null);
+      // Keep the local one if sync fails
     }
   };
 
@@ -517,7 +497,7 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
                 className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider opacity-60"
                 style={{ color: theme.textMuted }}
               >
-                <span>{labelSize.width}×{labelSize.height} MM</span>
+                <span>{Math.round(labelSize.width)}×{Math.round(labelSize.height)} MM</span>
                 <span>·</span>
                 <span>{elements.length} Objects</span>
                 <span>·</span>
@@ -735,6 +715,7 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
 
       {/* AI Assistant Chatbot */}
       <AIChatbot
+        onCreateLabel={onCreateLabel}
         onGenerateElements={(newElements, nextLabelSize, isNewRequest) => {
           if (nextLabelSize) setLabelSize(nextLabelSize);
           if (isNewRequest) {

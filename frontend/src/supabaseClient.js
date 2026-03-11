@@ -14,12 +14,28 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 // Edge Function names
 export const API_URLS = {
+
+    // Logins
     LOGIN: 'login',
     COMPLETE_PROFILE: 'complete-registration',
     GET_INVITATION: 'get-invitation',
     USER_INVITE: 'invite-user',
-    LIST_PRINT_JOBS: 'list-print-jobs',
-    CREATE_PRINT_JOB: 'create-print-job',
+
+    // Jobs
+    CREATE_JOB: 'create-job',
+    LIST_JOBS: 'list-jobs',
+    CANCEL_JOB: 'cancel-job',
+    CONNECTOR_AUTH: 'connector-auth',
+    POLL_JOBS: 'poll-jobs',
+    UPDATE_JOB_STATUS: 'update-job-status',
+
+    // Connectors / Devices
+    CREATE_CONNECTOR: 'create-connector',
+    LIST_CONNECTORS: 'list-connectors',
+    DELETE_CONNECTOR: 'delete-connector',
+    RESET_CONNECTOR: 'reset-connector',
+
+    // Designs
     CREATE_DESIGN: 'create-design',
     GET_DESIGNS: 'get-designs',
     GET_DESIGN: 'get-design',
@@ -28,10 +44,17 @@ export const API_URLS = {
     ARCHIVE_DESIGN: 'archive-design',
     DELETE_DESIGN: 'delete-design',
     RESTORE_DESIGN: 'restore-design',
+
+    // Elements
     ADD_ELEMENT: 'add-element',
     UPDATE_ELEMENT: 'update-element',
     DELETE_ELEMENT: 'delete-element',
-    GET_ELEMENTS: 'get-elements'
+    GET_ELEMENTS: 'get-elements',
+
+    // Users
+    LIST_USERS: 'list-users',
+    DELETE_USER: 'delete-user',
+    STATUS: 'toggle-user-status'
 };
 
 // Helper to call edge functions using the SDK
@@ -51,6 +74,9 @@ export const callEdgeFunction = async (functionName, body) => {
     const headers = {};
     if (token && !authEndpoints.includes(functionName)) {
         headers.Authorization = `Bearer ${token}`;
+        console.log(`Sending Auth Header for ${functionName}`);
+    } else if (!token && !authEndpoints.includes(functionName)) {
+        console.warn(`No token found for ${functionName} - might result in Unauthorized`);
     }
 
     console.log(`Calling Edge Function: ${functionName}`, body);
@@ -88,4 +114,60 @@ export const callEdgeFunction = async (functionName, body) => {
     }
 
     return data;
+};
+
+/* ==========================================================================
+   DESIGN NORMALIZATION & MAPPING UTILITIES
+   Ensures consistent property names across components regardless of backend 
+   naming conventions (e.g., position_x vs x).
+   ========================================================================== */
+
+export const mapPayloadToElement = (payload) => {
+    if (!payload) return null;
+    return {
+        ...(payload.properties || {}), // Load extra style properties from JSON field
+        id: payload.id,
+        type: payload.element_type || payload.type,
+        x: payload.position_x !== undefined ? payload.position_x : payload.x,
+        y: payload.position_y !== undefined ? payload.position_y : payload.y,
+        width: payload.width,
+        height: payload.height,
+        content: payload.static_content !== undefined ? payload.static_content : payload.content,
+        zIndex: payload.sort_order !== undefined ? payload.sort_order : payload.zIndex
+    };
+};
+
+export const normalizeDesign = (design) => {
+    if (!design) return design;
+
+    // Flatten nested design/data wrappers if present from API response
+    const base = design.design || design.data || design;
+    const finalId = base.design_id || base.id || design.design_id || design.id;
+
+    // Normalize dimensions to standard labelSize object
+    let labelSize = base.labelSize || base.dimensions ||
+        (base.width && base.height ? { width: base.width, height: base.height, unit: base.unit || 'mm' } : null);
+
+    if (labelSize) {
+        labelSize = {
+            ...labelSize,
+            width: Math.round(labelSize.width),
+            height: Math.round(labelSize.height)
+        };
+    }
+
+    // Normalize and map elements array
+    let elements = base.elements || design.elements || [];
+    if (Array.isArray(elements)) {
+        elements = elements.map(el => mapPayloadToElement(el));
+    }
+
+    return {
+        ...design,
+        ...base,
+        id: finalId,
+        design_id: finalId,
+        labelSize: labelSize || { width: 100, height: 80 },
+        elements
+    };
 };

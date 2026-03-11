@@ -35,11 +35,30 @@ const AdminDashboard = ({ userRole }) => {
         );
     }
 
-    const [users, setUsers] = useState([
-        { id: 1, firstName: "Alice", lastName: "Smith", email: "alice@atpl.com", mobile: "+1 555-0101", role: "admin", status: "Active" },
-        { id: 2, firstName: "Bob", lastName: "Jones", email: "bob@atpl.com", mobile: "+1 555-0102", role: "operator", status: "Active" },
-        { id: 3, firstName: "Charlie", lastName: "Davis", email: "charlie@atpl.com", mobile: "+1 555-0103", role: "operator", status: "Away" },
-    ]);
+    const [users, setUsers] = useState([]);
+    const [fetchLoading, setFetchLoading] = useState(true);
+
+
+    const fetchUsers = async () => {
+        setFetchLoading(true);
+        try {
+            const data = await callEdgeFunction(API_URLS.LIST_USERS);
+            if (data && data.users) {
+                setUsers(data.users);
+            } else if (Array.isArray(data)) {
+                setUsers(data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch users:", error);
+            // toast.error("Failed to load users"); // Only if toast is handled locally or via prop
+        } finally {
+            setFetchLoading(false);
+        }
+    };
+
+    React.useEffect(() => {
+        fetchUsers();
+    }, []);
 
     const [showAddModal, setShowAddModal] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
@@ -65,18 +84,8 @@ const AdminDashboard = ({ userRole }) => {
             setShowAddModal(false);
             setNewUser({ email: "", role: "operator" });
 
-            // Note: In a real app, we might want to refresh the user list here
-            // For now, let's add a placeholder to the list
-            const placeholderUser = {
-                id: Date.now(),
-                firstName: "Pending",
-                lastName: "User",
-                email: newUser.email,
-                mobile: "N/A",
-                role: newUser.role,
-                status: "Invited"
-            };
-            setUsers([placeholderUser, ...users]);
+            // Refresh the user list to show the new invitation
+            fetchUsers();
         } catch (error) {
             console.error("Failed to invite user:", error);
             toast.error(error.message || "Failed to send invitation");
@@ -85,10 +94,45 @@ const AdminDashboard = ({ userRole }) => {
         }
     };
 
-    const filteredUsers = users.filter(u =>
-        `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const handleDeleteUser = async (userId) => {
+        if (!window.confirm("Are you sure you want to remove this user?")) return;
+
+        try {
+            await callEdgeFunction(API_URLS.DELETE_USER, { user_id: userId });
+            toast.success("User removed successfully");
+            fetchUsers();
+        } catch (error) {
+            console.error("Failed to delete user:", error);
+            toast.error(error.message || "Failed to remove user");
+        }
+    };
+
+    const handleToggleUserStatus = async (userId, currentActiveState) => {
+        try {
+            // The API expects is_active (boolean)
+            const nextActiveState = !currentActiveState;
+            
+            await callEdgeFunction(API_URLS.STATUS, { 
+                user_id: userId, 
+                is_active: nextActiveState 
+            });
+            
+            toast.success(`Identity status: ${nextActiveState ? 'ACTIVE' : 'INACTIVE'}`);
+            fetchUsers();
+        } catch (error) {
+            console.error("Failed to toggle status:", error);
+            toast.error(error.message || "Failed to update node status");
+        }
+    };
+
+
+
+    const filteredUsers = users.filter(u => {
+        const fullName = `${u.first_name || u.firstName || ''} ${u.last_name || u.lastName || ''}`.toLowerCase();
+        const email = (u.email || '').toLowerCase();
+        const search = searchTerm.toLowerCase();
+        return fullName.includes(search) || email.includes(search);
+    });
 
     return (
         <div className="min-h-screen bg-[#F5F7F9] p-6 md:p-10 transition-colors duration-300" style={{ backgroundColor: theme.bg }}>
@@ -130,7 +174,7 @@ const AdminDashboard = ({ userRole }) => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     {[
                         { label: "Total Assets", value: "1,284", icon: Layers, color: "text-[#39A3DD]", bg: "bg-blue-50" },
-                        { label: "Active Team", value: users.length, icon: Users, color: "text-[#E85874]", bg: "bg-pink-50" },
+                        { label: "Active Team", value: fetchLoading ? "..." : users.length, icon: Users, color: "text-[#E85874]", bg: "bg-pink-50" },
                         { label: "System Uptime", value: "99.9%", icon: Activity, color: "text-green-500", bg: "bg-green-50" },
                         { label: "Security", value: "Locked", icon: Shield, color: "text-slate-600", bg: "bg-slate-50" },
                     ].map((stat, i) => (
@@ -156,7 +200,7 @@ const AdminDashboard = ({ userRole }) => {
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="border-b" style={{ borderColor: theme.border }}>
-                                    {["Identity", "Access Point", "Assigned Role", "Status", "Management"].map((head) => (
+                                    {["Identity", "Access Point", "Assigned Role", "Status", "Action"].map((head) => (
                                         <th key={head} className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-[#8A9BA5]">
                                             {head}
                                         </th>
@@ -164,47 +208,88 @@ const AdminDashboard = ({ userRole }) => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y" style={{ borderColor: theme.border }}>
-                                {filteredUsers.map((user) => (
-                                    <tr key={user.id} className="group hover:bg-slate-50 transition-colors" style={{ backgroundColor: isDarkMode ? undefined : 'white' }}>
-                                        <td className="px-8 py-5">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 bg-[#38474F] text-white flex items-center justify-center font-black text-xs uppercase tracking-tighter rounded">
-                                                    {user.firstName[0]}{user.lastName[0]}
-                                                </div>
-                                                <div>
-                                                    <p className="font-black text-sm text-[#38474F] uppercase tracking-wide" style={{ color: theme.text }}>{user.firstName} {user.lastName}</p>
-                                                    <p className="text-[10px] font-bold text-[#8A9BA5]">UUID: {user.id}93x84</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-5">
-                                            <div className="text-xs font-medium text-[#38474F]" style={{ color: theme.textMuted }}>
-                                                <div className="flex items-center gap-2 mb-1"><Mail size={12} className="text-[#39A3DD]" />{user.email}</div>
-                                                <div className="flex items-center gap-2"><Phone size={12} className="text-[#39A3DD]" />{user.mobile}</div>
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-5">
-                                            <span className={`inline-block px-3 py-1.5 rounded-sm text-[9px] font-black uppercase tracking-widest border border-gray-100 ${user.role.toLowerCase() === 'admin' ? 'bg-[#F59FB5]/10 text-[#E85874]' :
-                                                user.role.toLowerCase() === 'operator' ? 'bg-[#6BB9E5]/10 text-[#39A3DD]' :
-                                                    'bg-[#38474F]/5 text-[#38474F]'
-                                                }`}>
-                                                {user.role}
-                                            </span>
-                                        </td>
-                                        <td className="px-8 py-5">
-                                            <div className="flex items-center gap-2">
-                                                <span className={`w-1.5 h-1.5 rounded-full ${user.status === 'Active' ? 'bg-green-500' : 'bg-amber-400'}`}></span>
-                                                <span className="text-[10px] font-black uppercase tracking-wider text-[#38474F]" style={{ color: theme.text }}>{user.status}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-5">
-                                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button className="p-2.5 bg-white border border-gray-100 text-[#8A9BA5] hover:text-[#39A3DD] rounded shadow-sm transition-all"><Edit2 size={14} /></button>
-                                                <button className="p-2.5 bg-white border border-gray-100 text-[#8A9BA5] hover:text-red-500 rounded shadow-sm transition-all"><Trash2 size={14} /></button>
-                                            </div>
+                                {fetchLoading ? (
+                                    <tr>
+                                        <td colSpan="5" className="px-8 py-20 text-center">
+                                            <Loader2 className="animate-spin mx-auto text-[#39A3DD] mb-4" size={32} />
+                                            <p className="text-xs font-black uppercase tracking-widest text-[#8A9BA5]">Synchronizing Registry...</p>
                                         </td>
                                     </tr>
-                                ))}
+                                ) : filteredUsers.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="5" className="px-8 py-20 text-center text-[#8A9BA5]">
+                                            No resources found in the registry.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    filteredUsers.map((user) => (
+                                        <tr key={user.id} className="group hover:bg-slate-50 transition-colors" style={{ backgroundColor: isDarkMode ? undefined : 'white' }}>
+                                            <td className="px-8 py-5">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-10 h-10 bg-[#38474F] text-white flex items-center justify-center font-black text-xs uppercase tracking-tighter rounded">
+                                                        {user.first_name?.[0] || user.firstName?.[0] || '?'}{user.last_name?.[0] || user.lastName?.[0] || '?'}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-black text-sm text-[#38474F] uppercase tracking-wide" style={{ color: theme.text }}>
+                                                            {user.first_name || user.firstName || 'Pending'} {user.last_name || user.lastName || 'User'}
+                                                        </p>
+                                                        <p className="text-[10px] font-bold text-[#8A9BA5]">UUID: {user.id?.toString().slice(0, 8) || 'Unknown'}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-5">
+                                                <div className="text-xs font-medium text-[#38474F]" style={{ color: theme.textMuted }}>
+                                                    <div className="flex items-center gap-2 mb-1"><Mail size={12} className="text-[#39A3DD]" />{user.email}</div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Phone size={12} className="text-[#39A3DD]" />
+                                                        {user.phone || user.mobileNumber || user.mobile || 'N/A'}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-5">
+                                                <span className={`inline-block px-3 py-1.5 rounded-sm text-[9px] font-black uppercase tracking-widest border border-gray-100 ${user.role?.toLowerCase() === 'admin' ? 'bg-[#F59FB5]/10 text-[#E85874]' :
+                                                    user.role?.toLowerCase() === 'operator' ? 'bg-[#6BB9E5]/10 text-[#39A3DD]' :
+                                                        'bg-[#38474F]/5 text-[#38474F]'
+                                                    }`}>
+                                                    {user.role}
+                                                </span>
+                                            </td>
+                                            <td className="px-8 py-5">
+                                                <div className="flex items-center gap-4">
+                                                    <button 
+                                                        onClick={() => handleToggleUserStatus(user.id, user.is_active !== undefined ? user.is_active : (user.status === 'Active'))}
+                                                        className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none ${
+                                                            (user.is_active !== undefined ? user.is_active : (user.status === 'Active')) ? 'bg-green-500' : 'bg-red-500'
+                                                        }`}
+                                                    >
+                                                        <span
+                                                            className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                                                                (user.is_active !== undefined ? user.is_active : (user.status === 'Active')) ? 'translate-x-6' : 'translate-x-1'
+                                                            }`}
+                                                        />
+                                                    </button>
+                                                    <span className={`text-[10px] font-black uppercase tracking-wider ${
+                                                        !(user.is_active !== undefined ? user.is_active : (user.status === 'Active')) ? 'text-red-500' : 'text-[#38474F]'
+                                                    }`} style={{ color: (user.is_active !== undefined ? user.is_active : (user.status === 'Active')) ? theme.text : undefined }}>
+                                                        {(user.is_active !== undefined ? (user.is_active ? 'Active' : 'Inactive') : (user.status || 'Active'))}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-5">
+                                                <div className="flex items-center gap-2">
+
+                                                    <button
+                                                        onClick={() => handleDeleteUser(user.id)}
+                                                        className="p-2.5 bg-white border border-gray-100 text-[#8A9BA5] hover:text-red-500 rounded shadow-sm transition-all"
+                                                        title="Delete User"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>

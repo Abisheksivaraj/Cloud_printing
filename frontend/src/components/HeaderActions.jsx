@@ -2,9 +2,16 @@ import { Tag, Sun, Moon, LogOut } from "lucide-react";
 import { useTheme } from "../ThemeContext";
 import { useLanguage } from "../LanguageContext";
 
-export const AppHeader = ({ onNavigate, currentView }) => {
+export const AppHeader = ({ onNavigate, currentView, userRole }) => {
   const { isDarkMode, toggleTheme, theme } = useTheme();
   const { t } = useLanguage();
+
+  const navItems = [
+    { id: "library", label: "Design Library", short: "L" },
+    { id: "print_history", label: "Print History", short: "H" },
+    { id: "device_management", label: "Device Management", short: "D" },
+    { id: "admin_dashboard", label: "User Management", short: "A", adminOnly: true },
+  ].filter(item => !item.adminOnly || userRole === 'admin');
 
   return (
     <div
@@ -39,11 +46,7 @@ export const AppHeader = ({ onNavigate, currentView }) => {
             </div>
 
             <nav className="flex items-center gap-0.5 sm:gap-1">
-              {[
-                { id: "library", label: "Library", short: "L" },
-                { id: "history", label: "History", short: "H" },
-                { id: "admin", label: "Admin", short: "A" },
-              ].map((item) => (
+              {navItems.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => onNavigate(item.id)}
