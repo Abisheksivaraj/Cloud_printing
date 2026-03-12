@@ -83,13 +83,10 @@ const DeviceManagement = () => {
         try {
             const payload = {
                 name: formData.name || `${formData.brand} ${formData.model}`,
-                printer_model: `${formData.brand} ${formData.model}`,
-                output_format: formData.outputFormat,
-                metadata: {
-                    serial_number: formData.serialNumber,
-                    brand: formData.brand,
-                    model: formData.model
-                }
+                brand: formData.brand,
+                model: formData.model,
+                serial_number: formData.serialNumber,
+                output_format: formData.outputFormat
             };
 
             const result = await callEdgeFunction(API_URLS.CREATE_CONNECTOR, payload);
@@ -126,6 +123,23 @@ const DeviceManagement = () => {
         }
     };
 
+    const handleResetConnector = async (id) => {
+        if (!window.confirm("Refreshing the API key will disconnect the current agent. Are you sure?")) return;
+        setIsLoading(true);
+        try {
+            const result = await callEdgeFunction(API_URLS.RESET_CONNECTOR, { connector_id: id });
+            if (result.success && result.api_key) {
+                alert(`API Key Refreshed!\n\nNew Key: ${result.api_key}\n\nPlease update your connector-agent .env file and restart it.`);
+            }
+            fetchConnectors();
+        } catch (error) {
+            console.error("Failed to reset connector:", error);
+            alert("Reset failed: " + error.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const filteredConnectors = connectors.filter(c => 
         (c.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
         (c.printer_model || "").toLowerCase().includes(searchTerm.toLowerCase())
@@ -137,10 +151,10 @@ const DeviceManagement = () => {
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 mb-12">
                 <div className="flex-1">
                     <h1 className="text-5xl font-black tracking-tighter mb-4 flex items-baseline gap-3" style={{ color: theme.text }}>
-                        TEAM <span className="text-blue-500">RESOURCES</span>
+                        DEVICE <span className="text-blue-500">NODES</span>
                     </h1>
                     <p className="text-base font-medium opacity-40 max-w-xl" style={{ color: theme.text }}>
-                    Provision and manage enterprise hardware bridging nodes and print infrastructure.
+                    Provision and manage hardware bridging nodes and enterprise print infrastructure.
                     </p>
                 </div>
                 
@@ -164,7 +178,7 @@ const DeviceManagement = () => {
                         className="flex items-center gap-2 px-6 py-3.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-sm border border-slate-100 dark:border-slate-700 transition-all hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 whitespace-nowrap"
                     >
                         <Plus size={16} strokeWidth={4} className="text-blue-500" />
-                        INVITE USER
+                        PROVISION DEVICE
                     </button>
                 </div>
             </div>
@@ -173,9 +187,9 @@ const DeviceManagement = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
                 {[
                     { label: "TOTAL ASSETS", value: connectors.length, icon: Layers, color: "text-blue-500", bg: "bg-blue-50/50" },
-                    { label: "ACTIVE TEAM", value: connectors.filter(c => c.status === 'active').length, icon: Users, color: "text-rose-500", bg: "bg-rose-50/50" },
-                    { label: "SYSTEM UPTIME", value: "99.9%", icon: Activity, color: "text-emerald-500", bg: "bg-emerald-50/50" },
-                    { label: "SECURITY", value: "Locked", icon: Shield, color: "text-slate-500", bg: "bg-slate-50/50" },
+                    { label: "CONNECTED NODES", value: connectors.filter(c => c.status === 'active').length, icon: Activity, color: "text-emerald-500", bg: "bg-emerald-50/50" },
+                    { label: "SYSTEM UPTIME", value: "99.9%", icon: Shield, color: "text-blue-500", bg: "bg-blue-50/50" },
+                    { label: "ENCRYPTION", value: "AES-256", icon: Server, color: "text-slate-500", bg: "bg-slate-50/50" },
                 ].map((stat, i) => (
                     <div key={i} className="p-8 rounded-3xl border shadow-sm flex flex-col items-start transition-all hover:shadow-md" style={{ backgroundColor: theme.surface, borderColor: theme.border }}>
                         <div className={`w-12 h-12 rounded-xl ${stat.bg} ${stat.color} flex items-center justify-center mb-10`}>
@@ -245,8 +259,13 @@ const DeviceManagement = () => {
                                 
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-3 text-xs font-black uppercase tracking-widest opacity-40" style={{ color: theme.text }}>
-                                        <Settings size={16} />
-                                        {connector.printer_model}
+                                        <Printer size={16} />
+                                        {connector.brand} {connector.model}
+                                        {!connector.brand && connector.printer_model}
+                                    </div>
+                                    <div className="flex items-center gap-3 text-xs font-black uppercase tracking-widest opacity-40" style={{ color: theme.text }}>
+                                        <Cpu size={16} />
+                                        SN: {connector.serial_number || connector.metadata?.serial_number || 'N/A'}
                                     </div>
                                     <div className="flex items-center gap-3 text-xs font-black uppercase tracking-widest opacity-40" style={{ color: theme.text }}>
                                         <FileCode size={16} />
@@ -255,12 +274,15 @@ const DeviceManagement = () => {
                                 </div>
 
                                 <div className="mt-10 pt-8 border-t flex items-center justify-between" style={{ borderColor: theme.border }}>
-                                    <div>
-                                        <p className="text-[9px] font-black uppercase tracking-widest opacity-20 mb-1" style={{ color: theme.text }}>HARDWARE ID</p>
-                                        <p className="text-[11px] font-mono font-bold opacity-50" style={{ color: theme.text }}>{connector.id.slice(0, 16).toUpperCase()}</p>
+                                    <div className="flex flex-col gap-1">
+                                        <p className="text-[9px] font-black uppercase tracking-widest opacity-20" style={{ color: theme.text }}>SECURITY STATUS</p>
+                                        <p className="text-[11px] font-bold text-blue-500 flex items-center gap-1.5 active:opacity-60 transition-opacity cursor-pointer" onClick={() => handleResetConnector(connector.id)}>
+                                            <RefreshCw size={12} strokeWidth={3} />
+                                            Reset Credentials
+                                        </p>
                                     </div>
-                                    <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer">
-                                        <ChevronRight size={24} className="text-blue-500" />
+                                    <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer">
+                                        <ChevronRight size={20} className="text-blue-500" />
                                     </div>
                                 </div>
                             </div>
@@ -305,79 +327,117 @@ const DeviceManagement = () => {
                         ) : (
                             /* Standard Form State */
                             <>
-                                <div className="p-12 border-b flex items-center justify-between" style={{ borderColor: theme.border }}>
+                                <div className="p-10 border-b flex items-center justify-between relative" style={{ borderColor: theme.border }}>
                                     <div>
-                                        <h3 className="text-3xl font-black tracking-tight" style={{ color: theme.text }}>DEVICE <span className="text-blue-500">LINK</span></h3>
-                                        <p className="text-[11px] font-black uppercase tracking-[0.3em] opacity-30 mt-1" style={{ color: theme.text }}>Provision Node Infrastructure</p>
+                                        <div className="flex items-center gap-3 mb-1">
+                                            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                                                <Server size={18} className="text-blue-500" />
+                                            </div>
+                                            <h3 className="text-2xl font-black tracking-tight" style={{ color: theme.text }}>DEVICE <span className="text-blue-500">LINK</span></h3>
+                                        </div>
+                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-30 ml-11" style={{ color: theme.text }}>Provision Node Infrastructure</p>
                                     </div>
-                                    <button onClick={() => setShowAddModal(false)} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-2xl transition-all group">
-                                        <X size={28} className="group-hover:rotate-90 transition-transform duration-300 opacity-20" />
+                                    <button 
+                                        onClick={() => setShowAddModal(false)} 
+                                        className="w-10 h-10 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all group"
+                                    >
+                                        <X size={20} className="group-hover:rotate-90 transition-transform duration-300 opacity-40" />
                                     </button>
                                 </div>
 
-                                <form onSubmit={handleCreateConnector} className="p-12 space-y-10 text-left">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        <div className="space-y-3">
-                                            <label className="text-[10px] font-black uppercase tracking-[0.3em] ml-2 opacity-30" style={{ color: theme.text }}>Brand</label>
+                                <form onSubmit={handleCreateConnector} className="p-10 space-y-7 text-left">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] ml-1 opacity-40 flex items-center gap-2" style={{ color: theme.text }}>
+                                            <Activity size={12} className="text-blue-500" />
+                                            Connector Name
+                                        </label>
+                                        <div className="relative group">
+                                            <input
+                                                required
+                                                type="text"
+                                                placeholder="EX: Warehouse Connector 1"
+                                                className="w-full px-5 py-4 rounded-2xl border-2 outline-none transition-all focus:border-blue-500 font-bold text-sm bg-transparent hover:border-slate-300 dark:hover:border-slate-700"
+                                                value={formData.name}
+                                                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                                                style={{ borderColor: theme.border, color: theme.text }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase tracking-[0.2em] ml-1 opacity-40 flex items-center gap-2" style={{ color: theme.text }}>
+                                                <Shield size={12} className="text-blue-500" />
+                                                Brand
+                                            </label>
                                             <div className="relative group">
                                                 <select
-                                                    className="w-full pl-6 pr-12 py-5 rounded-[2rem] border-2 outline-none transition-all focus:border-blue-500 font-bold text-sm appearance-none cursor-pointer bg-transparent hover:border-slate-300 dark:hover:border-slate-700"
+                                                    className="w-full pl-5 pr-12 py-4 rounded-2xl border-2 outline-none transition-all focus:border-blue-500 font-bold text-sm appearance-none cursor-pointer bg-transparent hover:border-slate-300 dark:hover:border-slate-700"
                                                     value={formData.brand}
                                                     onChange={(e) => handleBrandChange(e.target.value)}
                                                     style={{ borderColor: theme.border, color: theme.text }}
                                                 >
                                                     {Object.keys(PRINTER_DATA).map(brand => (
-                                                        <option key={brand} value={brand}>{brand}</option>
+                                                        <option key={brand} value={brand} className="dark:bg-slate-900">{brand}</option>
                                                     ))}
                                                 </select>
-                                                <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none group-hover:opacity-40 transition-opacity" size={18} />
+                                                <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none group-hover:opacity-40 transition-opacity" size={16} />
                                             </div>
                                         </div>
-                                        <div className="space-y-3">
-                                            <label className="text-[10px] font-black uppercase tracking-[0.3em] ml-2 opacity-30" style={{ color: theme.text }}>Model</label>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase tracking-[0.2em] ml-1 opacity-40 flex items-center gap-2" style={{ color: theme.text }}>
+                                                <Layers size={12} className="text-blue-500" />
+                                                Model
+                                            </label>
                                             <div className="relative group">
                                                 <select
-                                                    className="w-full pl-6 pr-12 py-5 rounded-[2rem] border-2 outline-none transition-all focus:border-blue-500 font-bold text-sm appearance-none cursor-pointer bg-transparent hover:border-slate-300 dark:hover:border-slate-700"
+                                                    className="w-full pl-5 pr-12 py-4 rounded-2xl border-2 outline-none transition-all focus:border-blue-500 font-bold text-sm appearance-none cursor-pointer bg-transparent hover:border-slate-300 dark:hover:border-slate-700"
                                                     value={formData.model}
                                                     onChange={(e) => setFormData({...formData, model: e.target.value})}
                                                     style={{ borderColor: theme.border, color: theme.text }}
                                                 >
                                                     {PRINTER_DATA[formData.brand].map(model => (
-                                                        <option key={model} value={model}>{model}</option>
+                                                        <option key={model} value={model} className="dark:bg-slate-900">{model}</option>
                                                     ))}
                                                 </select>
-                                                <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none group-hover:opacity-40 transition-opacity" size={18} />
+                                                <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none group-hover:opacity-40 transition-opacity" size={16} />
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        <div className="space-y-3">
-                                            <label className="text-[10px] font-black uppercase tracking-[0.3em] ml-2 opacity-30" style={{ color: theme.text }}>Serial Number</label>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase tracking-[0.2em] ml-1 opacity-40 flex items-center gap-2" style={{ color: theme.text }}>
+                                                <Cpu size={12} className="text-blue-500" />
+                                                Serial Number
+                                            </label>
                                             <input
                                                 required
                                                 type="text"
-                                                placeholder="EX: SN-900"
-                                                className="w-full px-8 py-5 rounded-[2rem] border-2 outline-none transition-all focus:border-blue-500 font-bold text-sm bg-transparent hover:border-slate-300 dark:hover:border-slate-700"
+                                                placeholder="EX: SN-00123456"
+                                                className="w-full px-5 py-4 rounded-2xl border-2 outline-none transition-all focus:border-blue-500 font-bold text-sm bg-transparent hover:border-slate-300 dark:hover:border-slate-700"
                                                 value={formData.serialNumber}
                                                 onChange={(e) => setFormData({...formData, serialNumber: e.target.value})}
                                                 style={{ borderColor: theme.border, color: theme.text }}
                                             />
                                         </div>
-                                        <div className="space-y-3">
-                                            <label className="text-[10px] font-black uppercase tracking-[0.3em] ml-2 opacity-30" style={{ color: theme.text }}>Print Format</label>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase tracking-[0.2em] ml-1 opacity-40 flex items-center gap-2" style={{ color: theme.text }}>
+                                                <FileCode size={12} className="text-blue-500" />
+                                                Print Format
+                                            </label>
                                             <div className="relative group">
                                                 <select
-                                                    className="w-full pl-6 pr-12 py-5 rounded-[2rem] border-2 outline-none transition-all focus:border-blue-500 font-bold text-sm appearance-none cursor-pointer bg-transparent hover:border-slate-300 dark:hover:border-slate-700"
+                                                    className="w-full pl-5 pr-12 py-4 rounded-2xl border-2 outline-none transition-all focus:border-blue-500 font-bold text-sm appearance-none cursor-pointer bg-transparent hover:border-slate-300 dark:hover:border-slate-700"
                                                     value={formData.outputFormat}
                                                     onChange={(e) => setFormData({...formData, outputFormat: e.target.value})}
                                                     style={{ borderColor: theme.border, color: theme.text }}
                                                 >
                                                     {OUTPUT_FORMATS.map(format => (
-                                                        <option key={format} value={format}>{format.toUpperCase()}</option>
+                                                        <option key={format} value={format} className="dark:bg-slate-900">{format.toUpperCase()}</option>
                                                     ))}
                                                 </select>
-                                                <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none group-hover:opacity-40 transition-opacity" size={18} />
+                                                <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none group-hover:opacity-40 transition-opacity" size={16} />
                                             </div>
                                         </div>
                                     </div>
@@ -385,10 +445,11 @@ const DeviceManagement = () => {
                                     <button
                                         type="submit"
                                         disabled={isSaving}
-                                        className="w-full py-6 bg-blue-500 hover:bg-blue-600 text-white rounded-[2.5rem] font-black uppercase tracking-[0.3em] text-xs shadow-2xl shadow-blue-500/40 mt-8 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-4"
+                                        className="w-full py-5 bg-blue-500 hover:bg-blue-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] shadow-xl shadow-blue-500/25 mt-6 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3 overflow-hidden relative group/btn"
                                     >
-                                        <span>Initialize Node Link</span>
-                                        <Server size={20} strokeWidth={3} />
+                                        <div className="absolute inset-0 bg-white/10 translate-y-full group-hover/btn:translate-y-0 transition-transform duration-300"></div>
+                                        <span className="relative z-10">Initialize Node Link</span>
+                                        <RefreshCw size={16} strokeWidth={3} className="relative z-10 group-hover/btn:rotate-180 transition-transform duration-500" />
                                     </button>
                                 </form>
                             </>

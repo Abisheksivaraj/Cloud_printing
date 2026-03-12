@@ -35,11 +35,13 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
             });
 
             const token = data.access_token || data.token;
+            const refreshToken = data.refresh_token || data.refreshToken;
             if (token) {
                 sessionStorage.setItem("authToken", token);
+                if (refreshToken) sessionStorage.setItem("refreshToken", refreshToken);
                 await supabase.auth.setSession({
                     access_token: token,
-                    refresh_token: data.refresh_token || ""
+                    refresh_token: refreshToken || ""
                 });
             }
             if (data.admin) sessionStorage.setItem("userData", JSON.stringify(data.admin));

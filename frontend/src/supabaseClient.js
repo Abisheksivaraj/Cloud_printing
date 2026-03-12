@@ -33,7 +33,7 @@ export const API_URLS = {
     CREATE_CONNECTOR: 'create-connector',
     LIST_CONNECTORS: 'list-connectors',
     DELETE_CONNECTOR: 'delete-connector',
-    RESET_CONNECTOR: 'reset-connector',
+    RESET_CONNECTOR: 'reset-connector-key',
 
     // Designs
     CREATE_DESIGN: 'create-design',
@@ -60,21 +60,39 @@ export const API_URLS = {
 // Helper to call edge functions using the SDK
 export const callEdgeFunction = async (functionName, body) => {
     // 1. Try to get token from current active session (source of truth)
-    const { data: { session } } = await supabase.auth.getSession();
-    let token = session?.access_token;
-
-    // 2. Fallback to sessionStorage if no session
-    if (!token) {
-        token = sessionStorage.getItem("authToken");
+    let { data: { session } } = await supabase.auth.getSession();
+    
+    // 2. If session is missing but we have a refresh token, try a quick refresh
+    if (!session) {
+        const storedRefresh = sessionStorage.getItem("refreshToken");
+        const storedAuth = sessionStorage.getItem("authToken");
+        if (storedRefresh && storedAuth) {
+            const { data, error } = await supabase.auth.setSession({
+                access_token: storedAuth,
+                refresh_token: storedRefresh
+            });
+            if (!error && data.session) {
+                session = data.session;
+                sessionStorage.setItem("authToken", data.session.access_token);
+                if (data.session.refresh_token) {
+                    sessionStorage.setItem("refreshToken", data.session.refresh_token);
+                }
+            }
+        }
     }
 
-    // Skip Authorization header for auth-related endpoints if no session is active 
-    // or to avoid sending stale tokens from localStorage during signup/login
-    const authEndpoints = [API_URLS.LOGIN, API_URLS.COMPLETE_PROFILE, API_URLS.GET_INVITATION, API_URLS.USER_INVITE];
+    let token = session?.access_token || sessionStorage.getItem("authToken");
+
+    // Skip Authorization header ONLY for public/onboarding endpoints
+    const authEndpoints = [API_URLS.LOGIN, API_URLS.COMPLETE_PROFILE, API_URLS.GET_INVITATION];
     const headers = {};
     if (token && !authEndpoints.includes(functionName)) {
-        headers.Authorization = `Bearer ${token}`;
-        console.log(`Sending Auth Header for ${functionName}`);
+        headers.Authorization = `Bearer ${token.trim()}`;
+        // Verify token is not a placeholder string
+        if (token === "undefined" || token === "null") {
+            console.error(`Invalid token string detected for ${functionName}`);
+            token = null;
+        }
     } else if (!token && !authEndpoints.includes(functionName)) {
         console.warn(`No token found for ${functionName} - might result in Unauthorized`);
     }

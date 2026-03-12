@@ -31,6 +31,7 @@ const App = () => {
       await supabase.auth.getSession();
 
       const token = sessionStorage.getItem("authToken");
+      const refreshToken = sessionStorage.getItem("refreshToken");
       const storedUserData = sessionStorage.getItem("userData");
       let parsedUserData = null;
       if (storedUserData) {
@@ -50,18 +51,46 @@ const App = () => {
         setCurrentView("login");
         setIsAuthenticated(!!token);
       } else if (token) {
-        // Sync session with Supabase client
-        supabase.auth.setSession({
+        // Sync session with Supabase client (Await this to prevent race conditions)
+        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
           access_token: token,
-          refresh_token: "" // We don't have this in storage yet, but access_token is enough for many cases
+          refresh_token: refreshToken || ""
         });
-        setIsAuthenticated(true);
 
-        // Redirect based on role
-        if (parsedUserData?.role?.toLowerCase() === 'admin') {
-          setCurrentView("admin_dashboard");
+        if (!sessionError && sessionData?.session) {
+          // Update storage with fresh tokens if session was refreshed
+          const freshToken = sessionData.session.access_token;
+          const freshRefresh = sessionData.session.refresh_token;
+          sessionStorage.setItem("authToken", freshToken);
+          if (freshRefresh) sessionStorage.setItem("refreshToken", freshRefresh);
+          
+          setIsAuthenticated(true);
+        } else if (sessionError) {
+          console.warn("Session restoration failed:", sessionError);
+          setIsAuthenticated(false);
+          setCurrentView("login");
+          sessionStorage.clear();
         } else {
-          setCurrentView("library");
+          setIsAuthenticated(true);
+        }
+
+        const savedView = sessionStorage.getItem("currentView");
+        const isAdmin = parsedUserData?.role?.toLowerCase() === 'admin';
+
+        // Restore saved view if it exists and is valid for the role
+        if (savedView && savedView !== "login" && savedView !== "signup" && savedView !== "logout") {
+          if (savedView === "admin_dashboard" && !isAdmin) {
+            setCurrentView("library");
+          } else {
+            setCurrentView(savedView);
+          }
+        } else {
+          // Default redirect based on role
+          if (isAdmin) {
+            setCurrentView("admin_dashboard");
+          } else {
+            setCurrentView("library");
+          }
         }
       } else {
         setIsAuthenticated(false);
@@ -107,8 +136,10 @@ const App = () => {
   const navigateTo = (view) => {
     if (view === "logout") {
       sessionStorage.removeItem("authToken");
+      sessionStorage.removeItem("refreshToken");
       sessionStorage.removeItem("userData");
       sessionStorage.removeItem("companyName");
+      sessionStorage.removeItem("currentView");
       setIsAuthenticated(false);
       setUserRole(null);
       setUserData(null);
@@ -123,6 +154,10 @@ const App = () => {
     }
 
     setCurrentView(view);
+    // Only save potentially valid authenticated views
+    if (view !== "login" && view !== "signup" && view !== "logout") {
+      sessionStorage.setItem("currentView", view);
+    }
   };
 
   const handleSignup = (user) => {
