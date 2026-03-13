@@ -38,6 +38,8 @@ const DeviceManagement = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [showKeyModal, setShowKeyModal] = useState(false);
+    const [generatedKey, setGeneratedKey] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
 
     // Form State
@@ -93,7 +95,8 @@ const DeviceManagement = () => {
             
             if (result.success) {
                 if (result.api_key) {
-                    alert(`Connector Created! Save your API Key:\n\n${result.api_key}`);
+                    setGeneratedKey(result.api_key);
+                    setShowKeyModal(true);
                 }
                 setShowAddModal(false);
                 setFormData({
@@ -116,7 +119,7 @@ const DeviceManagement = () => {
     const handleDeleteConnector = async (id) => {
         if (!window.confirm("Are you sure you want to remove this device?")) return;
         try {
-            await callEdgeFunction(API_URLS.DELETE_CONNECTOR, { id });
+            await callEdgeFunction(API_URLS.DELETE_CONNECTOR, { connector_id: id });
             setConnectors(connectors.filter(c => c.id !== id));
         } catch (error) {
             console.error("Failed to delete connector:", error);
@@ -129,7 +132,8 @@ const DeviceManagement = () => {
         try {
             const result = await callEdgeFunction(API_URLS.RESET_CONNECTOR, { connector_id: id });
             if (result.success && result.api_key) {
-                alert(`API Key Refreshed!\n\nNew Key: ${result.api_key}\n\nPlease update your connector-agent .env file and restart it.`);
+                setGeneratedKey(result.api_key);
+                setShowKeyModal(true);
             }
             fetchConnectors();
         } catch (error) {
@@ -458,7 +462,54 @@ const DeviceManagement = () => {
                 </div>
             )}
 
+            {/* API Key Display Modal */}
+            {showKeyModal && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-8">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xl animate-in fade-in duration-300" onClick={() => setShowKeyModal(false)}></div>
+                    <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500 border border-white/5 p-10 text-center" style={{ backgroundColor: theme.surface }}>
+                        <div className="w-20 h-20 bg-emerald-500/10 rounded-[2rem] flex items-center justify-center mx-auto mb-8 border-2 border-emerald-500/20">
+                            <Shield size={32} className="text-emerald-500" />
+                        </div>
+                        
+                        <h3 className="text-2xl font-black tracking-tight mb-2" style={{ color: theme.text }}>API <span className="text-emerald-500">KEY</span></h3>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-30 mb-8" style={{ color: theme.text }}>Credentials Generated Successfully</p>
+                        
+                        <div className="relative group mb-8">
+                            <div className="absolute inset-0 bg-emerald-500/5 blur-xl group-hover:bg-emerald-500/10 transition-colors rounded-3xl"></div>
+                            <div 
+                                className="relative p-6 rounded-2xl border-2 border-dashed font-mono text-sm break-all cursor-pointer hover:border-emerald-500/50 transition-all active:scale-[0.98]"
+                                style={{ borderColor: theme.border, backgroundColor: theme.bg, color: theme.text }}
+                                onClick={() => {
+                                    navigator.clipboard.writeText(generatedKey);
+                                    const btn = document.getElementById('copy-indicator');
+                                    if (btn) btn.innerText = 'COPIED!';
+                                    setTimeout(() => { if (btn) btn.innerText = 'CLICK TO COPY'; }, 2000);
+                                }}
+                            >
+                                {generatedKey}
+                            </div>
+                            <p id="copy-indicator" className="mt-3 text-[9px] font-black text-emerald-500 uppercase tracking-widest">Click key to copy</p>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-left mb-8">
+                            <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-start gap-2 leading-relaxed">
+                                <Activity size={14} className="shrink-0 mt-0.5" />
+                                Please save this key immediately. For security reasons, it will not be shown again. Use it to configure your local connector agent.
+                            </p>
+                        </div>
+
+                        <button
+                            onClick={() => setShowKeyModal(false)}
+                            className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-xl transition-all active:scale-95"
+                        >
+                            I HAVE SAVED IT
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <style dangerouslySetInnerHTML={{ __html: `
+
                 @keyframes bounce-subtle {
                     0%, 100% { transform: translateY(0) rotate(45deg); }
                     50% { transform: translateY(-10px) rotate(45deg); }

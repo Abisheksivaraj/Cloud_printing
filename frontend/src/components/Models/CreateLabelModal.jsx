@@ -98,7 +98,7 @@ const CreateLabelModal = ({ onClose, onCreate }) => {
     dimensions: { width, height, unit },
     rotation,
     orientation,
-    binding_type: null,
+    binding_type: "static",
     settings: {
       dpi,
       margin,

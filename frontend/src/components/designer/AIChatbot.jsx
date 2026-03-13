@@ -168,7 +168,7 @@ const AIChatbot = ({ onGenerateElements, labelSize, generateId, onCreateLabel })
                 dimensions: pendingDesign.dimensions,
                 status: "draft",
                 category: pendingDesign.type?.toLowerCase() || "custom",
-                binding_type: null
+                binding_type: "static"
             };
 
             const designResult = await callEdgeFunction(API_URLS.CREATE_DESIGN, createPayload);
@@ -195,6 +195,7 @@ const AIChatbot = ({ onGenerateElements, labelSize, generateId, onCreateLabel })
                         width: el.width,
                         height: el.height,
                         static_content: el.content || (el.type === "image" ? (el.src || el.content) : ""),
+                        binding_type: "static",
                         properties: {
                             ...el,
                             id: undefined, // Don't send local ID to DB properties JSON
