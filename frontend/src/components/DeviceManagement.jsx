@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { 
-    Printer, 
-    Plus, 
-    Search, 
-    Trash2, 
-    Cpu, 
-    CheckCircle, 
+import {
+    Printer,
+    Plus,
+    Search,
+    Trash2,
+    Cpu,
+    CheckCircle,
     X,
     Server,
     Activity,
@@ -23,16 +23,9 @@ import {
 import { useTheme } from "../ThemeContext";
 import { callEdgeFunction, API_URLS } from "../supabaseClient";
 
-const PRINTER_DATA = {
-    Honeywell: ["PD45S", "PM43", "PC42t", "PX940", "RP4f"],
-    Zebra: ["ZD420", "ZT411", "GK420d", "ZT610", "ZD621"],
-    TSC: ["TTP-244 Pro", "TE210", "MX240P", "MH241", "Alpha-3R"],
-    Newland: ["NLS-NVH300", "NLS-HR2081", "NLS-MT90", "NLS-FM3080"]
-};
 
-const OUTPUT_FORMATS = ["zpl", "pdf", "prn"];
 
-const DeviceManagement = () => {
+const DeviceManagement = ({ onNavigate }) => {
     const { theme, isDarkMode } = useTheme();
     const [connectors, setConnectors] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -71,13 +64,7 @@ const DeviceManagement = () => {
         fetchConnectors();
     }, []);
 
-    const handleBrandChange = (brand) => {
-        setFormData({
-            ...formData,
-            brand,
-            model: PRINTER_DATA[brand][0]
-        });
-    };
+
 
     const handleCreateConnector = async (e) => {
         e.preventDefault();
@@ -92,7 +79,7 @@ const DeviceManagement = () => {
             };
 
             const result = await callEdgeFunction(API_URLS.CREATE_CONNECTOR, payload);
-            
+
             if (result.success) {
                 if (result.api_key) {
                     setGeneratedKey(result.api_key);
@@ -143,11 +130,11 @@ const DeviceManagement = () => {
             setIsLoading(false);
         }
     };
-
     const filteredConnectors = connectors.filter(c => 
         (c.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
         (c.printer_model || "").toLowerCase().includes(searchTerm.toLowerCase())
     );
+
 
     return (
         <div className="container mx-auto p-8 max-w-[1700px] animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -158,10 +145,10 @@ const DeviceManagement = () => {
                         DEVICE <span className="text-blue-500">NODES</span>
                     </h1>
                     <p className="text-base font-medium opacity-40 max-w-xl" style={{ color: theme.text }}>
-                    Provision and manage hardware bridging nodes and enterprise print infrastructure.
+                        Provision and manage hardware bridging nodes and enterprise print infrastructure.
                     </p>
                 </div>
-                
+
                 <div className="flex items-center gap-4 w-full lg:w-auto">
                     {/* Compact Search Bar */}
                     <div className="relative w-full sm:w-[400px] group">
@@ -175,7 +162,7 @@ const DeviceManagement = () => {
                             style={{ backgroundColor: theme.surface, borderColor: theme.border, color: theme.text }}
                         />
                     </div>
-                    
+
                     {/* Compact Primary Button */}
                     <button
                         onClick={() => setShowAddModal(true)}
@@ -187,33 +174,15 @@ const DeviceManagement = () => {
                 </div>
             </div>
 
-            {/* Scaled Refined Stat Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
-                {[
-                    { label: "TOTAL ASSETS", value: connectors.length, icon: Layers, color: "text-blue-500", bg: "bg-blue-50/50" },
-                    { label: "CONNECTED NODES", value: connectors.filter(c => c.status === 'active').length, icon: Activity, color: "text-emerald-500", bg: "bg-emerald-50/50" },
-                    { label: "SYSTEM UPTIME", value: "99.9%", icon: Shield, color: "text-blue-500", bg: "bg-blue-50/50" },
-                    { label: "ENCRYPTION", value: "AES-256", icon: Server, color: "text-slate-500", bg: "bg-slate-50/50" },
-                ].map((stat, i) => (
-                    <div key={i} className="p-8 rounded-3xl border shadow-sm flex flex-col items-start transition-all hover:shadow-md" style={{ backgroundColor: theme.surface, borderColor: theme.border }}>
-                        <div className={`w-12 h-12 rounded-xl ${stat.bg} ${stat.color} flex items-center justify-center mb-10`}>
-                            <stat.icon size={22} />
-                        </div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-3" style={{ color: theme.text }}>{stat.label}</p>
-                        <p className="text-3xl font-black" style={{ color: theme.text }}>{stat.value}</p>
-                    </div>
-                ))}
-            </div>
-
             {/* Registry Section Header - Scaled Down */}
             <div className="flex items-center justify-between mb-8 px-2">
                 <h3 className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30" style={{ color: theme.text }}>
                     ENTERPRISE REGISTRY
                 </h3>
                 <div className="flex items-center gap-4 text-slate-300">
-                    <RefreshCw 
-                        size={16} 
-                        className={`cursor-pointer hover:text-blue-500 transition-colors ${isLoading ? "animate-spin" : ""}`} 
+                    <RefreshCw
+                        size={16}
+                        className={`cursor-pointer hover:text-blue-500 transition-colors ${isLoading ? "animate-spin" : ""}`}
                         onClick={fetchConnectors}
                     />
                     <Settings size={16} className="cursor-pointer hover:text-blue-500 transition-colors" />
@@ -233,68 +202,80 @@ const DeviceManagement = () => {
                     <p className="text-sm font-bold mt-2">Provision a device to start managing your infrastructure.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-                    {filteredConnectors.map((connector) => (
-                        <div 
-                            key={connector.id} 
-                            className="p-12 rounded-[3.5rem] border-2 group transition-all hover:border-blue-500 hover:shadow-2xl hover:shadow-blue-500/10 relative overflow-hidden" 
-                            style={{ backgroundColor: theme.surface, borderColor: theme.border }}
-                        >
-                            <div className="flex justify-between items-start mb-10 relative z-10">
-                                <div className="p-6 rounded-[2rem] bg-slate-50 dark:bg-slate-800/50 text-slate-400 group-hover:text-blue-500 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 transition-all duration-300">
-                                    <Printer size={48} strokeWidth={1} />
-                                </div>
-                                <div className="flex flex-col items-end gap-3">
-                                    <div className="px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest text-emerald-500 flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                                        {connector.status || 'Active'}
-                                    </div>
-                                    <button 
-                                        onClick={() => handleDeleteConnector(connector.id)}
-                                        className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-2xl transition-all opacity-0 group-hover:opacity-100"
-                                    >
-                                        <Trash2 size={20} />
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="relative z-10">
-                                <h3 className="text-3xl font-black tracking-tight truncate mb-6" style={{ color: theme.text }}>{connector.name}</h3>
-                                
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-3 text-xs font-black uppercase tracking-widest opacity-40" style={{ color: theme.text }}>
-                                        <Printer size={16} />
-                                        {connector.brand} {connector.model}
-                                        {!connector.brand && connector.printer_model}
-                                    </div>
-                                    <div className="flex items-center gap-3 text-xs font-black uppercase tracking-widest opacity-40" style={{ color: theme.text }}>
-                                        <Cpu size={16} />
-                                        SN: {connector.serial_number || connector.metadata?.serial_number || 'N/A'}
-                                    </div>
-                                    <div className="flex items-center gap-3 text-xs font-black uppercase tracking-widest opacity-40" style={{ color: theme.text }}>
-                                        <FileCode size={16} />
-                                        Engine: {connector.output_format}
-                                    </div>
-                                </div>
-
-                                <div className="mt-10 pt-8 border-t flex items-center justify-between" style={{ borderColor: theme.border }}>
-                                    <div className="flex flex-col gap-1">
-                                        <p className="text-[9px] font-black uppercase tracking-widest opacity-20" style={{ color: theme.text }}>SECURITY STATUS</p>
-                                        <p className="text-[11px] font-bold text-blue-500 flex items-center gap-1.5 active:opacity-60 transition-opacity cursor-pointer" onClick={() => handleResetConnector(connector.id)}>
-                                            <RefreshCw size={12} strokeWidth={3} />
-                                            Reset Credentials
-                                        </p>
-                                    </div>
-                                    <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer">
-                                        <ChevronRight size={20} className="text-blue-500" />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Glow Effect */}
-                            <div className="absolute top-0 right-0 w-40 h-40 bg-blue-500/5 -rotate-45 translate-x-20 -translate-y-20 group-hover:translate-x-14 group-hover:-translate-y-14 transition-transform duration-700"></div>
-                        </div>
-                    ))}
+                <div className="rounded-[2.5rem] border overflow-hidden" style={{ borderColor: theme.border, backgroundColor: theme.surface }}>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse min-w-[800px]">
+                            <thead>
+                                <tr className="border-b bg-slate-50/50 dark:bg-slate-800/50" style={{ borderColor: theme.border }}>
+                                    <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] opacity-40" style={{ color: theme.text }}>Connector Info</th>
+                                    <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] opacity-40" style={{ color: theme.text }}>Status</th>
+                                    <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] opacity-40" style={{ color: theme.text }}>API Key</th>
+                                    <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] opacity-40 text-right" style={{ color: theme.text }}>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredConnectors.map((connector) => (
+                                    <tr key={connector.id} className="border-b last:border-0 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors" style={{ borderColor: theme.border }}>
+                                        <td className="px-8 py-6">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0">
+                                                    <Server size={20} />
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold text-sm mb-1" style={{ color: theme.text }}>{connector.name}</p>
+                                                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 flex items-center gap-2" style={{ color: theme.text }}>
+                                                        <Cpu size={10} /> ID: {connector.id?.split('-')[0] || 'N/A'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            <div className="inline-flex px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black uppercase tracking-widest text-emerald-500 items-center gap-1.5">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                                                {connector.status || 'Active'}
+                                            </div>
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            <div className="flex items-center gap-2 group/key">
+                                                <div className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border font-mono text-[10px] tracking-widest opacity-60 w-[180px] truncate" style={{ borderColor: theme.border, color: theme.text }}>
+                                                    ••••••••••••••••••••
+                                                </div>
+                                                <div className="flex flex-col gap-1 items-start opacity-0 group-hover/key:opacity-100 transition-opacity">
+                                                    <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">Hidden For</p>
+                                                    <p className="text-[8px] font-black uppercase tracking-widest text-emerald-500">Security</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-8 py-6 text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <button
+                                                    onClick={() => onNavigate('add_printer')}
+                                                    className="px-4 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white transition-all text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 whitespace-nowrap"
+                                                >
+                                                    <Printer size={12} />
+                                                    Add Printer
+                                                </button>
+                                                <button
+                                                    onClick={() => handleResetConnector(connector.id)}
+                                                    className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white transition-all flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400"
+                                                >
+                                                    <RefreshCw size={12} />
+                                                    Reset
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteConnector(connector.id)}
+                                                    className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center text-slate-500 dark:text-slate-400"
+                                                    title="Remove Device"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
 
@@ -315,7 +296,7 @@ const DeviceManagement = () => {
                                     <div className="absolute inset-[-20px] border border-blue-500/10 rounded-full animate-spin-slow"></div>
                                     <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-blue-500 rounded-full shadow-lg shadow-blue-500/50"></div>
                                 </div>
-                                
+
                                 <h3 className="text-3xl font-black tracking-tight mb-4" style={{ color: theme.text }}>
                                     Connecting To <span className="text-blue-500">HOST</span>
                                 </h3>
@@ -341,8 +322,8 @@ const DeviceManagement = () => {
                                         </div>
                                         <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-30 ml-11" style={{ color: theme.text }}>Provision Node Infrastructure</p>
                                     </div>
-                                    <button 
-                                        onClick={() => setShowAddModal(false)} 
+                                    <button
+                                        onClick={() => setShowAddModal(false)}
                                         className="w-10 h-10 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all group"
                                     >
                                         <X size={20} className="group-hover:rotate-90 transition-transform duration-300 opacity-40" />
@@ -362,87 +343,9 @@ const DeviceManagement = () => {
                                                 placeholder="EX: Warehouse Connector 1"
                                                 className="w-full px-5 py-4 rounded-2xl border-2 outline-none transition-all focus:border-blue-500 font-bold text-sm bg-transparent hover:border-slate-300 dark:hover:border-slate-700"
                                                 value={formData.name}
-                                                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                                 style={{ borderColor: theme.border, color: theme.text }}
                                             />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase tracking-[0.2em] ml-1 opacity-40 flex items-center gap-2" style={{ color: theme.text }}>
-                                                <Shield size={12} className="text-blue-500" />
-                                                Brand
-                                            </label>
-                                            <div className="relative group">
-                                                <select
-                                                    className="w-full pl-5 pr-12 py-4 rounded-2xl border-2 outline-none transition-all focus:border-blue-500 font-bold text-sm appearance-none cursor-pointer bg-transparent hover:border-slate-300 dark:hover:border-slate-700"
-                                                    value={formData.brand}
-                                                    onChange={(e) => handleBrandChange(e.target.value)}
-                                                    style={{ borderColor: theme.border, color: theme.text }}
-                                                >
-                                                    {Object.keys(PRINTER_DATA).map(brand => (
-                                                        <option key={brand} value={brand} className="dark:bg-slate-900">{brand}</option>
-                                                    ))}
-                                                </select>
-                                                <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none group-hover:opacity-40 transition-opacity" size={16} />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase tracking-[0.2em] ml-1 opacity-40 flex items-center gap-2" style={{ color: theme.text }}>
-                                                <Layers size={12} className="text-blue-500" />
-                                                Model
-                                            </label>
-                                            <div className="relative group">
-                                                <select
-                                                    className="w-full pl-5 pr-12 py-4 rounded-2xl border-2 outline-none transition-all focus:border-blue-500 font-bold text-sm appearance-none cursor-pointer bg-transparent hover:border-slate-300 dark:hover:border-slate-700"
-                                                    value={formData.model}
-                                                    onChange={(e) => setFormData({...formData, model: e.target.value})}
-                                                    style={{ borderColor: theme.border, color: theme.text }}
-                                                >
-                                                    {PRINTER_DATA[formData.brand].map(model => (
-                                                        <option key={model} value={model} className="dark:bg-slate-900">{model}</option>
-                                                    ))}
-                                                </select>
-                                                <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none group-hover:opacity-40 transition-opacity" size={16} />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase tracking-[0.2em] ml-1 opacity-40 flex items-center gap-2" style={{ color: theme.text }}>
-                                                <Cpu size={12} className="text-blue-500" />
-                                                Serial Number
-                                            </label>
-                                            <input
-                                                required
-                                                type="text"
-                                                placeholder="EX: SN-00123456"
-                                                className="w-full px-5 py-4 rounded-2xl border-2 outline-none transition-all focus:border-blue-500 font-bold text-sm bg-transparent hover:border-slate-300 dark:hover:border-slate-700"
-                                                value={formData.serialNumber}
-                                                onChange={(e) => setFormData({...formData, serialNumber: e.target.value})}
-                                                style={{ borderColor: theme.border, color: theme.text }}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase tracking-[0.2em] ml-1 opacity-40 flex items-center gap-2" style={{ color: theme.text }}>
-                                                <FileCode size={12} className="text-blue-500" />
-                                                Print Format
-                                            </label>
-                                            <div className="relative group">
-                                                <select
-                                                    className="w-full pl-5 pr-12 py-4 rounded-2xl border-2 outline-none transition-all focus:border-blue-500 font-bold text-sm appearance-none cursor-pointer bg-transparent hover:border-slate-300 dark:hover:border-slate-700"
-                                                    value={formData.outputFormat}
-                                                    onChange={(e) => setFormData({...formData, outputFormat: e.target.value})}
-                                                    style={{ borderColor: theme.border, color: theme.text }}
-                                                >
-                                                    {OUTPUT_FORMATS.map(format => (
-                                                        <option key={format} value={format} className="dark:bg-slate-900">{format.toUpperCase()}</option>
-                                                    ))}
-                                                </select>
-                                                <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none group-hover:opacity-40 transition-opacity" size={16} />
-                                            </div>
                                         </div>
                                     </div>
 
@@ -470,13 +373,13 @@ const DeviceManagement = () => {
                         <div className="w-20 h-20 bg-emerald-500/10 rounded-[2rem] flex items-center justify-center mx-auto mb-8 border-2 border-emerald-500/20">
                             <Shield size={32} className="text-emerald-500" />
                         </div>
-                        
+
                         <h3 className="text-2xl font-black tracking-tight mb-2" style={{ color: theme.text }}>API <span className="text-emerald-500">KEY</span></h3>
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-30 mb-8" style={{ color: theme.text }}>Credentials Generated Successfully</p>
-                        
+
                         <div className="relative group mb-8">
                             <div className="absolute inset-0 bg-emerald-500/5 blur-xl group-hover:bg-emerald-500/10 transition-colors rounded-3xl"></div>
-                            <div 
+                            <div
                                 className="relative p-6 rounded-2xl border-2 border-dashed font-mono text-sm break-all cursor-pointer hover:border-emerald-500/50 transition-all active:scale-[0.98]"
                                 style={{ borderColor: theme.border, backgroundColor: theme.bg, color: theme.text }}
                                 onClick={() => {
@@ -508,7 +411,8 @@ const DeviceManagement = () => {
                 </div>
             )}
 
-            <style dangerouslySetInnerHTML={{ __html: `
+            <style dangerouslySetInnerHTML={{
+                __html: `
 
                 @keyframes bounce-subtle {
                     0%, 100% { transform: translateY(0) rotate(45deg); }

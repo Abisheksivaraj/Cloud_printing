@@ -8,6 +8,7 @@ import Login from "./components/admin/Login";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import PrintHistory from "./components/PrintHistory";
 import DeviceManagement from "./components/DeviceManagement";
+import AddPrinter from "./components/AddPrinter";
 import { useTheme } from "./ThemeContext";
 import { supabase, callEdgeFunction, API_URLS, normalizeDesign } from "./supabaseClient";
 import Toast from "./components/Toast";
@@ -424,7 +425,10 @@ const App = () => {
               <PrintHistory labels={labels} fetchFullDesign={fetchFullDesign} />
             )}
             {currentView === "device_management" && (
-              <DeviceManagement />
+              <DeviceManagement onNavigate={navigateTo} />
+            )}
+            {currentView === "add_printer" && (
+              <AddPrinter onBack={() => navigateTo('device_management')} />
             )}
           </>
         )}
