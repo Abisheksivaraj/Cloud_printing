@@ -34,6 +34,8 @@ export const API_URLS = {
     LIST_CONNECTORS: 'list-connectors',
     DELETE_CONNECTOR: 'delete-connector',
     RESET_CONNECTOR: 'reset-connector-key',
+    ADD_PRINTER: 'add-printer',
+    LIST_PRINTERS: 'list-printers',
 
     // Designs
     CREATE_DESIGN: 'create-design',

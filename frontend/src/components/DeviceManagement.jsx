@@ -17,6 +17,7 @@ import {
     ChevronRight,
     Unplug,
     Shield,
+    Wifi,
     Users,
     Layers
 } from "lucide-react";
@@ -28,12 +29,14 @@ import { callEdgeFunction, API_URLS } from "../supabaseClient";
 const DeviceManagement = ({ onNavigate }) => {
     const { theme, isDarkMode } = useTheme();
     const [connectors, setConnectors] = useState([]);
+    const [printers, setPrinters] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showKeyModal, setShowKeyModal] = useState(false);
     const [generatedKey, setGeneratedKey] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
+    const [activeTab, setActiveTab] = useState("connectors"); // "connectors" or "printers"
 
     // Form State
     const [formData, setFormData] = useState({
@@ -60,8 +63,30 @@ const DeviceManagement = ({ onNavigate }) => {
         }
     };
 
+    const fetchPrinters = async () => {
+        setIsLoading(true);
+        try {
+            const data = await callEdgeFunction(API_URLS.LIST_PRINTERS);
+            if (data && data.printers) {
+                setPrinters(data.printers);
+            } else if (Array.isArray(data)) {
+                setPrinters(data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch printers:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const fetchData = async () => {
+        setIsLoading(true);
+        await Promise.all([fetchConnectors(), fetchPrinters()]);
+        setIsLoading(false);
+    };
+
     useEffect(() => {
-        fetchConnectors();
+        fetchData();
     }, []);
 
 
@@ -135,6 +160,11 @@ const DeviceManagement = ({ onNavigate }) => {
         (c.printer_model || "").toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const filteredPrinters = printers.filter(p => 
+        (p.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.ip_address || "").toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
 
     return (
         <div className="container mx-auto p-8 max-w-[1700px] animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -176,14 +206,29 @@ const DeviceManagement = ({ onNavigate }) => {
 
             {/* Registry Section Header - Scaled Down */}
             <div className="flex items-center justify-between mb-8 px-2">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30" style={{ color: theme.text }}>
-                    ENTERPRISE REGISTRY
-                </h3>
+                <div className="flex items-center gap-8">
+                    <button 
+                        onClick={() => setActiveTab("connectors")}
+                        className={`text-[10px] font-black uppercase tracking-[0.4em] transition-all relative py-2 ${activeTab === 'connectors' ? 'opacity-100' : 'opacity-30 hover:opacity-50'}`}
+                        style={{ color: theme.text }}
+                    >
+                        DEVICE NODES
+                        {activeTab === 'connectors' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 rounded-full"></div>}
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab("printers")}
+                        className={`text-[10px] font-black uppercase tracking-[0.4em] transition-all relative py-2 ${activeTab === 'printers' ? 'opacity-100' : 'opacity-30 hover:opacity-50'}`}
+                        style={{ color: theme.text }}
+                    >
+                        ACTIVE PRINTERS
+                        {activeTab === 'printers' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 rounded-full"></div>}
+                    </button>
+                </div>
                 <div className="flex items-center gap-4 text-slate-300">
                     <RefreshCw
                         size={16}
                         className={`cursor-pointer hover:text-blue-500 transition-colors ${isLoading ? "animate-spin" : ""}`}
-                        onClick={fetchConnectors}
+                        onClick={fetchData}
                     />
                     <Settings size={16} className="cursor-pointer hover:text-blue-500 transition-colors" />
                 </div>
@@ -195,13 +240,8 @@ const DeviceManagement = ({ onNavigate }) => {
                     <Loader2 size={60} className="animate-spin text-blue-500 opacity-20" />
                     <p className="font-black text-[10px] tracking-[0.4em] uppercase opacity-20">Syncing Registry</p>
                 </div>
-            ) : filteredConnectors.length === 0 ? (
-                <div className="py-40 rounded-[3rem] border-2 border-dashed flex flex-col items-center justify-center text-center opacity-20" style={{ borderColor: theme.border }}>
-                    <Cpu size={80} className="mb-6" />
-                    <h3 className="text-2xl font-black uppercase tracking-tighter">Zero Nodes Detected</h3>
-                    <p className="text-sm font-bold mt-2">Provision a device to start managing your infrastructure.</p>
-                </div>
-            ) : (
+            ) : activeTab === "connectors" ? (
+                /* Connectors Table */
                 <div className="rounded-[2.5rem] border overflow-hidden" style={{ borderColor: theme.border, backgroundColor: theme.surface }}>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse min-w-[800px]">
@@ -249,7 +289,7 @@ const DeviceManagement = ({ onNavigate }) => {
                                         <td className="px-8 py-6 text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 <button
-                                                    onClick={() => onNavigate('add_printer')}
+                                                    onClick={() => onNavigate('add_printer', connector.id)}
                                                     className="px-4 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white transition-all text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 whitespace-nowrap"
                                                 >
                                                     <Printer size={12} />
@@ -273,6 +313,80 @@ const DeviceManagement = ({ onNavigate }) => {
                                         </td>
                                     </tr>
                                 ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ) : (
+                /* Printers Table */
+                <div className="rounded-[2.5rem] border overflow-hidden" style={{ borderColor: theme.border, backgroundColor: theme.surface }}>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse min-w-[800px]">
+                            <thead>
+                                <tr className="border-b bg-slate-50/50 dark:bg-slate-800/50" style={{ borderColor: theme.border }}>
+                                    <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] opacity-40" style={{ color: theme.text }}>Printer Name</th>
+                                    <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] opacity-40" style={{ color: theme.text }}>Network Endpoint</th>
+                                    <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] opacity-40" style={{ color: theme.text }}>Status</th>
+                                    <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] opacity-40 text-right" style={{ color: theme.text }}>Metadata</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredPrinters.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="4" className="px-8 py-20 text-center">
+                                            <Printer size={40} className="mx-auto mb-4 opacity-10" />
+                                            <p className="text-[10px] font-black uppercase tracking-widest opacity-20">No Printers Detected On This Network</p>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    filteredPrinters.map((printer) => (
+                                        <tr key={printer.id} className="border-b last:border-0 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors" style={{ borderColor: theme.border }}>
+                                            <td className="px-8 py-6">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0">
+                                                        <Printer size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-sm mb-1" style={{ color: theme.text }}>{printer.name}</p>
+                                                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 flex items-center gap-2" style={{ color: theme.text }}>
+                                                            {printer.brand || 'Generic'} {printer.model || 'Printer'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-6">
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex items-center gap-2 text-sm font-bold" style={{ color: theme.text }}>
+                                                        <Wifi size={14} className="text-blue-500" />
+                                                        {printer.ip_address}
+                                                    </div>
+                                                    <p className="text-[10px] font-medium opacity-40 ml-5" style={{ color: theme.text }}>Port: {printer.port}</p>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-6">
+                                                {printer.status === 'online' || printer.is_available ? (
+                                                    <div className="inline-flex px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black uppercase tracking-widest text-emerald-500 items-center gap-1.5">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                                                        Online
+                                                    </div>
+                                                ) : (
+                                                    <div className="inline-flex px-3 py-1.5 rounded-full bg-slate-500/10 border border-slate-500/20 text-[9px] font-black uppercase tracking-widest text-slate-500 items-center gap-1.5">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div>
+                                                        Offline
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="px-8 py-6 text-right">
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <p className="text-[9px] font-black uppercase tracking-widest opacity-30" style={{ color: theme.text }}>Last Check</p>
+                                                    <p className="text-[9px] font-bold" style={{ color: theme.text }}>
+                                                        {printer.last_status_update_at ? new Date(printer.last_status_update_at).toLocaleTimeString() : 'Never'}
+                                                    </p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>

@@ -24,6 +24,7 @@ const App = () => {
   const [userRole, setUserRole] = useState(null);
   const [userData, setUserData] = useState(null);
   const [toast, setToast] = useState(null); // { message: string, type: 'success' | 'error' }
+  const [selectedConnectorId, setSelectedConnectorId] = useState(null);
 
   useEffect(() => {
     // Check for active session on mount
@@ -134,7 +135,7 @@ const App = () => {
   }, [currentView, isAuthenticated]);
 
   // Manage navigation
-  const navigateTo = (view) => {
+  const navigateTo = (view, payload = null) => {
     if (view === "logout") {
       sessionStorage.removeItem("authToken");
       sessionStorage.removeItem("refreshToken");
@@ -152,6 +153,10 @@ const App = () => {
     if (view === "admin_dashboard" && userRole !== 'admin') {
       setCurrentView("library");
       return;
+    }
+
+    if (view === "add_printer" && payload) {
+      setSelectedConnectorId(payload);
     }
 
     setCurrentView(view);
@@ -428,7 +433,10 @@ const App = () => {
               <DeviceManagement onNavigate={navigateTo} />
             )}
             {currentView === "add_printer" && (
-              <AddPrinter onBack={() => navigateTo('device_management')} />
+              <AddPrinter 
+                connectorId={selectedConnectorId}
+                onBack={() => navigateTo('device_management')} 
+              />
             )}
           </>
         )}
