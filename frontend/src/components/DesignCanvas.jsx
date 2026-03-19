@@ -348,6 +348,9 @@ const DesignCanvas = forwardRef(
         // Don't start dragging while in text edit mode for this element
         if (editingElementId === element.id) return;
 
+        // Skip selecting or dragging system/locked elements
+        if (element.isSystem || element.locked) return;
+
         setSelectedElementId(element.id);
         setIsDragging(true);
         setDragStart({ x: e.clientX, y: e.clientY });
@@ -458,8 +461,8 @@ const DesignCanvas = forwardRef(
         if (!canvasRef.current) return;
 
         const scale = displayZoom / 100;
-        const dx = (e.clientX - dragStart.x) / scale;
-        const dy = (e.clientY - dragStart.y) / scale;
+        const dx = (e.clientX - dragStart.x) / (scale * MM_TO_PX);
+        const dy = (e.clientY - dragStart.y) / (scale * MM_TO_PX);
 
         // ── Rotation ──────────────────────────────────────────────────────
         if (isRotating && selectedElementId && rotationStart) {
@@ -758,8 +761,8 @@ const DesignCanvas = forwardRef(
 
         const rect = canvasRef.current.getBoundingClientRect();
         const scale = displayZoom / 100;
-        const x = (e.clientX - rect.left) / scale;
-        const y = (e.clientY - rect.top) / scale;
+        const x = (e.clientX - rect.left) / (scale * MM_TO_PX);
+        const y = (e.clientY - rect.top) / (scale * MM_TO_PX);
 
         if (isDrawingText) {
           setTextDrawStart({ x, y });
@@ -801,8 +804,8 @@ const DesignCanvas = forwardRef(
 
         const rect = canvasRef.current.getBoundingClientRect();
         const scale = displayZoom / 100;
-        let x = (e.clientX - rect.left) / scale;
-        let y = (e.clientY - rect.top) / scale;
+        let x = (e.clientX - rect.left) / (scale * MM_TO_PX);
+        let y = (e.clientY - rect.top) / (scale * MM_TO_PX);
 
         // Track mouse for adaptive guidelines
         if (isDrawingLine) setLineMousePos({ x, y });
@@ -876,8 +879,8 @@ const DesignCanvas = forwardRef(
 
         const rect = canvasRef.current.getBoundingClientRect();
         const scale = displayZoom / 100;
-        let x = (e.clientX - rect.left) / scale;
-        let y = (e.clientY - rect.top) / scale;
+        let x = (e.clientX - rect.left) / (scale * MM_TO_PX);
+        let y = (e.clientY - rect.top) / (scale * MM_TO_PX);
 
         if (isDrawingText && textDrawStart) {
           const width = Math.abs(x - textDrawStart.x);
@@ -1082,15 +1085,15 @@ const DesignCanvas = forwardRef(
         if (draggedElement && canvasRef.current) {
           const rect = canvasRef.current.getBoundingClientRect();
           const scale = displayZoom / 100;
-          const x = (e.clientX - rect.left) / scale;
-          const y = (e.clientY - rect.top) / scale;
+          const x = (e.clientX - rect.left) / (scale * MM_TO_PX);
+          const y = (e.clientY - rect.top) / (scale * MM_TO_PX);
 
-          const defaultWidth = draggedElement === "barcode" ? 200 : 100;
-          const defaultHeight = draggedElement === "barcode" ? 80 : (draggedElement === "text" ? 30 : 100);
+          const defaultWidth = draggedElement === "barcode" ? 60 : 40; // mm
+          const defaultHeight = draggedElement === "barcode" ? 25 : (draggedElement === "text" ? 8 : 40); // mm
 
           const extra = {
-            x: Math.max(0, Math.min(x - 50, canvasPixelSize.width - defaultWidth)),
-            y: Math.max(0, Math.min(y - 25, canvasPixelSize.height - defaultHeight)),
+            x: Math.max(0, Math.min(x - defaultWidth / 2, labelSize.width - defaultWidth)),
+            y: Math.max(0, Math.min(y - defaultHeight / 2, labelSize.height - defaultHeight)),
             width: defaultWidth,
             height: defaultHeight,
           };
@@ -1350,23 +1353,23 @@ const DesignCanvas = forwardRef(
                 height: "100%",
                 zIndex: element.zIndex || 0,
                 pointerEvents:
-                  isDrawingLine || isDrawingBarcode || isDrawingShape
+                  isDrawingLine || isDrawingBarcode || isDrawingShape || element.isSystem
                     ? "none"
                     : "all",
               }}
             >
               <line
-                x1={x1}
-                y1={y1}
-                x2={x2}
-                y2={y2}
+                x1={x1 * MM_TO_PX}
+                y1={y1 * MM_TO_PX}
+                x2={x2 * MM_TO_PX}
+                y2={y2 * MM_TO_PX}
                 stroke={element.borderColor || "#000000"}
-                strokeWidth={element.borderWidth || 1}
+                strokeWidth={(element.borderWidth || 1) * MM_TO_PX}
                 strokeDasharray={
                   element.borderStyle === "dashed"
-                    ? "5,5"
+                    ? `${5 * MM_TO_PX},${5 * MM_TO_PX}`
                     : element.borderStyle === "dotted"
-                      ? "2,2"
+                      ? `${2 * MM_TO_PX},${2 * MM_TO_PX}`
                       : "none"
                 }
                 style={{
@@ -1375,8 +1378,8 @@ const DesignCanvas = forwardRef(
                 onMouseDown={(e) => {
                   const rect = canvasRef.current.getBoundingClientRect();
                   const scale = displayZoom / 100;
-                  const clickX = (e.clientX - rect.left) / scale;
-                  const clickY = (e.clientY - rect.top) / scale;
+                  const clickX = (e.clientX - rect.left) / (scale * MM_TO_PX);
+                  const clickY = (e.clientY - rect.top) / (scale * MM_TO_PX);
 
                   const distToStart = Math.sqrt(
                     Math.pow(clickX - x1, 2) + Math.pow(clickY - y1, 2),
@@ -1385,7 +1388,7 @@ const DesignCanvas = forwardRef(
                     Math.pow(clickX - x2, 2) + Math.pow(clickY - y2, 2),
                   );
 
-                  if (distToStart > 10 && distToEnd > 10) {
+                  if (distToStart > 10 / MM_TO_PX && distToEnd > 10 / MM_TO_PX) {
                     handleElementMouseDown(e, element);
                   }
                 }}
@@ -1394,11 +1397,12 @@ const DesignCanvas = forwardRef(
               {isSelected &&
                 !isDrawingLine &&
                 !isDrawingBarcode &&
-                !isDrawingShape && (
+                !isDrawingShape && 
+                !element.isSystem && (
                   <>
                     <circle
-                      cx={x1}
-                      cy={y1}
+                      cx={x1 * MM_TO_PX}
+                      cy={y1 * MM_TO_PX}
                       r="5"
                       fill="white"
                       stroke="var(--color-primary)"
@@ -1411,8 +1415,8 @@ const DesignCanvas = forwardRef(
                     />
 
                     <circle
-                      cx={x2}
-                      cy={y2}
+                      cx={x2 * MM_TO_PX}
+                      cy={y2 * MM_TO_PX}
                       r="5"
                       fill="white"
                       stroke="var(--color-primary)"
@@ -1425,10 +1429,10 @@ const DesignCanvas = forwardRef(
                     />
 
                     <line
-                      x1={x1}
-                      y1={y1}
-                      x2={x2}
-                      y2={y2}
+                      x1={x1 * MM_TO_PX}
+                      y1={y1 * MM_TO_PX}
+                      x2={x2 * MM_TO_PX}
+                      y2={y2 * MM_TO_PX}
                       stroke="var(--color-primary)"
                       strokeWidth="1"
                       strokeDasharray="4,4"
@@ -1443,11 +1447,12 @@ const DesignCanvas = forwardRef(
 
         const style = {
           position: "absolute",
-          left: element.x,
-          top: element.y,
-          width: element.width,
-          height: element.height,
+          left: element.x * MM_TO_PX,
+          top: element.y * MM_TO_PX,
+          width: element.width * MM_TO_PX,
+          height: element.height * MM_TO_PX,
           transform: `rotate(${element.rotation || 0}deg)`,
+          transformOrigin: "center center", // Ensure rotation is around center
           zIndex: element.zIndex || 0,
           cursor: isDragging
             ? "grabbing"
@@ -1456,14 +1461,14 @@ const DesignCanvas = forwardRef(
               : "move",
           borderWidth: isSelected && !isDrawingLine && !isDrawingBarcode && !isDrawingShape
             ? 2
-            : (element.borderWidth > 0 ? element.borderWidth : (element.type === "barcode" ? 0 : 1)),
+            : ((element.borderWidth || 0) * MM_TO_PX || (element.type === "barcode" ? 0 : 1)),
           borderStyle: isSelected && !isDrawingLine && !isDrawingBarcode && !isDrawingShape
             ? "solid"
             : (element.borderWidth > 0 ? (element.borderStyle || "solid") : "solid"),
           borderColor: isSelected && !isDrawingLine && !isDrawingBarcode && !isDrawingShape
             ? "var(--color-primary)"
             : (element.borderWidth > 0 ? element.borderColor : "transparent"),
-          fontSize: element.fontSize,
+          fontSize: (element.fontSize || 14) * (MM_TO_PX / 3.78), // Scale font
           fontFamily: element.fontFamily,
           fontWeight: element.fontWeight,
           fontStyle: element.fontStyle,
@@ -1471,16 +1476,16 @@ const DesignCanvas = forwardRef(
           color: element.color,
           backgroundColor: element.backgroundColor,
           borderRadius: element.borderRadius
-            ? `${element.borderRadius}px`
+            ? `${element.borderRadius * MM_TO_PX}px`
             : element.type === "circle"
               ? "50%"
               : undefined,
           userSelect: "none",
           pointerEvents:
-            isDrawingLine || isDrawingBarcode || isDrawingShape
+            isDrawingLine || isDrawingBarcode || isDrawingShape || element.isSystem
               ? "none"
               : "auto",
-          padding: element.type === "text" ? "0 4px" : "0",
+          padding: element.type === "text" ? `${0 * MM_TO_PX}px ${4 * MM_TO_PX}px` : "0",
           boxSizing: "border-box",
         };
         switch (element.type) {
@@ -1957,6 +1962,8 @@ const DesignCanvas = forwardRef(
                   transformOrigin: "center center",
                   backgroundColor: "#ffffff", // Always white for canvas representing paper
                   boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
+                  border: '1px solid #cbd5e1',
+                  boxSizing: 'border-box',
                   backgroundImage: showGrid
                     ? `radial-gradient(${gridColor} 1px, transparent 1px)`
                     : "none",
@@ -2042,10 +2049,10 @@ const DesignCanvas = forwardRef(
                     )}
                     {/* The actual line preview */}
                     <line
-                      x1={tempLine.x1}
-                      y1={tempLine.y1}
-                      x2={tempLine.x2}
-                      y2={tempLine.y2}
+                      x1={tempLine.x1 * MM_TO_PX}
+                      y1={tempLine.y1 * MM_TO_PX}
+                      x2={tempLine.x2 * MM_TO_PX}
+                      y2={tempLine.y2 * MM_TO_PX}
                       stroke="var(--color-primary)"
                       strokeWidth="1"
                       opacity="0.9"
@@ -2056,16 +2063,16 @@ const DesignCanvas = forwardRef(
                       const dy = tempLine.y2 - tempLine.y1;
                       const len = Math.sqrt(dx * dx + dy * dy);
                       const angleDeg = Math.round(Math.atan2(dy, dx) * (180 / Math.PI));
-                      const lenMm = Math.round(len / MM_TO_PX * 10) / 10;
-                      if (len < 5) return null;
+                      const lenMm = Math.round(len * 10) / 10;
+                      if (len < 5 / MM_TO_PX) return null;
                       return (
                         <>
                           {/* End dot */}
-                          <circle cx={tempLine.x2} cy={tempLine.y2} r="3" fill="var(--color-primary)" />
+                          <circle cx={tempLine.x2 * MM_TO_PX} cy={tempLine.y2 * MM_TO_PX} r="3" fill="var(--color-primary)" />
                           {/* Badge */}
                           <foreignObject
-                            x={tempLine.x2 + 8}
-                            y={tempLine.y2 - 14}
+                            x={tempLine.x2 * MM_TO_PX + 8}
+                            y={tempLine.y2 * MM_TO_PX - 14}
                             width="90" height="28"
                           >
                             <div
@@ -2096,10 +2103,10 @@ const DesignCanvas = forwardRef(
                     <div
                       style={{
                         position: "absolute",
-                        left: tempBarcode.x,
-                        top: tempBarcode.y,
-                        width: tempBarcode.width,
-                        height: tempBarcode.height,
+                        left: tempBarcode.x * MM_TO_PX,
+                        top: tempBarcode.y * MM_TO_PX,
+                        width: tempBarcode.width * MM_TO_PX,
+                        height: tempBarcode.height * MM_TO_PX,
                         border: "2px dashed var(--color-primary)",
                         backgroundColor: "rgba(59, 130, 246, 0.1)", // Blue hint
                         pointerEvents: "none",
@@ -2129,8 +2136,8 @@ const DesignCanvas = forwardRef(
                         })()}
                       </span>
                       <span className="text-[10px] text-[var(--color-primary)] font-medium bg-white/80 px-1 rounded">
-                        {Math.round(tempBarcode.width / MM_TO_PX)} ×{" "}
-                        {Math.round(tempBarcode.height / MM_TO_PX)}mm
+                        {Math.round(tempBarcode.width)} ×{" "}
+                        {Math.round(tempBarcode.height)}mm
                       </span>
                     </div>
                   )}
@@ -2139,10 +2146,10 @@ const DesignCanvas = forwardRef(
                   <div
                     style={{
                       position: "absolute",
-                      left: tempShape.x,
-                      top: tempShape.y,
-                      width: tempShape.width,
-                      height: tempShape.height,
+                      left: tempShape.x * MM_TO_PX,
+                      top: tempShape.y * MM_TO_PX,
+                      width: tempShape.width * MM_TO_PX,
+                      height: tempShape.height * MM_TO_PX,
                       border: "2px dashed #9333ea",
                       backgroundColor: "rgba(147, 51, 234, 0.1)",
                       borderRadius: tempShape.type === "circle" ? "50%" : "0",
@@ -2154,8 +2161,8 @@ const DesignCanvas = forwardRef(
                   >
                     <span className="text-[10px] text-purple-600 font-semibold bg-white/80 px-2 py-1 rounded shadow-sm">
                       {tempShape.type === "rectangle" ? "Rectangle" : "Circle"}:{" "}
-                      {Math.round(tempShape.width / MM_TO_PX)} ×{" "}
-                      {Math.round(tempShape.height / MM_TO_PX)}mm
+                      {Math.round(tempShape.width)} ×{" "}
+                      {Math.round(tempShape.height)}mm
                     </span>
                   </div>
                 )}
@@ -2165,10 +2172,10 @@ const DesignCanvas = forwardRef(
                   <div
                     style={{
                       position: "absolute",
-                      left: tempText.x,
-                      top: tempText.y,
-                      width: tempText.width,
-                      height: tempText.height,
+                      left: tempText.x * MM_TO_PX,
+                      top: tempText.y * MM_TO_PX,
+                      width: tempText.width * MM_TO_PX,
+                      height: tempText.height * MM_TO_PX,
                       border: "1.5px dashed #1a73e8",
                       backgroundColor: "rgba(26, 115, 232, 0.06)",
                       pointerEvents: "none",
@@ -2178,7 +2185,7 @@ const DesignCanvas = forwardRef(
                     }}
                   >
                     <span className="text-[10px] text-blue-600 font-semibold bg-white/80 px-2 py-1 rounded shadow-sm">
-                      T {Math.round(tempText.width / MM_TO_PX)} × {Math.round(tempText.height / MM_TO_PX)}mm
+                      T {Math.round(tempText.width)} × {Math.round(tempText.height)}mm
                     </span>
                   </div>
                 )}

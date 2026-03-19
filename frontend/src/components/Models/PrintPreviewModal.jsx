@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, Printer, Settings, Maximize2, Minimize2, Check } from "lucide-react";
 import BarcodeElement from "../designer/code";
 import { useTheme } from "../../ThemeContext";
@@ -46,29 +46,32 @@ const RenderLabel = ({ label }) => {
         position: "relative",
         overflow: "hidden",
         boxSizing: "border-box",
+        border: "5px solid #000000",
       }}
     >
       {(label.elements || []).map((element, elIndex) => {
         const style = {
           position: "absolute",
-          left: element.x,
-          top: element.y,
-          width: element.width,
-          height: element.height,
-          fontSize: element.fontSize,
+          left: element.x * MM_TO_PX,
+          top: element.y * MM_TO_PX,
+          width: element.width * MM_TO_PX,
+          height: element.height * MM_TO_PX,
+          fontSize: (element.fontSize || 14) * (MM_TO_PX / 3.78) * 3.78, // Simplified scaling for text
+          // Note: Standard canvas used 3.78 for mm to px at 96dpi.
+          // Let's just use MM_TO_PX consistently.
+          fontSize: (element.fontSize || 14) * (MM_TO_PX / 3.78) * 3.78, 
+          // Actually, fontSize is usually in pt or px. If it's in px, it needs scaling.
+          fontSize: (element.fontSize || 14) * (MM_TO_PX / 3.78),
           fontFamily: element.fontFamily,
           fontWeight: element.fontWeight,
           fontStyle: element.fontStyle,
           textAlign: element.textAlign,
           color: element.color,
           backgroundColor: element.backgroundColor,
-          borderWidth: element.borderWidth,
+          borderWidth: (element.borderWidth || 0) * MM_TO_PX,
           borderColor: element.borderColor,
-          borderStyle:
-            element.borderWidth > 0 ? element.borderStyle || "solid" : "none",
-          borderRadius: element.borderRadius
-            ? `${element.borderRadius}px`
-            : undefined,
+          borderStyle: (element.borderWidth > 0) ? (element.borderStyle || "solid") : "none",
+          borderRadius: element.borderRadius ? `${element.borderRadius * MM_TO_PX}px` : undefined,
           boxSizing: "border-box",
         };
 
@@ -135,20 +138,20 @@ const RenderLabel = ({ label }) => {
               key={elIndex}
               style={{
                 position: "absolute",
-                left: Math.min(x1, x2),
-                top: Math.min(y1, y2),
-                width: Math.abs(x2 - x1),
-                height: Math.abs(y2 - y1),
+                left: Math.min(x1, x2) * MM_TO_PX,
+                top: Math.min(y1, y2) * MM_TO_PX,
+                width: Math.abs(x2 - x1) * MM_TO_PX,
+                height: Math.abs(y2 - y1) * MM_TO_PX,
                 overflow: "visible",
               }}
             >
               <line
-                x1={x1 < x2 ? 0 : Math.abs(x2 - x1)}
-                y1={y1 < y2 ? 0 : Math.abs(y2 - y1)}
-                x2={x1 < x2 ? Math.abs(x2 - x1) : 0}
-                y2={y1 < y2 ? Math.abs(y2 - y1) : 0}
+                x1={(x1 < x2 ? 0 : Math.abs(x2 - x1)) * MM_TO_PX}
+                y1={(y1 < y2 ? 0 : Math.abs(y2 - y1)) * MM_TO_PX}
+                x2={(x1 < x2 ? Math.abs(x2 - x1) : 0) * MM_TO_PX}
+                y2={(y1 < y2 ? Math.abs(y2 - y1) : 0) * MM_TO_PX}
                 stroke={element.borderColor || "#000000"}
-                strokeWidth={element.borderWidth || 2}
+                strokeWidth={(element.borderWidth || 2) * MM_TO_PX}
                 strokeDasharray={
                   element.borderStyle === "dashed"
                     ? "5,5"
@@ -158,6 +161,22 @@ const RenderLabel = ({ label }) => {
                 }
               />
             </svg>
+          );
+        }
+
+        if (element.type === "image") {
+          return (
+            <div key={elIndex} style={style}>
+              <img
+                src={element.src}
+                alt=""
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "fill",
+                }}
+              />
+            </div>
           );
         }
 
@@ -212,6 +231,61 @@ const PrintPreviewModal = ({ label, onClose }) => {
     bottom: 5,
   });
   const [showCutMarks, setShowCutMarks] = useState(true);
+  
+  // Connector & Printer selection
+  const [connectors, setConnectors] = useState([]);
+  const [selectedConnectorId, setSelectedConnectorId] = useState(null);
+  const [printers, setPrinters] = useState([]);
+  const [selectedPrinterId, setSelectedPrinterId] = useState(null);
+  const [isLoadingDevices, setIsLoadingDevices] = useState(false);
+
+  // Fetch connectors on mount
+  useEffect(() => {
+    const fetchConnectors = async () => {
+      try {
+        setIsLoadingDevices(true);
+        const data = await callEdgeFunction(API_URLS.LIST_CONNECTORS, {});
+        const connectorList = Array.isArray(data) ? data : (data?.connectors || []);
+        setConnectors(connectorList);
+        if (connectorList.length > 0) {
+          setSelectedConnectorId(connectorList[0].id);
+        }
+      } catch (error) {
+        console.error("Failed to fetch connectors:", error);
+      } finally {
+        setIsLoadingDevices(false);
+      }
+    };
+    fetchConnectors();
+  }, []);
+
+  // Fetch printers when connector changes
+  useEffect(() => {
+    const fetchPrinters = async () => {
+      if (!selectedConnectorId) {
+        setPrinters([]);
+        return;
+      }
+      try {
+        setIsLoadingDevices(true);
+        const data = await callEdgeFunction(API_URLS.LIST_PRINTERS, { 
+          connector_id: selectedConnectorId 
+        });
+        const printerList = Array.isArray(data) ? data : (data?.printers || []);
+        setPrinters(printerList);
+        if (printerList.length > 0) {
+          setSelectedPrinterId(printerList[0].id);
+        } else {
+          setSelectedPrinterId(null);
+        }
+      } catch (error) {
+        console.error("Failed to fetch printers:", error);
+      } finally {
+        setIsLoadingDevices(false);
+      }
+    };
+    fetchPrinters();
+  }, [selectedConnectorId]);
 
   const config = MULTI_UP_CONFIGS[multiUpConfig];
   const { cols, rows } = config;
@@ -258,10 +332,28 @@ const PrintPreviewModal = ({ label, onClose }) => {
         document_type: "label",
         volumes: cols * rows,
         priority: "normal",
-        status: "pending",
         total_records: 1,
         printed_records: 1,
         printed_length: parseFloat(printedLengthMm),
+        connector_id: selectedConnectorId,
+        printer_id: selectedPrinterId,
+        output_format: "zpl",
+        elements: (label.elements || []).map(el => {
+          const dpi = (label.settings && label.settings.dpi) ? label.settings.dpi : 203;
+          const mmToDots = dpi / 25.4;
+          const scaled = { ...el };
+          if (scaled.x !== undefined) scaled.x = el.x * mmToDots;
+          if (scaled.y !== undefined) scaled.y = el.y * mmToDots;
+          if (scaled.width !== undefined) scaled.width = el.width * mmToDots;
+          if (scaled.height !== undefined) scaled.height = el.height * mmToDots;
+          if (scaled.x1 !== undefined) scaled.x1 = el.x1 * mmToDots;
+          if (scaled.y1 !== undefined) scaled.y1 = el.y1 * mmToDots;
+          if (scaled.x2 !== undefined) scaled.x2 = el.x2 * mmToDots;
+          if (scaled.y2 !== undefined) scaled.y2 = el.y2 * mmToDots;
+          if (scaled.borderWidth !== undefined) scaled.borderWidth = (el.borderWidth || 0) * mmToDots;
+          return scaled;
+        }),
+        idempotency_key: `print_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         metadata: {
           label_width: labelSize.width,
           label_height: labelSize.height,
@@ -271,14 +363,11 @@ const PrintPreviewModal = ({ label, onClose }) => {
       };
 
       await callEdgeFunction(API_URLS.CREATE_JOB, jobData);
-
-      // Trigger browser print
-      window.print();
-
+      alert("Print job submitted successfully to the connector.");
+      onClose();
     } catch (error) {
       console.error("Print tracking failed:", error);
-      // Still show print dialog even if tracking fails
-      window.print();
+      alert("Print failed: " + error.message);
     }
   };
 
@@ -418,6 +507,50 @@ const PrintPreviewModal = ({ label, onClose }) => {
                     />
                     <span className="text-sm font-medium" style={{ color: theme.text }}>Show Cut Marks</span>
                   </label>
+                </div>
+
+                {/* Device Selection */}
+                <div className="mb-8 border-t pt-6" style={{ borderColor: theme.border }}>
+                  <h4 className="font-semibold text-sm mb-4" style={{ color: theme.text }}>Print Destination</h4>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs mb-1" style={{ color: theme.textMuted }}>
+                        Connector
+                      </label>
+                      <select
+                        value={selectedConnectorId || ""}
+                        onChange={(e) => setSelectedConnectorId(e.target.value)}
+                        className="input text-sm"
+                        disabled={isLoadingDevices}
+                      >
+                        <option value="" disabled>Select Connector</option>
+                        {connectors.map(c => (
+                          <option key={c.id} value={c.id}>{c.name || 'Unnamed Connector'}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs mb-1" style={{ color: theme.textMuted }}>
+                        Printer
+                      </label>
+                      <select
+                        value={selectedPrinterId || ""}
+                        onChange={(e) => setSelectedPrinterId(e.target.value)}
+                        className="input text-sm"
+                        disabled={isLoadingDevices || !selectedConnectorId}
+                      >
+                        <option value="" disabled>Select Printer</option>
+                        {printers.map(p => (
+                          <option key={p.id} value={p.id}>{p.printer_name || p.name || 'Unnamed Printer'}</option>
+                        ))}
+                      </select>
+                      {selectedConnectorId && printers.length === 0 && !isLoadingDevices && (
+                        <p className="text-[10px] mt-1 text-red-500">No printers found for this connector</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Quick Presets */}

@@ -103,30 +103,33 @@ export const BarcodeElement = ({ element }) => {
           `${-offsetX / scale} ${-offsetY / scale} ${containerWidth / scale} ${containerHeight / scale}`,
         );
         svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
-      } else if (barcodeType.library === "bwip" && canvasRef.current) {
+      } else if (barcodeType.library === "bwip" && barcodeRef.current) {
         const containerWidth = element.width || 200;
         const containerHeight = element.height || 100;
 
-        // Calculate appropriate scale
-        const scale = Math.max(
-          2,
-          Math.min(containerWidth, containerHeight) / 50,
-        );
+        // Map internal types to bwip bcid
+        const bcidMap = {
+          DATAMATRIX: 'datamatrix',
+          PDF417: 'pdf417',
+          AZTEC: 'aztec'
+        };
 
-        bwipjs.toCanvas(canvasRef.current, {
-          bcid: "datamatrix",
+        let svgContent = bwipjs.toSVG({
+          bcid: bcidMap[element.barcodeType] || 'datamatrix',
           text: combinedValue,
-          scale: scale,
-          width: Math.floor(containerWidth / scale),
-          height: Math.floor(containerHeight / scale),
+          scale: 2,
+          width: Math.floor(containerWidth / 7),
+          height: Math.floor(containerHeight / 7),
           includetext: false,
-          paddingwidth: 0,
-          paddingheight: 0,
         });
 
-        // Scale canvas to fit container
-        canvasRef.current.style.width = `${containerWidth}px`;
-        canvasRef.current.style.height = `${containerHeight}px`;
+        barcodeRef.current.innerHTML = svgContent;
+        const svg = barcodeRef.current.querySelector('svg');
+        if (svg) {
+          svg.setAttribute("width", "100%");
+          svg.setAttribute("height", "100%");
+          svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+        }
       }
     } catch (error) {
       console.error("Barcode generation error:", error);
@@ -163,20 +166,7 @@ export const BarcodeElement = ({ element }) => {
     );
   }
 
-  if (barcodeType?.library === "bwip") {
-    return (
-      <div className="flex items-center justify-center w-full h-full">
-        <canvas
-          ref={canvasRef}
-          style={{
-            maxWidth: "100%",
-            maxHeight: "100%",
-            objectFit: "contain",
-          }}
-        />
-      </div>
-    );
-  }
+
 
   return (
     <div

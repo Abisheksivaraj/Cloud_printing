@@ -21,7 +21,7 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     if (l?.labelSize) return l.labelSize;
     if (l?.dimensions) return l.dimensions;
     if (l?.width && l?.height) return { width: l.width, height: l.height };
-    return { width: 100, height: 80 };
+    return { width: 100, height: 150 }; // Default to 100x150mm as requested
   };
 
   const [elements, setElements] = useState(label?.elements || []);
@@ -40,6 +40,24 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
   const [zoom, setZoom] = useState(100);
   const [isPropertiesExpanded, setIsPropertiesExpanded] = useState(false);
 
+  // Define border sync logic
+  const syncBorderLines = useCallback((currentElements, currentSize) => {
+    if (!currentSize) return currentElements;
+    
+    const thicknessMm = 5 / 3.7795; // 5px converted to mm
+    const borderIds = ['border-top', 'border-bottom', 'border-left', 'border-right'];
+    const otherElements = (currentElements || []).filter(el => !borderIds.includes(el.id));
+    
+    const borders = [
+      { id: 'border-top', type: 'line', x: 0, y: 0, x1: 0, y1: 0, x2: currentSize.width, y2: 0, borderWidth: thicknessMm, borderColor: "#000000", isSystem: true, locked: true },
+      { id: 'border-bottom', type: 'line', x: 0, y: currentSize.height, x1: 0, y1: currentSize.height, x2: currentSize.width, y2: currentSize.height, borderWidth: thicknessMm, borderColor: "#000000", isSystem: true, locked: true },
+      { id: 'border-left', type: 'line', x: 0, y: 0, x1: 0, y1: 0, x2: 0, y2: currentSize.height, borderWidth: thicknessMm, borderColor: "#000000", isSystem: true, locked: true },
+      { id: 'border-right', type: 'line', x: currentSize.width, y: 0, x1: currentSize.width, y1: 0, x2: currentSize.width, y2: currentSize.height, borderWidth: thicknessMm, borderColor: "#000000", isSystem: true, locked: true },
+    ];
+    
+    return [...otherElements, ...borders];
+  }, []);
+
   // Sync state and fetch full elements when selected label changes
   React.useEffect(() => {
     const syncAndFetch = async () => {
@@ -47,10 +65,13 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
       if (!designId) return;
 
       try {
-        const fullDesign = await callEdgeFunction(API_URLS.GET_DESIGN, { design_id: designId });
-        const normalized = normalizeDesign(fullDesign);
+        const data = await callEdgeFunction(API_URLS.GET_DESIGN, { design_id: designId });
+        const normalized = normalizeDesign(data);
         
-        setElements(normalized.elements || []);
+        let initialElements = normalized.elements || [];
+        initialElements = syncBorderLines(initialElements, normalized.labelSize);
+        
+        setElements(initialElements);
         setLabelSize(normalized.labelSize);
       } catch (error) {
         console.error("Failed to fetch elements:", error);
@@ -59,7 +80,12 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     };
 
     syncAndFetch();
-  }, [label?.design_id, label?.id]);
+  }, [label?.id, syncBorderLines]);
+
+  // Effect to update borders when size changes
+  React.useEffect(() => {
+    setElements(prev => syncBorderLines(prev, labelSize));
+  }, [labelSize, syncBorderLines]);
 
   const elementIdCounter = useRef(0);
   const canvasRef = useRef(null);
@@ -142,7 +168,7 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
       binding_type: el.binding_type || "static",
       static_content: content || " ", // Ensure at least a space if still empty
       properties: { ...el }, // Store full state in JSON properties
-      sort_order: el.zIndex || elements.length
+      sort_order: el.zIndex || 0
     };
   };
 
@@ -151,13 +177,18 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
 
   // ─── Add element ────────────────────────────────────────────────────────
   const addElement = async (type, extra = {}) => {
+    if (type === "image") {
+      imageInputRef.current?.click();
+      return;
+    }
+
     let newElement = {
       id: generateId(),
       type,
-      x: 50,
-      y: 50,
-      width: 100,
-      height: 100,
+      x: 10, // 10mm instead of 50px
+      y: 10,
+      width: 40, // 40mm instead of 100px
+      height: 20,
       zIndex: elements.length,
       rotation: 0,
       ...extra
@@ -178,17 +209,17 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     } else if (type === "rectangle" || type === "circle") {
       newElement = {
         ...newElement,
-        width: 80, height: 60,
-        borderWidth: 2, borderColor: "#000000", borderStyle: "solid",
+        width: 30, height: 20, // mm
+        borderWidth: 0.5, borderColor: "#000000", borderStyle: "solid",
         backgroundColor: "transparent",
       };
     } else if (type === "text" || type === "barcode") {
       newElement = {
         ...newElement,
-        width: type === "text" ? 120 : 200,
-        height: type === "text" ? 30 : 80,
+        width: type === "text" ? 40 : 60, // mm
+        height: type === "text" ? 8 : 25, // mm
         content: type === "text" ? "Sample Text" : "123456789",
-        barcodeType: type === "barcode" ? "CODE128" : undefined,
+        barcodeType: type === "barcode" ? (extra.barcodeType || "CODE128") : undefined,
         fontSize: 14, fontFamily: "Arial",
       };
     } else if (type === "line" && Object.keys(extra).length === 0) {

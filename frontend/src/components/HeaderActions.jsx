@@ -16,8 +16,8 @@ export const AppHeader = ({ onNavigate, currentView, userRole, userData }) => {
   // Format name
   const firstName = userData?.first_name || '';
   const lastName = userData?.last_name || '';
-  const displayName = firstName || lastName 
-    ? `${firstName} ${lastName}`.trim() 
+  const displayName = firstName || lastName
+    ? `${firstName} ${lastName}`.trim()
     : userData?.name || 'User';
   const displayRole = userRole?.toUpperCase() || 'OPERATOR';
 
@@ -40,7 +40,7 @@ export const AppHeader = ({ onNavigate, currentView, userRole, userData }) => {
               </div>
               <div className="hidden xl:flex flex-col justify-center">
                 <h1 className="text-[13px] font-black tracking-tight leading-[1.1]" style={{ color: theme.text }}>
-                  ATPL's <span className="text-[#39A3DD]">Perfect Labeler</span>
+                  <span className="text-[#39A3DD]">Perfect Labeler</span>
                 </h1>
                 <span className="text-[8px] font-black uppercase tracking-[0.35em] text-[#8A9BA5] mt-0.5 leading-none">
                   PRO EDITION
@@ -72,34 +72,34 @@ export const AppHeader = ({ onNavigate, currentView, userRole, userData }) => {
             <div className="flex items-center gap-2 md:gap-3 flex-nowrap shrink-0">
               {/* Mobile Nav Icons */}
               <nav className="flex lg:hidden items-center gap-0.5 mr-1">
-                  {navItems.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => onNavigate(item.id)}
-                      className={`p-2 rounded-lg transition-all
+                {navItems.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => onNavigate(item.id)}
+                    className={`p-2 rounded-lg transition-all
                         ${currentView === item.id
-                          ? 'text-[#39A3DD] bg-blue-50 dark:bg-blue-900/20'
-                          : 'text-[#8A9BA5] hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-                      title={item.label}
-                    >
-                      <span className="text-[10px] font-black">{item.short}</span>
-                    </button>
-                  ))}
+                        ? 'text-[#39A3DD] bg-blue-50 dark:bg-blue-900/20'
+                        : 'text-[#8A9BA5] hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                    title={item.label}
+                  >
+                    <span className="text-[10px] font-black">{item.short}</span>
+                  </button>
+                ))}
               </nav>
 
               {/* Profile Block */}
               <div className="hidden sm:flex items-center gap-2.5 bg-gray-50/80 dark:bg-gray-800/40 px-3 py-1.5 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all shrink-0">
-                 <div className="flex flex-col items-end">
-                    <span className="text-[11px] font-black tracking-tight leading-none whitespace-nowrap text-right" style={{ color: theme.text }}>
-                      {displayName}
-                    </span>
-                    <span className="text-[8px] font-black uppercase tracking-[0.05em] text-[#39A3DD] mt-1 opacity-90">
-                      {displayRole}
-                    </span>
-                 </div>
-                 <div className="w-7 h-7 rounded-lg bg-[#38474F] text-white flex items-center justify-center text-[10px] font-black shadow-inner uppercase shrink-0">
-                    {displayName[0]}
-                 </div>
+                <div className="flex flex-col items-end">
+                  <span className="text-[11px] font-black tracking-tight leading-none whitespace-nowrap text-right" style={{ color: theme.text }}>
+                    {displayName}
+                  </span>
+                  <span className="text-[8px] font-black uppercase tracking-[0.05em] text-[#39A3DD] mt-1 opacity-90">
+                    {displayRole}
+                  </span>
+                </div>
+                <div className="w-7 h-7 rounded-lg bg-[#38474F] text-white flex items-center justify-center text-[10px] font-black shadow-inner uppercase shrink-0">
+                  {displayName[0]}
+                </div>
               </div>
 
               {/* Global Actions */}
