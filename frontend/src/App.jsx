@@ -10,7 +10,9 @@ import PrintHistory from "./components/PrintHistory";
 import DeviceManagement from "./components/DeviceManagement";
 import AddPrinter from "./components/AddPrinter";
 import { useTheme } from "./ThemeContext";
-import { supabase, callEdgeFunction, API_URLS, normalizeDesign } from "./supabaseClient";
+import { callEdgeFunction, API_URLS, normalizeDesign } from "./supabaseClient";
+
+const MM_TO_PX = 3.7795275591;
 import Toast from "./components/Toast";
 
 
@@ -314,6 +316,7 @@ const App = () => {
         name: labelData.name || currentLabel.name,
         description: labelData.description || currentLabel.description,
         dimensions: labelData.labelSize || currentLabel.dimensions || currentLabel.labelSize,
+        canvas_width: Math.round((labelData.labelSize?.width || currentLabel.dimensions?.width || currentLabel.labelSize?.width || 100) * MM_TO_PX),
         status: currentLabel.status, // Keep current status for update
       };
 

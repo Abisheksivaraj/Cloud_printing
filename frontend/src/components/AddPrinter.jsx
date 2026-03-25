@@ -8,7 +8,8 @@ import {
     Loader2, 
     Plus,
     Printer as PrinterIcon,
-    AlertCircle
+    AlertCircle,
+    Trash2
 } from "lucide-react";
 import { useTheme } from "../ThemeContext";
 import { callEdgeFunction, API_URLS } from "../supabaseClient";
@@ -82,6 +83,18 @@ const AddPrinter = ({ onBack, connectorId }) => {
             alert("Failed to add printer: " + error.message);
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleDeletePrinter = async (printerId) => {
+        if (!window.confirm("Are you sure you want to delete this printer?")) return;
+        
+        try {
+            await callEdgeFunction(API_URLS.DELETE_PRINTER, { printer_id: printerId });
+            fetchPrintersForConnector();
+        } catch (error) {
+            console.error("Failed to delete printer:", error);
+            alert("Failed to delete printer: " + (error.message || "Unknown error"));
         }
     };
 
@@ -280,17 +293,29 @@ const AddPrinter = ({ onBack, connectorId }) => {
                                             </div>
 
                                             <div className="text-right flex flex-col items-end gap-3">
-                                                {p.status === 'online' || p.is_available ? (
-                                                    <div className="px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black uppercase tracking-[0.2em] text-emerald-500 flex items-center gap-2">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-lg shadow-emerald-500/50"></div>
-                                                        Live
-                                                    </div>
-                                                ) : (
-                                                    <div className="px-4 py-2 rounded-full bg-slate-500/10 border border-slate-500/20 text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div>
-                                                        Offline
-                                                    </div>
-                                                )}
+                                                <div className="flex items-center gap-3">
+                                                    {p.status === 'online' || p.is_available ? (
+                                                        <div className="px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black uppercase tracking-[0.2em] text-emerald-500 flex items-center gap-2">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-lg shadow-emerald-500/50"></div>
+                                                            Live
+                                                        </div>
+                                                    ) : (
+                                                        <div className="px-4 py-2 rounded-full bg-slate-500/10 border border-slate-500/20 text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div>
+                                                            Offline
+                                                        </div>
+                                                    )}
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDeletePrinter(p.id);
+                                                        }}
+                                                        className="p-2 rounded-xl text-red-500 hover:bg-red-500/10 transition-all active:scale-90"
+                                                        title="Delete Printer"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
                                                 <p className="text-[8px] font-black uppercase tracking-[0.3em] opacity-20" style={{ color: theme.text }}>Check Success</p>
                                             </div>
                                         </div>

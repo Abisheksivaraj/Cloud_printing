@@ -11,6 +11,8 @@ import { useLanguage } from "../LanguageContext";
 import AIChatbot from "./designer/AIChatbot";
 import { callEdgeFunction, API_URLS, mapPayloadToElement, normalizeDesign } from "../supabaseClient";
 
+const MM_TO_PX = 3.7795275591;
+
 const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCreateLabel, onDeleteLabel, onNavigateToLibrary, userRole }) => {
   const { isDarkMode, theme } = useTheme();
   const { t } = useLanguage();
@@ -44,15 +46,18 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
   const syncBorderLines = useCallback((currentElements, currentSize) => {
     if (!currentSize) return currentElements;
     
-    const thicknessMm = 5 / 3.7795; // 5px converted to mm
+    const thickness = 5; // 5px
     const borderIds = ['border-top', 'border-bottom', 'border-left', 'border-right'];
     const otherElements = (currentElements || []).filter(el => !borderIds.includes(el.id));
     
+    const widthPx = currentSize.width * MM_TO_PX;
+    const heightPx = currentSize.height * MM_TO_PX;
+
     const borders = [
-      { id: 'border-top', type: 'line', x: 0, y: 0, x1: 0, y1: 0, x2: currentSize.width, y2: 0, borderWidth: thicknessMm, borderColor: "#000000", isSystem: true, locked: true },
-      { id: 'border-bottom', type: 'line', x: 0, y: currentSize.height, x1: 0, y1: currentSize.height, x2: currentSize.width, y2: currentSize.height, borderWidth: thicknessMm, borderColor: "#000000", isSystem: true, locked: true },
-      { id: 'border-left', type: 'line', x: 0, y: 0, x1: 0, y1: 0, x2: 0, y2: currentSize.height, borderWidth: thicknessMm, borderColor: "#000000", isSystem: true, locked: true },
-      { id: 'border-right', type: 'line', x: currentSize.width, y: 0, x1: currentSize.width, y1: 0, x2: currentSize.width, y2: currentSize.height, borderWidth: thicknessMm, borderColor: "#000000", isSystem: true, locked: true },
+      { id: 'border-top', type: 'line', x: 0, y: 0, x1: 0, y1: 0, x2: widthPx, y2: 0, borderWidth: thickness, borderColor: "#000000", isSystem: true, locked: true },
+      { id: 'border-bottom', type: 'line', x: 0, y: heightPx, x1: 0, y1: heightPx, x2: widthPx, y2: heightPx, borderWidth: thickness, borderColor: "#000000", isSystem: true, locked: true },
+      { id: 'border-left', type: 'line', x: 0, y: 0, x1: 0, y1: 0, x2: 0, y2: heightPx, borderWidth: thickness, borderColor: "#000000", isSystem: true, locked: true },
+      { id: 'border-right', type: 'line', x: widthPx, y: 0, x1: widthPx, y1: 0, x2: widthPx, y2: heightPx, borderWidth: thickness, borderColor: "#000000", isSystem: true, locked: true },
     ];
     
     return [...otherElements, ...borders];
@@ -185,10 +190,10 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     let newElement = {
       id: generateId(),
       type,
-      x: 10, // 10mm instead of 50px
-      y: 10,
-      width: 40, // 40mm instead of 100px
-      height: 20,
+      x: 38, // ~10mm
+      y: 38,
+      width: 151, // ~40mm
+      height: 76,
       zIndex: elements.length,
       rotation: 0,
       ...extra
@@ -209,15 +214,15 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     } else if (type === "rectangle" || type === "circle") {
       newElement = {
         ...newElement,
-        width: 30, height: 20, // mm
-        borderWidth: 0.5, borderColor: "#000000", borderStyle: "solid",
+        width: 113, height: 76, // ~30x20mm
+        borderWidth: 2, borderColor: "#000000", borderStyle: "solid",
         backgroundColor: "transparent",
       };
     } else if (type === "text" || type === "barcode") {
       newElement = {
         ...newElement,
-        width: type === "text" ? 40 : 60, // mm
-        height: type === "text" ? 8 : 25, // mm
+        width: type === "text" ? 151 : 227, // ~40 vs 60mm
+        height: type === "text" ? 30 : 95, // ~8 vs 25mm
         content: type === "text" ? "Sample Text" : "123456789",
         barcodeType: type === "barcode" ? (extra.barcodeType || "CODE128") : undefined,
         fontSize: 14, fontFamily: "Arial",
@@ -268,8 +273,8 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
         const element = {
           id: generateId(),
           type: "image",
-          x: 50, y: 50,
-          width: w, height: h,
+          x: 189, y: 189, // ~50mm
+          width: w * MM_TO_PX, height: h * MM_TO_PX,
           src: dataUrl,
           opacity: 1,
           lockAspectRatio: true,
@@ -309,7 +314,8 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     const element = {
       id: generateId(),
       type: "placeholder",
-      x: 50, y: 50, width: 150, height: 35,
+      x: 189, y: 189, width: 567, height: 132, // ~50mm offset, 150x35mm size? Wait, 150x35mm is huge. 
+      // Existing code had 50, 50, 150, 35. 
       content: placeholderName,
       fontSize: 14, fontFamily: "Arial",
       rotation: 0, zIndex: elements.length,

@@ -36,6 +36,7 @@ export const API_URLS = {
     RESET_CONNECTOR: 'reset-connector-key',
     ADD_PRINTER: 'add-printer',
     LIST_PRINTERS: 'list-printers',
+    DELETE_PRINTER: 'delete-printer',
 
     // Designs
     CREATE_DESIGN: 'create-design',
@@ -160,6 +161,8 @@ export const mapPayloadToElement = (payload) => {
 export const normalizeDesign = (design) => {
     if (!design) return design;
 
+    const MM_TO_PX = 3.7795275591;
+
     // Flatten nested design/data wrappers if present from API response
     const base = design.design || design.data || design;
     const finalId = base.design_id || base.id || design.design_id || design.id;
@@ -179,7 +182,25 @@ export const normalizeDesign = (design) => {
     // Normalize and map elements array
     let elements = base.elements || design.elements || [];
     if (Array.isArray(elements)) {
-        elements = elements.map(el => mapPayloadToElement(el));
+        elements = elements.map(el => {
+            const mapped = mapPayloadToElement(el);
+            // MIGRATION: If canvas_width is missing, this is likely an old MM-based design.
+            // Convert positions and dimensions to PX for the new designer.
+            if (!base.canvas_width && !design.canvas_width) {
+                return {
+                    ...mapped,
+                    x: mapped.x * MM_TO_PX,
+                    y: mapped.y * MM_TO_PX,
+                    width: mapped.width * MM_TO_PX,
+                    height: mapped.height * MM_TO_PX,
+                    fontSize: (mapped.fontSize || 14) * (MM_TO_PX / 3.784), // Adjust legacy font sizes
+                    borderWidth: (mapped.borderWidth || 0) * MM_TO_PX,
+                    borderRadius: (mapped.borderRadius || 0) * MM_TO_PX,
+                    letterSpacing: (mapped.letterSpacing || 0) * MM_TO_PX,
+                };
+            }
+            return mapped;
+        });
     }
 
     return {

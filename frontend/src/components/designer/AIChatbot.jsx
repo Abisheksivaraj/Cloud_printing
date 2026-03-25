@@ -23,6 +23,8 @@ const MSG = { USER: "user", BOT: "bot", ERROR: "error" };
 let _mc = 0;
 const mid = () => `m_${Date.now()}_${++_mc}`;
 
+const MM_TO_PX = 3.7795275591;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 const AIChatbot = ({ onGenerateElements, labelSize, generateId, onCreateLabel }) => {
     const { theme } = useTheme();
@@ -77,12 +79,18 @@ const AIChatbot = ({ onGenerateElements, labelSize, generateId, onCreateLabel })
                 const elements = labelData.elements.map(el => ({
                     ...el,
                     id: generateId ? generateId() : el.id,
+                    // Convert MM to PX
+                    x: el.x * MM_TO_PX,
+                    y: el.y * MM_TO_PX,
+                    width: el.width * MM_TO_PX,
+                    height: el.height * MM_TO_PX,
                     // Ensure all required fields for canvas rendering
                     fontStyle: el.fontStyle ?? "normal",
                     textDecoration: el.textDecoration ?? "none",
-                    letterSpacing: el.letterSpacing ?? 0,
+                    letterSpacing: (el.letterSpacing ?? 0) * MM_TO_PX,
+                    fontSize: (el.fontSize ?? 14) * (MM_TO_PX / 3.78), // Approximate scale for fonts
                     lineHeight: el.lineHeight ?? 1.2,
-                    borderRadius: el.borderRadius ?? 0,
+                    borderRadius: (el.borderRadius ?? 0) * MM_TO_PX,
                     lockAspectRatio: false,
                 }));
 
@@ -166,6 +174,7 @@ const AIChatbot = ({ onGenerateElements, labelSize, generateId, onCreateLabel })
                 name: designName.trim(),
                 description: designDescription || pendingDesign.description,
                 dimensions: pendingDesign.dimensions,
+                canvas_width: Math.round(pendingDesign.dimensions.width * MM_TO_PX),
                 status: "draft",
                 category: pendingDesign.type?.toLowerCase() || "custom",
                 binding_type: "static"
