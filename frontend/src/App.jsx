@@ -10,7 +10,7 @@ import PrintHistory from "./components/PrintHistory";
 import DeviceManagement from "./components/DeviceManagement";
 import AddPrinter from "./components/AddPrinter";
 import { useTheme } from "./ThemeContext";
-import { callEdgeFunction, API_URLS, normalizeDesign } from "./supabaseClient";
+import { supabase, callEdgeFunction, API_URLS, normalizeDesign } from "./supabaseClient";
 
 const MM_TO_PX = 3.7795275591;
 import Toast from "./components/Toast";
