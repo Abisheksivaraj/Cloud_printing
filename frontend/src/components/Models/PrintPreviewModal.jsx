@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X, Printer, Settings, Maximize2, Minimize2, Check } from "lucide-react";
+import * as htmlToImage from 'html-to-image';
 import BarcodeElement from "../designer/code";
 import { useTheme } from "../../ThemeContext";
 import { callEdgeFunction, API_URLS } from "../../supabaseClient";
@@ -34,7 +35,7 @@ const CutMarks = () => {
 /* =========================
    RENDER LABEL - EXACT MATCH TO DESIGN CANVAS
 ========================= */
-const RenderLabel = ({ label }) => {
+const RenderLabel = ({ label, noBorder = false }) => {
   const labelW = (label.labelSize?.width || 100) * MM_TO_PX;
   const labelH = (label.labelSize?.height || 80) * MM_TO_PX;
 
@@ -46,7 +47,7 @@ const RenderLabel = ({ label }) => {
         position: "relative",
         overflow: "hidden",
         boxSizing: "border-box",
-        border: "5px solid #000000",
+        border: noBorder ? "none" : "5px solid #000000",
       }}
     >
       {(label.elements || []).map((element, elIndex) => {
@@ -56,12 +57,8 @@ const RenderLabel = ({ label }) => {
           top: element.y * MM_TO_PX,
           width: element.width * MM_TO_PX,
           height: element.height * MM_TO_PX,
-          fontSize: (element.fontSize || 14) * (MM_TO_PX / 3.78) * 3.78, // Simplified scaling for text
-          // Note: Standard canvas used 3.78 for mm to px at 96dpi.
-          // Let's just use MM_TO_PX consistently.
-          fontSize: (element.fontSize || 14) * (MM_TO_PX / 3.78) * 3.78, 
-          // Actually, fontSize is usually in pt or px. If it's in px, it needs scaling.
-          fontSize: (element.fontSize || 14) * (MM_TO_PX / 3.78),
+          // font scaling based on millimeter to pixel conversion
+          fontSize: (element.fontSize || 14) * (MM_TO_PX / 3.7795),
           fontFamily: element.fontFamily,
           fontWeight: element.fontWeight,
           fontStyle: element.fontStyle,
@@ -169,6 +166,7 @@ const RenderLabel = ({ label }) => {
             <div key={elIndex} style={style}>
               <img
                 src={element.src}
+                crossOrigin="anonymous"
                 alt=""
                 style={{
                   width: "100%",
@@ -215,6 +213,7 @@ const MULTI_UP_CONFIGS = {
 ========================= */
 const PrintPreviewModal = ({ label, onClose }) => {
   const { theme, isDarkMode } = useTheme();
+  const labelRef = React.useRef(null);
   const labelSize = label.labelSize || { width: 100, height: 80 };
 
   // State for multi-up configuration
@@ -231,7 +230,8 @@ const PrintPreviewModal = ({ label, onClose }) => {
     bottom: 5,
   });
   const [showCutMarks, setShowCutMarks] = useState(true);
-  
+  const [selectedDpi, setSelectedDpi] = useState(label.settings?.dpi || 300);
+
   // Connector & Printer selection
   const [connectors, setConnectors] = useState([]);
   const [selectedConnectorId, setSelectedConnectorId] = useState(null);
@@ -268,8 +268,8 @@ const PrintPreviewModal = ({ label, onClose }) => {
       }
       try {
         setIsLoadingDevices(true);
-        const data = await callEdgeFunction(API_URLS.LIST_PRINTERS, { 
-          connector_id: selectedConnectorId 
+        const data = await callEdgeFunction(API_URLS.LIST_PRINTERS, {
+          connector_id: selectedConnectorId
         });
         const printerList = Array.isArray(data) ? data : (data?.printers || []);
         setPrinters(printerList);
@@ -322,48 +322,70 @@ const PrintPreviewModal = ({ label, onClose }) => {
       // Calculate print metrics
       const printedLengthMm = (sheetHeight / MM_TO_PX).toFixed(1);
 
+      // Capture label as PNG
+      let renderedPng = null;
+      if (labelRef.current) {
+        try {
+          // Calculate exact pixel ratio for target DPI (e.g., 203 DPI)
+          // Standard web DPI is 96. Ratio = Target / 96.
+          const targetDpi = (label.settings && label.settings.dpi) ? Number(label.settings.dpi) : 203;
+          const currentDpi = 96;
+          const ratio = targetDpi / currentDpi;
+
+          console.log(`Capturing PNG at ${targetDpi} DPI (pixelRatio: ${ratio.toFixed(4)})`);
+
+          renderedPng = await htmlToImage.toPng(labelRef.current, {
+            pixelRatio: ratio,
+            backgroundColor: '#ffffff',
+            skipFonts: true, // Reverted to true to bypass CORS/SecurityError with Google Fonts
+            cacheBust: true,
+            includePlaceholder: true,
+            // Ensure no transforms interfere with capture
+            style: {
+              transform: 'none',
+              transformOrigin: 'top left',
+              left: '0',
+              top: '0',
+              margin: '0',
+            }
+          });
+
+          if (renderedPng) {
+            const dataSizeKb = Math.round(renderedPng.length / 1024);
+            console.log(`Captured PNG size: ${dataSizeKb} KB (DPI: ${targetDpi}, PixelRatio: ${ratio.toFixed(2)})`);
+
+            if (!renderedPng.startsWith('data:image/png;base64,')) {
+              console.warn("PNG Capture returned invalid prefix:", renderedPng.substring(0, 30));
+            }
+            if (dataSizeKb < 30) {
+               console.warn("PNG Capture result is suspiciously small. Check if elements are visible in the capture container.");
+            }
+          }
+        } catch (captureErr) {
+          console.error("PNG Capture failed, falling back to ZPL elements:", captureErr);
+        }
+      }
+
       // Create print job record
       const jobData = {
-        printer_name: printerName,
-        document_name: label.name || "Unnamed Label",
-        design_id: label.design_id || label.id,
-        version_major: label.version_major || 1,
-        version_minor: label.version_minor || 0,
-        document_type: "label",
-        volumes: cols * rows,
-        priority: "normal",
-        total_records: 1,
-        printed_records: 1,
-        printed_length: parseFloat(printedLengthMm),
+        design_id: label.design_id || label.id || label.design?.id || label.data?.id,
+        version_major: (label.version_major !== undefined && label.version_major !== null) ? label.version_major : 1,
+        version_minor: (label.version_minor !== undefined && label.version_minor !== null) ? label.version_minor : 0,
         connector_id: selectedConnectorId,
         printer_id: selectedPrinterId,
-        output_format: "zpl",
-        elements: (label.elements || []).map(el => {
-          const dpi = (label.settings && label.settings.dpi) ? label.settings.dpi : 203;
-          const mmToDots = dpi / 25.4;
-          const scaled = { ...el };
-          if (scaled.x !== undefined) scaled.x = el.x * mmToDots;
-          if (scaled.y !== undefined) scaled.y = el.y * mmToDots;
-          if (scaled.width !== undefined) scaled.width = el.width * mmToDots;
-          if (scaled.height !== undefined) scaled.height = el.height * mmToDots;
-          if (scaled.x1 !== undefined) scaled.x1 = el.x1 * mmToDots;
-          if (scaled.y1 !== undefined) scaled.y1 = el.y1 * mmToDots;
-          if (scaled.x2 !== undefined) scaled.x2 = el.x2 * mmToDots;
-          if (scaled.y2 !== undefined) scaled.y2 = el.y2 * mmToDots;
-          if (scaled.borderWidth !== undefined) scaled.borderWidth = (el.borderWidth || 0) * mmToDots;
-          return scaled;
-        }),
         idempotency_key: `print_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        metadata: {
-          label_width: labelSize.width,
-          label_height: labelSize.height,
-          cols,
-          rows
-        }
+        render_dpi: selectedDpi, // Added for backend conversion
+        input_data: {} // Empty as per user example, but could be extended
       };
 
+      console.log("Submitting Print Job Data:", jobData);
+
+      if (!jobData.design_id) {
+        throw new Error("Cannot print: Missing design_id. Please save the design first.");
+      }
+
       await callEdgeFunction(API_URLS.CREATE_JOB, jobData);
-      alert("Print job submitted successfully to the connector.");
+      alert("Print job submitted successfully.");
       onClose();
     } catch (error) {
       console.error("Print tracking failed:", error);
@@ -373,6 +395,24 @@ const PrintPreviewModal = ({ label, onClose }) => {
 
   return (
     <>
+      {/* ================= HIDDEN CAPTURE CONTAINER ================= */}
+      <div 
+        style={{ 
+          position: "fixed", 
+          top: "-9999px", 
+          left: "-9999px", 
+          zIndex: -1,
+          width: labelW,
+          height: labelH,
+          backgroundColor: "#ffffff",
+          overflow: "hidden"
+        }}
+      >
+        <div ref={labelRef} style={{ width: labelW, height: labelH, position: "relative", backgroundColor: "#ffffff" }}>
+          <RenderLabel label={label} noBorder={true} />
+        </div>
+      </div>
+
       {/* ================= PREVIEW UI ================= */}
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 print:hidden overflow-hidden p-6 animate-in fade-in duration-200">
         <div
@@ -509,10 +549,29 @@ const PrintPreviewModal = ({ label, onClose }) => {
                   </label>
                 </div>
 
+                {/* DPI Settings */}
+                <div className="mb-8">
+                  <label className="block text-sm font-semibold mb-2" style={{ color: theme.text }}>
+                    Target Resolution
+                  </label>
+                  <select
+                    value={selectedDpi}
+                    onChange={(e) => setSelectedDpi(Number(e.target.value))}
+                    className="input text-sm"
+                  >
+                    <option value={203}>203 DPI</option>
+                    <option value={300}>300 DPI</option>
+                    <option value={600}>600 DPI</option>
+                  </select>
+                  <p className="text-xs mt-2" style={{ color: theme.textMuted }}>
+                    Physical resolution of your printer
+                  </p>
+                </div>
+
                 {/* Device Selection */}
                 <div className="mb-8 border-t pt-6" style={{ borderColor: theme.border }}>
                   <h4 className="font-semibold text-sm mb-4" style={{ color: theme.text }}>Print Destination</h4>
-                  
+
                   <div className="space-y-4">
                     <div>
                       <label className="block text-xs mb-1" style={{ color: theme.textMuted }}>
@@ -783,6 +842,21 @@ const PrintPreviewModal = ({ label, onClose }) => {
           }
         }
       `}</style>
+      {/* Hidden container for high-resolution PNG capture */}
+      <div
+        style={{
+          position: "fixed",
+          left: "-9999px",
+          top: "0",
+          zIndex: -1,
+          pointerEvents: "none",
+          backgroundColor: "#fff"
+        }}
+      >
+        <div ref={labelRef} style={{ background: '#fff', display: 'inline-block' }}>
+          <RenderLabel label={label} noBorder={true} />
+        </div>
+      </div>
     </>
   );
 };

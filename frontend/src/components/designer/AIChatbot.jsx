@@ -41,6 +41,7 @@ const AIChatbot = ({ onGenerateElements, labelSize, generateId, onCreateLabel })
     const [designName, setDesignName] = useState("");
     const [designDescription, setDesignDescription] = useState("");
     const [isSaving, setIsSaving] = useState(false);
+    const [selectedBindingType, setSelectedBindingType] = useState("static"); // Values: 'static', 'input', 'computed'
 
     const scrollRef = useRef(null);
     const inputRef = useRef(null);
@@ -80,10 +81,10 @@ const AIChatbot = ({ onGenerateElements, labelSize, generateId, onCreateLabel })
                     ...el,
                     id: generateId ? generateId() : el.id,
                     // Convert MM to PX
-                    x: el.x * MM_TO_PX,
-                    y: el.y * MM_TO_PX,
-                    width: el.width * MM_TO_PX,
-                    height: el.height * MM_TO_PX,
+                    x: Math.round(el.x * MM_TO_PX),
+                    y: Math.round(el.y * MM_TO_PX),
+                    width: Math.round(el.width * MM_TO_PX),
+                    height: Math.round(el.height * MM_TO_PX),
                     // Ensure all required fields for canvas rendering
                     fontStyle: el.fontStyle ?? "normal",
                     textDecoration: el.textDecoration ?? "none",
@@ -132,7 +133,7 @@ const AIChatbot = ({ onGenerateElements, labelSize, generateId, onCreateLabel })
                     ]);
                 } else {
                     // For additive changes, just apply immediately
-                    onGenerateElements(elements, newSize, false);
+                    onGenerateElements(elements, newSize, false, selectedBindingType);
 
                     // Success reply
                     setMessages(prev => [...prev,
@@ -174,11 +175,17 @@ const AIChatbot = ({ onGenerateElements, labelSize, generateId, onCreateLabel })
                 name: designName.trim(),
                 description: designDescription || pendingDesign.description,
                 dimensions: pendingDesign.dimensions,
-                canvas_width: Math.round(pendingDesign.dimensions.width * MM_TO_PX),
+                settings: {
+                    ...pendingDesign.settings,
+                    canvas_width: Math.round(pendingDesign.dimensions.width * MM_TO_PX),
+                },
                 status: "draft",
                 category: pendingDesign.type?.toLowerCase() || "custom",
-                binding_type: "static"
+                binding_type: selectedBindingType || "static"
             };
+            
+            // Backend validation: static_content is required when binding_type is 'static'
+            // We'll ensure it's set in the element loop below.
 
             const designResult = await callEdgeFunction(API_URLS.CREATE_DESIGN, createPayload);
 
@@ -203,8 +210,8 @@ const AIChatbot = ({ onGenerateElements, labelSize, generateId, onCreateLabel })
                         position_y: el.y,
                         width: el.width,
                         height: el.height,
-                        static_content: el.content || (el.type === "image" ? (el.src || el.content) : ""),
-                        binding_type: "static",
+                        static_content: (el.content || (el.type === "image" ? (el.src || el.content) : "")) || " ", 
+                        binding_type: selectedBindingType || "static",
                         properties: {
                             ...el,
                             id: undefined, // Don't send local ID to DB properties JSON
@@ -350,6 +357,8 @@ const AIChatbot = ({ onGenerateElements, labelSize, generateId, onCreateLabel })
                                 setDesignDescription={setDesignDescription}
                                 onSave={handleSaveDesign}
                                 isSaving={isSaving}
+                                selectedBindingType={selectedBindingType}
+                                setSelectedBindingType={setSelectedBindingType}
                             />
                         ))}
 
@@ -434,7 +443,7 @@ const AIChatbot = ({ onGenerateElements, labelSize, generateId, onCreateLabel })
 };
 
 // ─── Message Bubble ───────────────────────────────────────────────────────────
-const Bubble = ({ msg, theme, designName, setDesignName, designDescription, setDesignDescription, onSave, isSaving }) => {
+const Bubble = ({ msg, theme, designName, setDesignName, designDescription, setDesignDescription, onSave, isSaving, selectedBindingType, setSelectedBindingType }) => {
     if (msg.role === MSG.USER) {
         return (
             <div className="flex justify-end">
@@ -511,6 +520,9 @@ const Bubble = ({ msg, theme, designName, setDesignName, designDescription, setD
                             </div>
                         </div>
 
+                        {/* Binding Configuration hidden for initial creation per user request */}
+                        {/* But we keep the state defaulting to 'static' */}
+
                         <button
                             onClick={onSave}
                             disabled={!designName.trim() || isSaving}
@@ -537,11 +549,33 @@ const Bubble = ({ msg, theme, designName, setDesignName, designDescription, setD
                         <CheckCircle2 size={13} className="text-emerald-500" />
                         <span className="text-[10px] font-black text-emerald-500 uppercase tracking-wider">Label Generated</span>
                     </div>
-                    <div className="p-3 grid grid-cols-2 gap-2 text-[10px]">
-                        <Cell icon="🏷️" label="Type" value={msg.labelData.type} theme={theme} />
-                        <Cell icon="📐" label="Size" value={msg.labelData.size} theme={theme} />
-                        <Cell icon="🔢" label="Elements" value={`${msg.labelData.elementCount} objects`} theme={theme} />
+
+                    <div className="p-3 space-y-3">
+                        <div className="grid grid-cols-2 gap-2 text-[10px]">
+                            <Cell icon="🏷️" label="Type" value={msg.labelData.type} theme={theme} />
+                            <Cell icon="📐" label="Size" value={msg.labelData.size} theme={theme} />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Update Binding Mode</label>
+                            <div className="flex gap-1.5">
+                                {[
+                                    { id: 'static', label: 'Static' },
+                                    { id: 'input', label: 'Input' },
+                                    { id: 'computed', label: 'Computed' }
+                                ].map((type) => (
+                                    <button
+                                        key={type.id}
+                                        onClick={() => setSelectedBindingType(type.id)}
+                                        className={`flex-1 py-1.5 rounded-lg border text-[8px] font-black uppercase tracking-wider transition-all ${selectedBindingType === type.id ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}
+                                    >
+                                        {type.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
+
                     {msg.labelData.description && (
                         <p className="px-3 pb-3 text-[10px] leading-relaxed opacity-60" style={{ color: theme.text }}>
                             {msg.labelData.description}

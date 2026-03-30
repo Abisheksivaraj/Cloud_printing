@@ -31,40 +31,8 @@ const CreateLabelModal = ({ onClose, onCreate }) => {
   const [margin, setMargin] = useState(2);
   const [defaultFont, setDefaultFont] = useState("Arial");
 
-  // Printer states
-  const [availablePrinters, setAvailablePrinters] = useState([]);
-  const [selectedPrinter, setSelectedPrinter] = useState("");
-  const [isLoadingPrinters, setIsLoadingPrinters] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPreviewJson, setIsPreviewJson] = useState(false);
-
-  // Fetch available printers on component mount
-  useEffect(() => {
-    fetchAvailablePrinters();
-  }, []);
-
-  const fetchAvailablePrinters = async () => {
-    setIsLoadingPrinters(true);
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-      const response = await fetch("http://localhost:3001/api/printers", { signal: controller.signal });
-      clearTimeout(timeoutId);
-      if (response.ok) {
-        const data = await response.json();
-        setAvailablePrinters(data.printers || []);
-        if (data.printers && data.printers.length > 0) {
-          const defaultPrinter = data.printers.find((p) => p.isDefault);
-          setSelectedPrinter(defaultPrinter ? defaultPrinter.name : data.printers[0].name);
-        }
-      }
-    } catch (error) {
-      // Local printer server not running — fail silently
-      console.warn("Printer server not available (localhost:3001). Skipping printer discovery.");
-    } finally {
-      setIsLoadingPrinters(false);
-    }
-  };
 
   const handleCategoryChange = (catId) => {
     setCategory(catId);
@@ -98,7 +66,7 @@ const CreateLabelModal = ({ onClose, onCreate }) => {
     dimensions: { width, height, unit },
     rotation,
     orientation,
-    binding_type: "static",
+    binding_type: null,
     settings: {
       dpi,
       margin,
@@ -115,14 +83,12 @@ const CreateLabelModal = ({ onClose, onCreate }) => {
       const design = await callEdgeFunction(API_URLS.CREATE_DESIGN, currentPayload);
 
       if (design) {
-        onCreate({
+        const newLabelDetails = {
           ...currentPayload,
           ...design,
-          printer: {
-            name: selectedPrinter,
-            displayName: availablePrinters.find((p) => p.name === selectedPrinter)?.displayName || selectedPrinter,
-          }
-        });
+        };
+        console.log("Creating Label:", newLabelDetails);
+        onCreate(newLabelDetails);
         onClose();
       }
     } catch (error) {
@@ -295,32 +261,14 @@ const CreateLabelModal = ({ onClose, onCreate }) => {
               </div>
             </div>
 
-            {/* Printer & DPI */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t" style={{ borderColor: theme.border }}>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Target Printer</label>
-                  <button type="button" onClick={fetchAvailablePrinters} className="text-[9px] font-black text-[var(--color-primary)] uppercase">Sync</button>
-                </div>
-                <select
-                  value={selectedPrinter}
-                  onChange={(e) => setSelectedPrinter(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border-2 font-medium focus:border-[var(--color-primary)]"
-                  style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
-                >
-                  {availablePrinters.length === 0 && <option>No printers found</option>}
-                  {availablePrinters.map(p => (
-                    <option key={p.name} value={p.name}>{p.displayName || p.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
+            {/* DPI Settings */}
+            <div className="pt-4 border-t" style={{ borderColor: theme.border }}>
+              <div className="max-w-xs space-y-2">
                 <label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Output Resolution</label>
                 <select
                   value={dpi}
                   onChange={(e) => setDpi(Number(e.target.value))}
-                  className="w-full px-4 py-3 rounded-xl border-2 font-medium focus:border-[var(--color-primary)]"
+                  className="w-full px-4 py-3 rounded-xl border-2 font-medium focus:border-[var(--color-primary)] opacity-100"
                   style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
                 >
                   <option value={203}>203 DPI</option>

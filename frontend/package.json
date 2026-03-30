@@ -21,6 +21,7 @@
     "axios": "^1.11.0",
     "bwip-js": "^4.8.0",
     "framer-motion": "^12.23.12",
+    "html-to-image": "^1.11.13",
     "jsbarcode": "^3.12.1",
     "konva": "^9.3.22",
     "lucide-react": "^0.539.0",

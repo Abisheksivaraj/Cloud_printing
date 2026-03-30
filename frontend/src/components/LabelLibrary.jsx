@@ -429,11 +429,12 @@ const LabelLibrary = ({
 
       {/* AI Assistant Chatbot */}
       <AIChatbot
-        onGenerateElements={(newElements, nextLabelSize, isNewRequest) => {
+        onGenerateElements={(newElements, nextLabelSize, isNewRequest, bindingType) => {
           onCreateLabel({
             name: `AI Design - ${new Date().toLocaleTimeString()}`,
-            elements: newElements,
-            labelSize: nextLabelSize || { width: 100, height: 80 }
+            elements: newElements.map(el => ({ ...el, binding_type: bindingType || "static" })),
+            labelSize: nextLabelSize || { width: 100, height: 80 },
+            binding_type: bindingType || "static"
           });
         }}
         labelSize={{ width: 100, height: 80 }}

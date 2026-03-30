@@ -372,6 +372,8 @@ const RollPrinterPreview = ({ labels, labelSettings, onClose }) => {
     (totalRows - 1) * verticalSpacing * MM_TO_PX +
     (margins.top + margins.bottom) * MM_TO_PX;
 
+  const [selectedDpi, setSelectedDpi] = useState(labelSettings?.dpi || 300);
+
   // Calculate preview scale
   const maxPreviewWidth = window.innerWidth * 0.5;
   const maxPreviewHeight = window.innerHeight * 0.6;
@@ -393,46 +395,21 @@ const RollPrinterPreview = ({ labels, labelSettings, onClose }) => {
 
       // Create print job record
       const jobData = {
-        printer_name: printerName,
-        document_name: labels[0]?.templateName ? `Bulk Print - ${labels[0].templateName}` : `Bulk Print - ${labels.length} Labels`,
-        design_id: labels[0]?.design_id || labels[0]?.id || labels[0]?.importContext?.templateId,
-        version_major: labels[0]?.version_major || 1,
-        version_minor: labels[0]?.version_minor || 0,
-        document_type: "label",
-        volumes: labels.length,
-        priority: "normal",
-        status: "pending",
-        total_records: totalAvailable,
-        printed_records: printedRecords,
-        printed_length: parseFloat(printedLengthMm),
-        source_data: labels[0]?.importContext?.sourceData || [],
+        design_id: labels[0]?.design_id || labels[0]?.id || labels[0]?.design?.id || labels[0]?.data?.id || labels[0]?.importContext?.templateId,
+        version_major: (labels[0]?.version_major !== undefined && labels[0]?.version_major !== null) ? labels[0].version_major : 1,
+        version_minor: (labels[0]?.version_minor !== undefined && labels[0]?.version_minor !== null) ? labels[0].version_minor : 0,
         connector_id: selectedConnectorId,
         printer_id: selectedPrinterId,
-        output_format: "zpl",
-        elements: (label.elements || []).map(el => {
-          const dpi = (label.settings && label.settings.dpi) ? label.settings.dpi : 203;
-          const mmToDots = dpi / 25.4;
-          const scaled = { ...el };
-          if (scaled.x !== undefined) scaled.x = el.x * mmToDots;
-          if (scaled.y !== undefined) scaled.y = el.y * mmToDots;
-          if (scaled.width !== undefined) scaled.width = el.width * mmToDots;
-          if (scaled.height !== undefined) scaled.height = el.height * mmToDots;
-          if (scaled.x1 !== undefined) scaled.x1 = el.x1 * mmToDots;
-          if (scaled.y1 !== undefined) scaled.y1 = el.y1 * mmToDots;
-          if (scaled.x2 !== undefined) scaled.x2 = el.x2 * mmToDots;
-          if (scaled.y2 !== undefined) scaled.y2 = el.y2 * mmToDots;
-          if (scaled.borderWidth !== undefined) scaled.borderWidth = (el.borderWidth || 0) * mmToDots;
-          return scaled;
-        }),
         idempotency_key: `bulk_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        metadata: {
-          label_width: labelSize.width,
-          label_height: labelSize.height,
-          columns,
-          is_bulk: true,
-          mappings: labels[0]?.importContext?.mappings || {}
-        }
+        render_dpi: selectedDpi, // Added for backend conversion
+        input_data: labels[0]?.importContext?.sourceData || []
       };
+
+      console.log("Submitting Bulk Print Job Data:", jobData);
+
+      if (!jobData.design_id) {
+        throw new Error("Cannot print: Missing design_id. Please save the design first.");
+      }
 
       await callEdgeFunction(API_URLS.CREATE_JOB, jobData);
       alert("Bulk print job submitted successfully.");
@@ -758,6 +735,20 @@ const RollPrinterPreview = ({ labels, labelSettings, onClose }) => {
                       />
                     </div>
                   </div>
+                </div>
+
+                <div className="mb-6">
+                  <h4 className="font-semibold text-sm mb-3">Output Resolution</h4>
+                  <select
+                    value={selectedDpi}
+                    onChange={(e) => setSelectedDpi(Number(e.target.value))}
+                    className="w-full border-2 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value={203}>203 DPI</option>
+                    <option value={300}>300 DPI</option>
+                    <option value={600}>600 DPI</option>
+                  </select>
+                  <p className="text-[10px] text-gray-500 mt-2">Physical resolution of your printer</p>
                 </div>
 
                 <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-3">

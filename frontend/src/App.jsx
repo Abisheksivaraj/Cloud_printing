@@ -316,7 +316,10 @@ const App = () => {
         name: labelData.name || currentLabel.name,
         description: labelData.description || currentLabel.description,
         dimensions: labelData.labelSize || currentLabel.dimensions || currentLabel.labelSize,
-        canvas_width: Math.round((labelData.labelSize?.width || currentLabel.dimensions?.width || currentLabel.labelSize?.width || 100) * MM_TO_PX),
+        settings: {
+          ...currentLabel.settings,
+          canvas_width: Math.round((labelData.labelSize?.width || currentLabel.dimensions?.width || currentLabel.labelSize?.width || 100) * MM_TO_PX),
+        },
         status: currentLabel.status, // Keep current status for update
       };
 
@@ -346,6 +349,7 @@ const App = () => {
           ? {
             ...label,
             ...updatedDesign,
+            elements: labelData.elements || label.elements || [], // Preserve elements during metadata update
             status: isPublishing ? 'published' : (updatedDesign.status || label.status),
             lastModified: new Date().toLocaleString(),
           }

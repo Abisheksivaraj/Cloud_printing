@@ -61,26 +61,20 @@ export const API_URLS = {
 };
 
 // Helper to call edge functions using the SDK
-export const callEdgeFunction = async (functionName, body) => {
+export const callEdgeFunction = async (functionName, body, retryCount = 0) => {
     // 1. Try to get token from current active session (source of truth)
     let { data: { session } } = await supabase.auth.getSession();
     
-    // 2. If session is missing but we have a refresh token, try a quick refresh
+    // 2. If session is missing but we have a refresh token, try restoration
     if (!session) {
         const storedRefresh = sessionStorage.getItem("refreshToken");
         const storedAuth = sessionStorage.getItem("authToken");
         if (storedRefresh && storedAuth) {
-            const { data, error } = await supabase.auth.setSession({
+            const { data } = await supabase.auth.setSession({
                 access_token: storedAuth,
                 refresh_token: storedRefresh
             });
-            if (!error && data.session) {
-                session = data.session;
-                sessionStorage.setItem("authToken", data.session.access_token);
-                if (data.session.refresh_token) {
-                    sessionStorage.setItem("refreshToken", data.session.refresh_token);
-                }
-            }
+            session = data.session;
         }
     }
 
@@ -91,31 +85,40 @@ export const callEdgeFunction = async (functionName, body) => {
     const headers = {};
     if (token && !authEndpoints.includes(functionName)) {
         headers.Authorization = `Bearer ${token.trim()}`;
-        // Verify token is not a placeholder string
-        if (token === "undefined" || token === "null") {
-            console.error(`Invalid token string detected for ${functionName}`);
-            token = null;
-        }
-    } else if (!token && !authEndpoints.includes(functionName)) {
-        console.warn(`No token found for ${functionName} - might result in Unauthorized`);
     }
 
-    console.log(`Calling Edge Function: ${functionName}`, body);
+    console.log(`Calling Edge Function: ${functionName} (Retry: ${retryCount})`);
     const { data, error } = await supabase.functions.invoke(functionName, {
         body: body,
         headers: headers,
     });
 
     if (error) {
+        // Handle 401 Unauthorized with one retry after a session refresh
+        const isUnauthorized = error.message?.includes("401") || 
+                             (error.context && error.context.status === 401);
+
+        if (isUnauthorized && retryCount < 1) {
+            console.warn(`401 Detected for ${functionName}. Refreshing session and retrying...`);
+            const { data: refreshData } = await supabase.auth.refreshSession();
+            if (refreshData?.session) {
+                sessionStorage.setItem("authToken", refreshData.session.access_token);
+                if (refreshData.session.refresh_token) {
+                    sessionStorage.setItem("refreshToken", refreshData.session.refresh_token);
+                }
+                // Small delay to let client state settle
+                await new Promise(resolve => setTimeout(resolve, 300));
+                return callEdgeFunction(functionName, body, retryCount + 1);
+            }
+        }
+
         console.error(`Error calling function ${functionName}:`, error);
 
         let errorMessage = 'Request failed';
 
-        // Supabase FunctionsHttpError usually includes context
         if (error.context) {
             try {
                 const response = error.context;
-                // error.context is a Response object
                 const text = await response.text();
                 try {
                     const parsed = JSON.parse(text);
@@ -185,19 +188,26 @@ export const normalizeDesign = (design) => {
         elements = elements.map(el => {
             const mapped = mapPayloadToElement(el);
             // MIGRATION: If canvas_width is missing, this is likely an old MM-based design.
-            // Convert positions and dimensions to PX for the new designer.
-            if (!base.canvas_width && !design.canvas_width) {
-                return {
-                    ...mapped,
-                    x: mapped.x * MM_TO_PX,
-                    y: mapped.y * MM_TO_PX,
-                    width: mapped.width * MM_TO_PX,
-                    height: mapped.height * MM_TO_PX,
-                    fontSize: (mapped.fontSize || 14) * (MM_TO_PX / 3.784), // Adjust legacy font sizes
-                    borderWidth: (mapped.borderWidth || 0) * MM_TO_PX,
-                    borderRadius: (mapped.borderRadius || 0) * MM_TO_PX,
-                    letterSpacing: (mapped.letterSpacing || 0) * MM_TO_PX,
-                };
+            // Check both top-level and settings for canvas_width
+            const hasCanvasWidth = base.canvas_width || design.canvas_width || base.settings?.canvas_width || design.settings?.canvas_width;
+            
+            if (!hasCanvasWidth) {
+                const thresholdX = (labelSize?.width || 100) * 1.5;
+                const isLikelyMm = mapped.x < thresholdX;
+                
+                if (isLikelyMm) {
+                    return {
+                        ...mapped,
+                        x: mapped.x * MM_TO_PX,
+                        y: mapped.y * MM_TO_PX,
+                        width: mapped.width * MM_TO_PX,
+                        height: mapped.height * MM_TO_PX,
+                        fontSize: (mapped.fontSize || 14) * (MM_TO_PX / 3.784),
+                        borderWidth: (mapped.borderWidth || 0) * MM_TO_PX,
+                        borderRadius: (mapped.borderRadius || 0) * MM_TO_PX,
+                        letterSpacing: (mapped.letterSpacing || 0) * MM_TO_PX,
+                    };
+                }
             }
             return mapped;
         });

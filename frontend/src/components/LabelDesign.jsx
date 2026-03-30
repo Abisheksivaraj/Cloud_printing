@@ -6,6 +6,7 @@ import ToolsPalette from "./designer/ToolsPalette";
 import PropertiesPanel from "./designer/PropertiesPanel";
 import BarcodeModal from "../components/Models/BarcodeModel";
 import CreateLabelModal from "../components/Models/CreateLabelModal";
+import BindingTypeModal from "../components/Models/BindingTypeModal";
 import { useTheme } from "../ThemeContext";
 import { useLanguage } from "../LanguageContext";
 import AIChatbot from "./designer/AIChatbot";
@@ -18,6 +19,7 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
   const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [pendingBindingElement, setPendingBindingElement] = useState(null);
   // Helper to get dimensions from various possible formats
   const getInitialDimensions = (l) => {
     if (l?.labelSize) return l.labelSize;
@@ -166,11 +168,11 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
       version_major: label.version_major || 0,
       version_minor: label.version_minor || 1,
       element_type: el.type,
-      position_x: el.x,
-      position_y: el.y,
-      width: el.width,
-      height: el.height,
-      binding_type: el.binding_type || "static",
+      position_x: Math.round(el.x),
+      position_y: Math.round(el.y),
+      width: Math.round(el.width),
+      height: Math.round(el.height),
+      binding_type: el.binding_type || null,
       static_content: content || " ", // Ensure at least a space if still empty
       properties: { ...el }, // Store full state in JSON properties
       sort_order: el.zIndex || 0
@@ -221,11 +223,12 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     } else if (type === "text" || type === "barcode") {
       newElement = {
         ...newElement,
-        width: type === "text" ? 151 : 227, // ~40 vs 60mm
-        height: type === "text" ? 30 : 95, // ~8 vs 25mm
-        content: type === "text" ? "Sample Text" : "123456789",
+        width: extra.width || (type === "text" ? 151 : 227), // ~40 vs 60mm
+        height: extra.height || (type === "text" ? 30 : 95), // ~8 vs 25mm
+        content: extra.content || (type === "text" ? "Sample Text" : "123456789"),
         barcodeType: type === "barcode" ? (extra.barcodeType || "CODE128") : undefined,
-        fontSize: 14, fontFamily: "Arial",
+        fontSize: extra.fontSize || 14, 
+        fontFamily: extra.fontFamily || "Arial",
       };
     } else if (type === "line" && Object.keys(extra).length === 0) {
       // If we're just triggering the tool, don't create yet
@@ -234,26 +237,52 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     }
 
     // Optimistically add locally first so it shows up immediately
+    console.log("Adding Element (pending binding type):", newElement, "Position:", { x: newElement.x, y: newElement.y });
     setElements((prev) => [...prev, newElement]);
     setSelectedElementId(newElement.id);
     setSelectedTool(null);
 
-    // Only sync to backend if we have a design_id
+    // Prompt for binding type before syncing
+    setPendingBindingElement(newElement);
+  };
+
+  const handleBindingTypeSave = async (bindingType) => {
+    if (!pendingBindingElement) return;
+
+    const updatedElement = { ...pendingBindingElement, binding_type: bindingType };
+    
+    // Update locally
+    setElements((prev) => prev.map(el => el.id === pendingBindingElement.id ? updatedElement : el));
+    setPendingBindingElement(null);
+
     const designId = label?.design_id || label?.id;
     if (!designId) return;
 
     try {
-      const payload = mapElementToPayload(newElement);
+      const payload = mapElementToPayload(updatedElement);
       const result = await callEdgeFunction(API_URLS.ADD_ELEMENT, payload);
       if (result) {
-        const synced = mapPayloadToElement(result);
-        // Replace the optimistic element with the synced one (using backend ID)
-        setElements((prev) => prev.map(el => el.id === newElement.id ? synced : el));
+        const synced = { ...updatedElement, ...mapPayloadToElement(result) };
+        setElements((prev) => {
+          const exists = prev.some(el => el.id === updatedElement.id);
+          if (exists) {
+            return prev.map(el => el.id === updatedElement.id ? synced : el);
+          } else {
+            return [...prev, synced];
+          }
+        });
         setSelectedElementId(synced.id);
       }
     } catch (error) {
-      console.error("Failed to sync add-element:", error);
-      // Keep the local one if sync fails
+      console.error("Failed to sync add-element with binding type:", error);
+    }
+  };
+
+  const handleBindingTypeCancel = () => {
+    if (pendingBindingElement) {
+      setElements((prev) => prev.filter(el => el.id !== pendingBindingElement.id));
+      if (selectedElementId === pendingBindingElement.id) setSelectedElementId(null);
+      setPendingBindingElement(null);
     }
   };
 
@@ -282,26 +311,11 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
           zIndex: elements.length,
         };
 
-        try {
-          const designId = label?.design_id || label?.id;
-          if (!designId) {
-            // No design saved yet — add locally only
-            setElements((prev) => [...prev, element]);
-            setSelectedElementId(element.id);
-          } else {
-            const payload = mapElementToPayload(element);
-            const result = await callEdgeFunction(API_URLS.ADD_ELEMENT, payload);
-            if (result) {
-              const synced = mapPayloadToElement(result);
-              setElements((prev) => [...prev, synced]);
-              setSelectedElementId(synced.id);
-            }
-          }
-        } catch (error) {
-          console.error("Failed to sync image:", error);
-          setElements((prev) => [...prev, element]);
-          setSelectedElementId(element.id);
-        }
+        console.log("Adding Image Element (pending binding type):", element, "Position:", { x: element.x, y: element.y });
+        
+        setElements((prev) => [...prev, element]);
+        setSelectedElementId(element.id);
+        setPendingBindingElement(element);
       };
       img.src = dataUrl;
     };
@@ -311,34 +325,35 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
 
   // ─── Placeholder ─────────────────────────────────────────────────────────
   const handleAddPlaceholder = async (placeholderName) => {
+    const tempId = generateId();
     const element = {
-      id: generateId(),
+      id: tempId,
       type: "placeholder",
-      x: 189, y: 189, width: 567, height: 132, // ~50mm offset, 150x35mm size? Wait, 150x35mm is huge. 
-      // Existing code had 50, 50, 150, 35. 
+      x: 189, y: 189, width: 567, height: 132, 
       content: placeholderName,
       fontSize: 14, fontFamily: "Arial",
       rotation: 0, zIndex: elements.length,
     };
 
+    // Optimistically add locally
+    setElements((prev) => [...prev, element]);
+    setSelectedElementId(tempId);
+
+    const designId = label?.design_id || label?.id;
+    if (!designId) return; // No design saved yet, stays as local temp element
+
     try {
-      const designId = label?.design_id || label?.id;
-      if (!designId) {
-        setElements((prev) => [...prev, element]);
-        setSelectedElementId(element.id);
-        return;
-      }
       const payload = mapElementToPayload(element);
       payload.binding_type = "placeholder";
       const result = await callEdgeFunction(API_URLS.ADD_ELEMENT, payload);
       if (result) {
-        setElements((prev) => [...prev, mapPayloadToElement(result)]);
-        setSelectedElementId(result.id);
+        const synced = { ...element, ...mapPayloadToElement(result) };
+        setElements((prev) => prev.map(el => el.id === tempId ? synced : el));
+        setSelectedElementId(synced.id);
       }
     } catch (error) {
       console.error("Failed to sync placeholder:", error);
-      setElements((prev) => [...prev, element]);
-      setSelectedElementId(element.id);
+      // Keep the local one if sync fails
     }
   };
 
@@ -750,15 +765,67 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
         />
       )}
 
+      {pendingBindingElement && (
+        <BindingTypeModal
+          onClose={handleBindingTypeCancel}
+          onSave={handleBindingTypeSave}
+          defaultType={pendingBindingElement.type === "barcode" ? "dynamic" : "static"}
+        />
+      )}
+
       {/* AI Assistant Chatbot */}
       <AIChatbot
         onCreateLabel={onCreateLabel}
-        onGenerateElements={(newElements, nextLabelSize, isNewRequest) => {
+        onGenerateElements={async (newElements, nextLabelSize, isNewRequest, bindingType) => {
           if (nextLabelSize) setLabelSize(nextLabelSize);
+          
+          const designId = label?.design_id || label?.id;
+          
+          // Apply binding type to new elements
+          const elementsWithBinding = newElements.map(el => ({
+            ...el,
+            binding_type: bindingType || el.binding_type || "static"
+          }));
+
           if (isNewRequest) {
-            setElements(newElements);
+            setElements(elementsWithBinding);
+            // If we have a design ID, sync all new elements immediately
+            if (designId) {
+              try {
+                const results = await Promise.all(
+                  elementsWithBinding.map(async (el) => {
+                    const payload = mapElementToPayload(el);
+                    const result = await callEdgeFunction(API_URLS.ADD_ELEMENT, payload);
+                    return { local: el, synced: mapPayloadToElement(result) };
+                  })
+                );
+                const syncedElements = results.map(r => ({ ...r.local, ...r.synced }));
+                setElements(syncedElements);
+              } catch (error) {
+                console.error("Failed to sync AI-generated elements:", error);
+              }
+            }
           } else {
-            setElements((prev) => [...prev, ...newElements]);
+            setElements((prev) => [...prev, ...elementsWithBinding]);
+            if (designId) {
+              try {
+                const results = await Promise.all(
+                  elementsWithBinding.map(async (el) => {
+                    const payload = mapElementToPayload(el);
+                    const result = await callEdgeFunction(API_URLS.ADD_ELEMENT, payload);
+                    return { local: el, synced: mapPayloadToElement(result) };
+                  })
+                );
+                const syncedBatch = results.map(r => ({ ...r.local, ...r.synced }));
+                setElements((prev) => {
+                  const tempIds = elementsWithBinding.map(n => n.id);
+                  const filtered = prev.filter(p => !tempIds.includes(p.id));
+                  return [...filtered, ...syncedBatch];
+                });
+              } catch (error) {
+                console.error("Failed to sync AI-generated batch:", error);
+              }
+            }
           }
         }}
         labelSize={labelSize}

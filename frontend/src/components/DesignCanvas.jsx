@@ -1378,8 +1378,8 @@ const DesignCanvas = forwardRef(
                 onMouseDown={(e) => {
                   const rect = canvasRef.current.getBoundingClientRect();
                   const scale = displayZoom / 100;
-                  const clickX = (e.clientX - rect.left) / (scale * MM_TO_PX);
-                  const clickY = (e.clientY - rect.top) / (scale * MM_TO_PX);
+                   const clickX = (e.clientX - rect.left) / scale;
+                   const clickY = (e.clientY - rect.top) / scale;
 
                   const distToStart = Math.sqrt(
                     Math.pow(clickX - x1, 2) + Math.pow(clickY - y1, 2),
@@ -1388,7 +1388,7 @@ const DesignCanvas = forwardRef(
                     Math.pow(clickX - x2, 2) + Math.pow(clickY - y2, 2),
                   );
 
-                  if (distToStart > 10 / MM_TO_PX && distToEnd > 10 / MM_TO_PX) {
+                   if (distToStart > 10 && distToEnd > 10) {
                     handleElementMouseDown(e, element);
                   }
                 }}
@@ -1447,10 +1447,10 @@ const DesignCanvas = forwardRef(
 
         const style = {
           position: "absolute",
-          left: element.x,
-          top: element.y,
-          width: element.width,
-          height: element.height,
+          left: `${element.x}px`,
+          top: `${element.y}px`,
+          width: `${element.width}px`,
+          height: `${element.height}px`,
           transform: `rotate(${element.rotation || 0}deg)`,
           transformOrigin: "center center", // Ensure rotation is around center
           zIndex: element.zIndex || 0,
@@ -1460,15 +1460,15 @@ const DesignCanvas = forwardRef(
               ? "crosshair"
               : "move",
           borderWidth: isSelected && !isDrawingLine && !isDrawingBarcode && !isDrawingShape
-            ? 2
-            : ((element.borderWidth || 0) || (element.type === "barcode" ? 0 : 1)),
+            ? `2px`
+            : `${((element.borderWidth || 0) || (element.type === "barcode" ? 0 : 1))}px`,
           borderStyle: isSelected && !isDrawingLine && !isDrawingBarcode && !isDrawingShape
             ? "solid"
             : (element.borderWidth > 0 ? (element.borderStyle || "solid") : "solid"),
           borderColor: isSelected && !isDrawingLine && !isDrawingBarcode && !isDrawingShape
             ? "var(--color-primary)"
             : (element.borderWidth > 0 ? element.borderColor : "transparent"),
-          fontSize: element.fontSize || 14,
+          fontSize: `${element.fontSize || 14}px`,
           fontFamily: element.fontFamily,
           fontWeight: element.fontWeight,
           fontStyle: element.fontStyle,
@@ -1964,6 +1964,7 @@ const DesignCanvas = forwardRef(
                   boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
                   border: '1px solid #cbd5e1',
                   boxSizing: 'border-box',
+                  overflow: 'hidden',
                   backgroundImage: showGrid
                     ? `radial-gradient(${gridColor} 1px, transparent 1px)`
                     : "none",
