@@ -148,16 +148,20 @@ export const callEdgeFunction = async (functionName, body, retryCount = 0) => {
 
 export const mapPayloadToElement = (payload) => {
     if (!payload) return null;
+    const props = payload.properties || {};
     return {
-        ...(payload.properties || {}), // Load extra style properties from JSON field
+        ...props, // Load extra style properties from JSON field
         id: payload.id,
         type: payload.element_type || payload.type,
-        x: payload.position_x !== undefined ? payload.position_x : payload.x,
-        y: payload.position_y !== undefined ? payload.position_y : payload.y,
-        width: payload.width,
-        height: payload.height,
-        content: payload.static_content !== undefined ? payload.static_content : payload.content,
-        zIndex: payload.sort_order !== undefined ? payload.sort_order : payload.zIndex
+        x: payload.position_x !== undefined ? payload.position_x : (props.x !== undefined ? props.x : payload.x),
+        y: payload.position_y !== undefined ? payload.position_y : (props.y !== undefined ? props.y : payload.y),
+        width: payload.width !== undefined ? payload.width : props.width,
+        height: payload.height !== undefined ? payload.height : props.height,
+        fontSize: props.fontSize || payload.fontSize,
+        borderWidth: props.borderWidth !== undefined ? props.borderWidth : payload.borderWidth,
+        borderRadius: props.borderRadius !== undefined ? props.borderRadius : payload.borderRadius,
+        content: payload.static_content !== undefined ? payload.static_content : (payload.content || props.content),
+        zIndex: payload.sort_order !== undefined ? payload.sort_order : (payload.zIndex || props.zIndex || props.sort_order)
     };
 };
 

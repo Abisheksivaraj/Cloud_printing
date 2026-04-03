@@ -163,18 +163,33 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
       content = el.type.toUpperCase();
     }
 
+    // Ensure all numeric properties are stored as rounded numbers for the backend
+    const pos_x = Math.round(el.x);
+    const pos_y = Math.round(el.y);
+    const w = Math.round(el.width);
+    const h = Math.round(el.height);
+
     return {
       design_id: designId,
       version_major: label.version_major || 0,
       version_minor: label.version_minor || 1,
       element_type: el.type,
-      position_x: Math.round(el.x),
-      position_y: Math.round(el.y),
-      width: Math.round(el.width),
-      height: Math.round(el.height),
+      position_x: pos_x,
+      position_y: pos_y,
+      width: w,
+      height: h,
       binding_type: el.binding_type || null,
-      static_content: content || " ", // Ensure at least a space if still empty
-      properties: { ...el }, // Store full state in JSON properties
+      static_content: content || " ",
+      properties: {
+        ...el,
+        x: pos_x,
+        y: pos_y,
+        width: w,
+        height: h,
+        fontSize: el.fontSize ? Math.round(el.fontSize) : undefined,
+        borderWidth: el.borderWidth !== undefined ? Math.round(el.borderWidth) : undefined,
+        borderRadius: el.borderRadius !== undefined ? Math.round(el.borderRadius) : undefined,
+      },
       sort_order: el.zIndex || 0
     };
   };

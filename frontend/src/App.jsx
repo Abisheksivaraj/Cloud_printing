@@ -318,9 +318,11 @@ const App = () => {
         dimensions: labelData.labelSize || currentLabel.dimensions || currentLabel.labelSize,
         settings: {
           ...currentLabel.settings,
+          dpi: currentLabel.settings?.dpi || 203,
           canvas_width: Math.round((labelData.labelSize?.width || currentLabel.dimensions?.width || currentLabel.labelSize?.width || 100) * MM_TO_PX),
+          default_font: currentLabel.settings?.default_font || "Arial"
         },
-        status: currentLabel.status, // Keep current status for update
+        status: currentLabel.status,
       };
 
       const savedResult = await callEdgeFunction(API_URLS.UPDATE_DESIGN, updatePayload);

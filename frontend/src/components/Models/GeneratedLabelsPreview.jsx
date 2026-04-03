@@ -105,8 +105,10 @@ const CutMarks = () => {
    RENDER LABEL
 ========================= */
 const RenderLabel = ({ label }) => {
-  const labelW = (label.labelSize?.width || 100) * MM_TO_PX;
-  const labelH = (label.labelSize?.height || 80) * MM_TO_PX;
+  // Use canvas_width if available, otherwise fallback to mm * MM_TO_PX
+  const labelW = label.settings?.canvas_width || (label.labelSize?.width || 100) * MM_TO_PX;
+  // Calculate height proportional to width based on mm dimensions
+  const labelH = (label.settings?.canvas_width ? (label.settings.canvas_width * (label.labelSize?.height / label.labelSize?.width)) : (label.labelSize?.height || 80) * MM_TO_PX);
 
   return (
     <div
@@ -121,23 +123,24 @@ const RenderLabel = ({ label }) => {
       }}
     >
       {(label.elements || []).map((element, elIndex) => {
+        // Elements are normalized to pixels in supabaseClient.js
         const style = {
           position: "absolute",
-          left: element.x * MM_TO_PX,
-          top: element.y * MM_TO_PX,
-          width: element.width * MM_TO_PX,
-          height: element.height * MM_TO_PX,
-          fontSize: (element.fontSize || 14) * (MM_TO_PX / 3.78),
+          left: element.x,
+          top: element.y,
+          width: element.width,
+          height: element.height,
+          fontSize: element.fontSize,
           fontFamily: element.fontFamily,
           fontWeight: element.fontWeight,
           fontStyle: element.fontStyle,
           textAlign: element.textAlign,
           color: element.color,
           backgroundColor: element.backgroundColor,
-          borderWidth: (element.borderWidth || 0) * MM_TO_PX,
+          borderWidth: element.borderWidth || 0,
           borderColor: element.borderColor,
           borderStyle: (element.borderWidth > 0) ? (element.borderStyle || "solid") : "none",
-          borderRadius: element.borderRadius ? `${element.borderRadius * MM_TO_PX}px` : undefined,
+          borderRadius: element.borderRadius ? `${element.borderRadius}px` : undefined,
           boxSizing: "border-box",
         };
 
@@ -178,10 +181,10 @@ const RenderLabel = ({ label }) => {
               key={elIndex}
               style={{
                 position: "absolute",
-                left: element.x * MM_TO_PX,
-                top: element.y * MM_TO_PX,
-                width: element.width * MM_TO_PX,
-                height: element.height * MM_TO_PX,
+                left: element.x,
+                top: element.y,
+                width: element.width,
+                height: element.height,
                 backgroundColor: "#fff",
                 display: "flex",
                 alignItems: "center",
@@ -218,20 +221,20 @@ const RenderLabel = ({ label }) => {
               key={elIndex}
               style={{
                 position: "absolute",
-                left: Math.min(x1, x2) * MM_TO_PX,
-                top: Math.min(y1, y2) * MM_TO_PX,
-                width: Math.abs(x2 - x1) * MM_TO_PX,
-                height: Math.abs(y2 - y1) * MM_TO_PX,
+                left: Math.min(x1, x2),
+                top: Math.min(y1, y2),
+                width: Math.abs(x2 - x1),
+                height: Math.abs(y2 - y1),
                 overflow: "visible",
               }}
             >
               <line
-                x1={(x1 < x2 ? 0 : Math.abs(x2 - x1)) * MM_TO_PX}
-                y1={(y1 < y2 ? 0 : Math.abs(y2 - y1)) * MM_TO_PX}
-                x2={(x1 < x2 ? Math.abs(x2 - x1) : 0) * MM_TO_PX}
-                y2={(y1 < y2 ? Math.abs(y2 - y1) : 0) * MM_TO_PX}
+                x1={x1 < x2 ? 0 : Math.abs(x2 - x1)}
+                y1={y1 < y2 ? 0 : Math.abs(y2 - y1)}
+                x2={x1 < x2 ? Math.abs(x2 - x1) : 0}
+                y2={y1 < y2 ? Math.abs(y2 - y1) : 0}
                 stroke={element.borderColor || "#000000"}
-                strokeWidth={(element.borderWidth || 2) * MM_TO_PX}
+                strokeWidth={element.borderWidth || 2}
                 strokeDasharray={
                   element.borderStyle === "dashed"
                     ? "5,5"
@@ -400,8 +403,7 @@ const RollPrinterPreview = ({ labels, labelSettings, onClose }) => {
         version_minor: (labels[0]?.version_minor !== undefined && labels[0]?.version_minor !== null) ? labels[0].version_minor : 0,
         connector_id: selectedConnectorId,
         printer_id: selectedPrinterId,
-        idempotency_key: `bulk_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        render_dpi: selectedDpi, // Added for backend conversion
+        idempotency_key: `bulk_${Date.now()}_${Math.random().toString(36).slice(2)}`,
         input_data: labels[0]?.importContext?.sourceData || []
       };
 
