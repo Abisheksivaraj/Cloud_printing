@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import BarcodeElement from "../components/designer/code";
 import { useTheme } from "../ThemeContext";
+import { convertToPx } from "../supabaseClient";
 
 const DesignCanvas = forwardRef(
   (
@@ -16,7 +17,7 @@ const DesignCanvas = forwardRef(
       setElements,
       selectedElementId,
       setSelectedElementId,
-      labelSize = { width: 100, height: 80 },
+      labelSize = { width: 100, height: 80, unit: 'mm' },
       showGrid = true,
       isDrawingLine = false,
       setIsDrawingLine,
@@ -86,17 +87,18 @@ const DesignCanvas = forwardRef(
     const [history, setHistory] = useState([[]]);
     const [historyIndex, setHistoryIndex] = useState(0);
 
-    const MM_TO_PX = 3.7795275591;
     const RULER_SIZE = 32;
 
     const getCanvasPixelSize = () => {
       const width = labelSize?.width || 100;
       const height = labelSize?.height || 80;
+      const unit = labelSize?.unit || 'mm';
       return {
-        width: width * MM_TO_PX,
-        height: height * MM_TO_PX,
+        width: convertToPx(width, unit),
+        height: convertToPx(height, unit),
       };
     };
+
 
     const displayZoom = zoom;
     const canvasPixelSize = getCanvasPixelSize();

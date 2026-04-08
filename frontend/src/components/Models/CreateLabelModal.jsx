@@ -204,8 +204,8 @@ const CreateLabelModal = ({ onClose, onCreate }) => {
                     style={{ backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }}
                   >
                     <option value="mm">mm</option>
-                    <option value="in">in</option>
-                    <option value="px">px</option>
+                    <option value="cm">cm</option>
+                    <option value="inch">inch</option>
                   </select>
                 </div>
                 <div className="space-y-2">

@@ -3,10 +3,7 @@ import { X, Printer, Settings, Maximize2, Minimize2, Check } from "lucide-react"
 import * as htmlToImage from 'html-to-image';
 import BarcodeElement from "../designer/code";
 import { useTheme } from "../../ThemeContext";
-import { callEdgeFunction, API_URLS } from "../../supabaseClient";
-
-
-const MM_TO_PX = 3.7795275591;
+import { callEdgeFunction, API_URLS, convertToPx } from "../../supabaseClient";
 
 /* =========================
    CUT MARKS
@@ -36,10 +33,15 @@ const CutMarks = () => {
    RENDER LABEL - EXACT MATCH TO DESIGN CANVAS
 ========================= */
 const RenderLabel = ({ label, noBorder = false }) => {
-  // Use canvas_width if available, otherwise fallback to mm * MM_TO_PX
-  const labelW = label.settings?.canvas_width || (label.labelSize?.width || 100) * MM_TO_PX;
-  // Calculate height proportional to width based on mm dimensions
-  const labelH = (label.settings?.canvas_width ? (label.settings.canvas_width * (label.labelSize?.height / label.labelSize?.width)) : (label.labelSize?.height || 80) * MM_TO_PX);
+  const width = label.labelSize?.width || 100;
+  const height = label.labelSize?.height || 80;
+  const unit = label.labelSize?.unit || 'mm';
+
+  // Use canvas_width if available (legacy), otherwise use unit conversion
+  const labelW = label.settings?.canvas_width || convertToPx(width, unit);
+  const labelH = label.settings?.canvas_width 
+    ? (label.settings.canvas_width * (height / width)) 
+    : convertToPx(height, unit);
 
   return (
     <div
@@ -52,6 +54,7 @@ const RenderLabel = ({ label, noBorder = false }) => {
         border: noBorder ? "none" : "5px solid #000000",
       }}
     >
+
       {(label.elements || []).map((element, elIndex) => {
         // Elements are already normalized to pixels in supabaseClient.js
         const style = {
@@ -293,18 +296,20 @@ const PrintPreviewModal = ({ label, onClose }) => {
   const { cols, rows } = config;
 
   /* ---- Sizes ---- */
-  const labelW = labelSize.width * MM_TO_PX;
-  const labelH = labelSize.height * MM_TO_PX;
+  const unit = labelSize.unit || 'mm';
+  const labelW = convertToPx(labelSize.width, unit);
+  const labelH = convertToPx(labelSize.height, unit);
 
+  // Gaps and margins are currently in MM in the UI
   const sheetWidth =
     cols * labelW +
-    (cols - 1) * horizontalGap * MM_TO_PX +
-    (margins.left + margins.right) * MM_TO_PX;
+    (cols - 1) * convertToPx(horizontalGap, 'mm') +
+    (convertToPx(margins.left, 'mm') + convertToPx(margins.right, 'mm'));
 
   const sheetHeight =
     rows * labelH +
-    (rows - 1) * verticalGap * MM_TO_PX +
-    (margins.top + margins.bottom) * MM_TO_PX;
+    (rows - 1) * convertToPx(verticalGap, 'mm') +
+    (convertToPx(margins.top, 'mm') + convertToPx(margins.bottom, 'mm'));
 
   // Calculate preview scale to fit in viewport
   // We want a bit more padding for the new UI
@@ -322,7 +327,7 @@ const PrintPreviewModal = ({ label, onClose }) => {
       let printerName = "System Default";
 
       // Calculate print metrics
-      const printedLengthMm = (sheetHeight / MM_TO_PX).toFixed(1);
+      const printedLengthMm = (sheetHeight / (96 / 25.4)).toFixed(1);
 
       // Capture label as PNG
       let renderedPng = null;
@@ -428,7 +433,7 @@ const PrintPreviewModal = ({ label, onClose }) => {
                 Print Preview
               </h2>
               <p className="text-sm mt-1" style={{ color: theme.textMuted }}>
-                {config.name} • {labelSize.width}×{labelSize.height}mm
+                {config.name} • {Math.round(labelSize.width * 100) / 100}×{Math.round(labelSize.height * 100) / 100}{labelSize.unit || 'mm'}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -663,8 +668,8 @@ const PrintPreviewModal = ({ label, onClose }) => {
                       display: "grid",
                       gridTemplateColumns: `repeat(${cols}, ${labelW}px)`,
                       gridTemplateRows: `repeat(${rows}, ${labelH}px)`,
-                      gap: `${verticalGap * MM_TO_PX}px ${horizontalGap * MM_TO_PX}px`,
-                      padding: `${margins.top * MM_TO_PX}px ${margins.right * MM_TO_PX}px ${margins.bottom * MM_TO_PX}px ${margins.left * MM_TO_PX}px`,
+                      gap: `${convertToPx(verticalGap, 'mm')}px ${convertToPx(horizontalGap, 'mm')}px`,
+                      padding: `${convertToPx(margins.top, 'mm')}px ${convertToPx(margins.right, 'mm')}px ${convertToPx(margins.bottom, 'mm')}px ${convertToPx(margins.left, 'mm')}px`,
                       backgroundColor: "#fff",
                       backgroundImage: `
                             linear-gradient(45deg, #f0f0f0 25%, transparent 25%), 
@@ -698,7 +703,7 @@ const PrintPreviewModal = ({ label, onClose }) => {
               </div>
 
               <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-2 text-center text-xs text-gray-500">
-                Sheet Size: {(sheetWidth / MM_TO_PX).toFixed(1)}mm × {(sheetHeight / MM_TO_PX).toFixed(1)}mm
+                Sheet Size: {(sheetWidth / (96 / 25.4)).toFixed(1)}mm × {(sheetHeight / (96 / 25.4)).toFixed(1)}mm
               </div>
             </div>
           </div>
@@ -742,9 +747,9 @@ const PrintPreviewModal = ({ label, onClose }) => {
               display: "grid",
               gridTemplateColumns: `repeat(${cols}, ${labelW}px)`,
               gridTemplateRows: `repeat(${rows}, ${labelH}px)`,
-              columnGap: `${horizontalGap * MM_TO_PX}px`,
-              rowGap: `${verticalGap * MM_TO_PX}px`,
-              padding: `${margins.top * MM_TO_PX}px ${margins.right * MM_TO_PX}px ${margins.bottom * MM_TO_PX}px ${margins.left * MM_TO_PX}px`,
+              columnGap: `${convertToPx(horizontalGap, 'mm')}px`,
+              rowGap: `${convertToPx(verticalGap, 'mm')}px`,
+              padding: `${convertToPx(margins.top, 'mm')}px ${convertToPx(margins.right, 'mm')}px ${convertToPx(margins.bottom, 'mm')}px ${convertToPx(margins.left, 'mm')}px`,
               width: "100%",
               height: "100%",
               boxSizing: "border-box",

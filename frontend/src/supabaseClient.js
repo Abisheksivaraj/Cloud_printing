@@ -141,10 +141,33 @@ export const callEdgeFunction = async (functionName, body, retryCount = 0) => {
 };
 
 /* ==========================================================================
-   DESIGN NORMALIZATION & MAPPING UTILITIES
-   Ensures consistent property names across components regardless of backend 
-   naming conventions (e.g., position_x vs x).
+   UNIT CONVERSION UTILITIES (96 DPI assumption)
    ========================================================================== */
+
+const DPI = 96;
+const MM_TO_PX_RATIO = DPI / 25.4;
+const CM_TO_PX_RATIO = DPI / 2.54;
+const INCH_TO_PX_RATIO = DPI;
+
+export const convertToPx = (value, unit) => {
+    if (value === undefined || value === null) return value;
+    switch (unit) {
+        case 'mm': return value * MM_TO_PX_RATIO;
+        case 'cm': return value * CM_TO_PX_RATIO;
+        case 'inch': return value * INCH_TO_PX_RATIO;
+        default: return value; // Default to px or unknown
+    }
+};
+
+export const convertFromPx = (px, unit) => {
+    if (px === undefined || px === null) return px;
+    switch (unit) {
+        case 'mm': return px / MM_TO_PX_RATIO;
+        case 'cm': return px / CM_TO_PX_RATIO;
+        case 'inch': return px / INCH_TO_PX_RATIO;
+        default: return px;
+    }
+};
 
 export const mapPayloadToElement = (payload) => {
     if (!payload) return null;
@@ -157,7 +180,7 @@ export const mapPayloadToElement = (payload) => {
         y: payload.position_y !== undefined ? payload.position_y : (props.y !== undefined ? props.y : payload.y),
         width: payload.width !== undefined ? payload.width : props.width,
         height: payload.height !== undefined ? payload.height : props.height,
-        fontSize: props.fontSize || payload.fontSize,
+        fontSize: props.fontSize !== undefined ? props.fontSize : payload.fontSize,
         borderWidth: props.borderWidth !== undefined ? props.borderWidth : payload.borderWidth,
         borderRadius: props.borderRadius !== undefined ? props.borderRadius : payload.borderRadius,
         content: payload.static_content !== undefined ? payload.static_content : (payload.content || props.content),
@@ -168,9 +191,7 @@ export const mapPayloadToElement = (payload) => {
 export const normalizeDesign = (design) => {
     if (!design) return design;
 
-    const MM_TO_PX = 3.7795275591;
-
-    // Flatten nested design/data wrappers if present from API response
+    // Flatten nested design/data wrappers
     const base = design.design || design.data || design;
     const finalId = base.design_id || base.id || design.design_id || design.id;
 
@@ -181,39 +202,40 @@ export const normalizeDesign = (design) => {
     if (labelSize) {
         labelSize = {
             ...labelSize,
-            width: Math.round(labelSize.width),
-            height: Math.round(labelSize.height)
+            width: Number(labelSize.width),
+            height: Number(labelSize.height),
+            unit: labelSize.unit === 'in' ? 'inch' : (labelSize.unit || 'mm')
         };
+    } else {
+        labelSize = { width: 100, height: 80, unit: 'mm' };
     }
+
+    const currentUnit = labelSize.unit;
 
     // Normalize and map elements array
     let elements = base.elements || design.elements || [];
     if (Array.isArray(elements)) {
         elements = elements.map(el => {
             const mapped = mapPayloadToElement(el);
-            // MIGRATION: If canvas_width is missing, this is likely an old MM-based design.
-            // Check both top-level and settings for canvas_width
-            const hasCanvasWidth = base.canvas_width || design.canvas_width || base.settings?.canvas_width || design.settings?.canvas_width;
             
-            if (!hasCanvasWidth) {
-                const thresholdX = (labelSize?.width || 100) * 1.5;
-                const isLikelyMm = mapped.x < thresholdX;
-                
-                if (isLikelyMm) {
-                    return {
-                        ...mapped,
-                        x: mapped.x * MM_TO_PX,
-                        y: mapped.y * MM_TO_PX,
-                        width: mapped.width * MM_TO_PX,
-                        height: mapped.height * MM_TO_PX,
-                        fontSize: (mapped.fontSize || 14) * (MM_TO_PX / 3.784),
-                        borderWidth: (mapped.borderWidth || 0) * MM_TO_PX,
-                        borderRadius: (mapped.borderRadius || 0) * MM_TO_PX,
-                        letterSpacing: (mapped.letterSpacing || 0) * MM_TO_PX,
-                    };
-                }
-            }
-            return mapped;
+            const converted = {
+                ...mapped,
+                x: convertToPx(mapped.x, currentUnit),
+                y: convertToPx(mapped.y, currentUnit),
+                width: convertToPx(mapped.width, currentUnit),
+                height: convertToPx(mapped.height, currentUnit),
+                fontSize: convertToPx(mapped.fontSize, currentUnit),
+                borderWidth: convertToPx(mapped.borderWidth, currentUnit),
+                borderRadius: convertToPx(mapped.borderRadius, currentUnit),
+            };
+
+            // Handle special cases like line points if they exist in properties
+            if (mapped.x1 !== undefined) converted.x1 = convertToPx(mapped.x1, currentUnit);
+            if (mapped.y1 !== undefined) converted.y1 = convertToPx(mapped.y1, currentUnit);
+            if (mapped.x2 !== undefined) converted.x2 = convertToPx(mapped.x2, currentUnit);
+            if (mapped.y2 !== undefined) converted.y2 = convertToPx(mapped.y2, currentUnit);
+
+            return converted;
         });
     }
 
@@ -222,7 +244,8 @@ export const normalizeDesign = (design) => {
         ...base,
         id: finalId,
         design_id: finalId,
-        labelSize: labelSize || { width: 100, height: 80 },
+        labelSize,
         elements
     };
 };
+

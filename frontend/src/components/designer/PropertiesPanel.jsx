@@ -1,11 +1,6 @@
-import React, { useState } from "react";
-import {
-  Trash2, Undo, Redo, Copy, Plus, Check,
-  FileText, ArrowUp, ArrowDown, RotateCw,
-  AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline,
-  ChevronDown, ChevronUp, Layers, Image as ImageIcon,
-} from "lucide-react";
+import { Trash2, Undo, Redo, Copy, Plus, Check, FileText, ArrowUp, ArrowDown, RotateCw, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, ChevronDown, ChevronUp, Layers, Image as ImageIcon, Settings, Ruler } from "lucide-react";
 import { useTheme } from "../../ThemeContext";
+import { convertToPx, convertFromPx } from "../../supabaseClient";
 
 const PropertiesPanel = ({
   selectedElement,
@@ -32,7 +27,10 @@ const PropertiesPanel = ({
   setSelectedBarcodeType,
   onBringForward,
   onSendBackward,
+  labelSize,
+  updateLabelSize
 }) => {
+
   const { theme, isDarkMode } = useTheme();
   const [tableRows, setTableRows] = useState(2);
   const [tableColumns, setTableColumns] = useState(2);
@@ -87,7 +85,8 @@ const PropertiesPanel = ({
   const el = selectedElement;
   const id = el?.id;
 
-  // Section header style
+  const unit = labelSize?.unit || "mm";
+
   const SectionHeader = ({ children, color = "var(--color-primary)" }) => (
     <h5 className="text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5" style={{ color }}>
       {children}
@@ -100,20 +99,31 @@ const PropertiesPanel = ({
     </label>
   );
 
-  const NumInput = ({ label, value, onChange, min = 0, max, step = 1 }) => (
-    <div>
-      <Label>{label}</Label>
-      <input
-        type="number"
-        value={value ?? 0}
-        onChange={(e) => onChange(Number(e.target.value))}
-        min={min}
-        max={max}
-        step={step}
-        className="input text-xs py-1.5 w-full"
-      />
-    </div>
-  );
+  const NumInput = ({ label, value, onChange, min = 0, max, step = 0.01, isPx = true }) => {
+    // If the value is in pixels, convert it to the display unit
+    const displayValue = isPx ? convertFromPx(value, unit) : value;
+    // Format to 2 decimal places for better readability in non-px units
+    const formattedValue = isPx && unit !== 'px' ? Math.round(displayValue * 100) / 100 : displayValue;
+
+    return (
+      <div>
+        <Label>{label} ({unit})</Label>
+        <input
+          type="number"
+          value={formattedValue ?? 0}
+          onChange={(e) => {
+            const val = Number(e.target.value);
+            onChange(isPx ? convertToPx(val, unit) : val);
+          }}
+          min={min}
+          max={max}
+          step={unit === 'px' ? 1 : 0.01}
+          className="input text-xs py-1.5 w-full"
+        />
+      </div>
+    );
+  };
+
 
   const ColorPicker = ({ label, value, onChange }) => (
     <div>
@@ -187,24 +197,68 @@ const PropertiesPanel = ({
 
       <div className="flex-1 overflow-y-auto p-3 space-y-4">
 
-        {/* No selection state */}
+        {/* No selection state - Show Label Settings */}
         {!el && (
-          <div className="flex flex-col items-center justify-center h-36 text-center text-gray-400 opacity-60">
-            {(isDrawingLine || isDrawingBarcode || isDrawingShape) ? (
-              <>
-                <div className="animate-pulse mb-2 text-2xl">✏️</div>
-                <p className="font-bold text-xs">Drawing Mode Active</p>
-                <p className="text-[10px] mt-1">Click and drag on the canvas</p>
-              </>
-            ) : (
-              <>
-                <div className="mb-2 text-2xl">🖱️</div>
-                <p className="font-bold text-xs">No Element Selected</p>
-                <p className="text-[10px] mt-1">Click an element on the canvas</p>
-              </>
-            )}
+          <div className="space-y-6">
+            <div className="rounded-lg p-4 border bg-blue-500/5" style={{ borderColor: theme.border }}>
+              <SectionHeader color="var(--color-primary)"><Settings size={12} className="mr-0.5" /> Label Settings</SectionHeader>
+              
+              <div className="space-y-4">
+                {/* Unit Selection */}
+                <div>
+                  <Label>Design Unit</Label>
+                  <div className="flex bg-[var(--color-bg-main)] p-0.5 rounded-lg border border-[var(--color-border)]">
+                    {['mm', 'cm', 'inch'].map((u) => (
+                      <button
+                        key={u}
+                        onClick={() => updateLabelSize({ ...labelSize, unit: u })}
+                        className={`flex-1 py-1.5 rounded flex items-center justify-center text-[10px] font-black uppercase tracking-widest transition-all ${unit === u ? 'bg-white dark:bg-gray-700 shadow-sm text-[var(--color-primary)]' : 'text-gray-400 hover:text-gray-600'}`}
+                      >
+                        {u}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[9px] text-gray-400 mt-1.5 leading-tight italic">
+                    Switching units converts all positions and sizes to the new system.
+                  </p>
+                </div>
+
+                {/* Label Dimensions */}
+                <div className="grid grid-cols-2 gap-3">
+                  <NumInput 
+                    isPx={false} 
+                    label="Label Width" 
+                    value={labelSize.width} 
+                    onChange={(v) => updateLabelSize({ ...labelSize, width: v })} 
+                  />
+                  <NumInput 
+                    isPx={false} 
+                    label="Label Height" 
+                    value={labelSize.height} 
+                    onChange={(v) => updateLabelSize({ ...labelSize, height: v })} 
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center justify-center h-24 text-center text-gray-400 opacity-60">
+              {(isDrawingLine || isDrawingBarcode || isDrawingShape) ? (
+                <>
+                  <div className="animate-pulse mb-2 text-2xl">✏️</div>
+                  <p className="font-bold text-xs">Drawing Mode Active</p>
+                  <p className="text-[10px] mt-1">Click and drag on the canvas</p>
+                </>
+              ) : (
+                <>
+                  <div className="mb-2 text-2xl">🖱️</div>
+                  <p className="font-bold text-xs">No Element Selected</p>
+                  <p className="text-[10px] mt-1">Select an object or customize label above</p>
+                </>
+              )}
+            </div>
           </div>
         )}
+
 
         {/* Placeholder Widget */}
         <div className="rounded-lg p-3 border" style={{ backgroundColor: 'rgba(245,158,11,0.05)', borderColor: 'rgba(245,158,11,0.25)' }}>
@@ -360,12 +414,12 @@ const PropertiesPanel = ({
             <div className="rounded-lg p-3 border space-y-3" style={{ borderColor: theme.border }}>
               <SectionHeader>Position & Size</SectionHeader>
               <div className="grid grid-cols-2 gap-2">
-                <NumInput label="X (px)" value={Math.round(el.x)} onChange={(v) => updateElement(id, { x: v })} />
-                <NumInput label="Y (px)" value={Math.round(el.y)} onChange={(v) => updateElement(id, { y: v })} />
+                <NumInput label="X" value={el.x} onChange={(v) => updateElement(id, { x: v })} />
+                <NumInput label="Y" value={el.y} onChange={(v) => updateElement(id, { y: v })} />
                 {el.type !== 'line' && (
                   <>
-                    <NumInput label="Width (px)" value={Math.round(el.width)} onChange={(v) => updateElement(id, { width: Math.max(10, v) })} min={10} />
-                    <NumInput label="Height (px)" value={Math.round(el.height)} onChange={(v) => updateElement(id, { height: Math.max(10, v) })} min={10} />
+                    <NumInput label="Width" value={el.width} onChange={(v) => updateElement(id, { width: Math.max(10, v) })} min={1} />
+                    <NumInput label="Height" value={el.height} onChange={(v) => updateElement(id, { height: Math.max(10, v) })} min={1} />
                   </>
                 )}
               </div>
@@ -427,7 +481,7 @@ const PropertiesPanel = ({
 
                 {/* Size + Color row */}
                 <div className="grid grid-cols-2 gap-2">
-                  <NumInput label="Font Size (pt)" value={el.fontSize || 14} onChange={(v) => updateElement(id, { fontSize: Math.max(6, v) })} min={6} max={200} />
+                  <NumInput label="Font Size" value={el.fontSize || 14} onChange={(v) => updateElement(id, { fontSize: Math.max(1, v) })} min={1} max={500} />
                   <ColorPicker label="Text Color" value={el.color || "#000000"} onChange={(v) => updateElement(id, { color: v })} />
                 </div>
 
@@ -577,7 +631,7 @@ const PropertiesPanel = ({
               <div className="rounded-lg p-3 border space-y-3" style={{ borderColor: theme.border }}>
                 <SectionHeader>╱ Stroke Style</SectionHeader>
                 <div className="grid grid-cols-2 gap-2">
-                  <NumInput label="Thickness (px)" value={el.borderWidth || 1} onChange={(v) => updateElement(id, { borderWidth: Math.max(1, v) })} min={1} max={50} />
+                  <NumInput label="Thickness" value={el.borderWidth || 1} onChange={(v) => updateElement(id, { borderWidth: Math.max(0, v) })} min={0} max={100} />
                   <ColorPicker label="Color" value={el.borderColor || "#000000"} onChange={(v) => updateElement(id, { borderColor: v })} />
                 </div>
                 <div>
@@ -602,9 +656,9 @@ const PropertiesPanel = ({
                 <div className="grid grid-cols-2 gap-2">
                   <ColorPicker label="Fill Color" value={el.backgroundColor || "transparent"} onChange={(v) => updateElement(id, { backgroundColor: v })} />
                   <ColorPicker label="Border Color" value={el.borderColor || "#000000"} onChange={(v) => updateElement(id, { borderColor: v })} />
-                  <NumInput label="Border Width" value={el.borderWidth || 0} onChange={(v) => updateElement(id, { borderWidth: Math.max(0, v) })} min={0} max={50} />
+                  <NumInput label="Border Width" value={el.borderWidth || 0} onChange={(v) => updateElement(id, { borderWidth: Math.max(0, v) })} min={0} max={100} />
                   {el.type === 'rectangle' && (
-                    <NumInput label="Corner Radius" value={el.borderRadius || 0} onChange={(v) => updateElement(id, { borderRadius: Math.max(0, v) })} min={0} max={100} />
+                    <NumInput label="Corner Radius" value={el.borderRadius || 0} onChange={(v) => updateElement(id, { borderRadius: Math.max(0, v) })} min={0} max={200} />
                   )}
                 </div>
                 <div>
@@ -627,8 +681,8 @@ const PropertiesPanel = ({
               <div className="rounded-lg p-3 border space-y-3" style={{ borderColor: theme.border }}>
                 <SectionHeader>⊞ Table Style</SectionHeader>
                 <div className="grid grid-cols-2 gap-2">
-                  <NumInput label="Cell Width (px)" value={el.cellWidth || 60} onChange={(v) => updateElement(id, { cellWidth: Math.max(20, v) })} min={20} />
-                  <NumInput label="Cell Height (px)" value={el.cellHeight || 25} onChange={(v) => updateElement(id, { cellHeight: Math.max(10, v) })} min={10} />
+                  <NumInput label="Cell Width" value={el.cellWidth || 60} onChange={(v) => updateElement(id, { cellWidth: Math.max(1, v) })} min={1} />
+                  <NumInput label="Cell Height" value={el.cellHeight || 25} onChange={(v) => updateElement(id, { cellHeight: Math.max(1, v) })} min={1} />
                   <NumInput label="Border Width" value={el.borderWidth || 1} onChange={(v) => updateElement(id, { borderWidth: Math.max(0, v) })} min={0} />
                   <ColorPicker label="Border Color" value={el.borderColor || "#000000"} onChange={(v) => updateElement(id, { borderColor: v })} />
                 </div>

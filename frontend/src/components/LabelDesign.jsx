@@ -10,9 +10,7 @@ import BindingTypeModal from "../components/Models/BindingTypeModal";
 import { useTheme } from "../ThemeContext";
 import { useLanguage } from "../LanguageContext";
 import AIChatbot from "./designer/AIChatbot";
-import { callEdgeFunction, API_URLS, mapPayloadToElement, normalizeDesign } from "../supabaseClient";
-
-const MM_TO_PX = 3.7795275591;
+import { callEdgeFunction, API_URLS, mapPayloadToElement, normalizeDesign, convertFromPx, convertToPx } from "../supabaseClient";
 
 const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCreateLabel, onDeleteLabel, onNavigateToLibrary, userRole }) => {
   const { isDarkMode, theme } = useTheme();
@@ -24,13 +22,21 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
   const getInitialDimensions = (l) => {
     if (l?.labelSize) return l.labelSize;
     if (l?.dimensions) return l.dimensions;
-    if (l?.width && l?.height) return { width: l.width, height: l.height };
-    return { width: 100, height: 150 }; // Default to 100x150mm as requested
+    if (l?.width && l?.height) return { width: l.width, height: l.height, unit: l.unit || 'mm' };
+    return { width: 100, height: 150, unit: 'mm' }; // Default to 100x150mm as requested
   };
 
   const [elements, setElements] = useState(label?.elements || []);
   const [selectedElementId, setSelectedElementId] = useState(null);
   const [labelSize, setLabelSize] = useState(getInitialDimensions(label));
+
+  // Ensure labelSize.unit is standardized
+  useEffect(() => {
+    if (labelSize && labelSize.unit === 'in') {
+      setLabelSize(prev => ({ ...prev, unit: 'inch' }));
+    }
+  }, [labelSize?.unit]);
+
   const [showGrid, setShowGrid] = useState(true);
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [barcodeValue, setBarcodeValue] = useState("");
@@ -52,8 +58,11 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     const borderIds = ['border-top', 'border-bottom', 'border-left', 'border-right'];
     const otherElements = (currentElements || []).filter(el => !borderIds.includes(el.id));
     
-    const widthPx = currentSize.width * MM_TO_PX;
-    const heightPx = currentSize.height * MM_TO_PX;
+    // Borders are calculated in pixels for canvas rendering
+    const DPI = 96;
+    const MM_TO_PX = DPI / 25.4;
+    const widthPx = currentSize.width * (currentSize.unit === 'mm' ? MM_TO_PX : (currentSize.unit === 'cm' ? DPI/2.54 : (currentSize.unit === 'inch' ? DPI : MM_TO_PX)));
+    const heightPx = currentSize.height * (currentSize.unit === 'mm' ? MM_TO_PX : (currentSize.unit === 'cm' ? DPI/2.54 : (currentSize.unit === 'inch' ? DPI : MM_TO_PX)));
 
     const borders = [
       { id: 'border-top', type: 'line', x: 0, y: 0, x1: 0, y1: 0, x2: widthPx, y2: 0, borderWidth: thickness, borderColor: "#000000", isSystem: true, locked: true },
@@ -92,7 +101,7 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
   // Effect to update borders when size changes
   React.useEffect(() => {
     setElements(prev => syncBorderLines(prev, labelSize));
-  }, [labelSize, syncBorderLines]);
+  }, [labelSize.width, labelSize.height, labelSize.unit, syncBorderLines]);
 
   const elementIdCounter = useRef(0);
   const canvasRef = useRef(null);
@@ -163,11 +172,31 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
       content = el.type.toUpperCase();
     }
 
-    // Ensure all numeric properties are stored as rounded numbers for the backend
-    const pos_x = Math.round(el.x);
-    const pos_y = Math.round(el.y);
-    const w = Math.round(el.width);
-    const h = Math.round(el.height);
+    const currentUnit = labelSize.unit || 'mm';
+
+    // Convert all numeric properties from interface pixels to design unit
+    const pos_x = convertFromPx(el.x, currentUnit);
+    const pos_y = convertFromPx(el.y, currentUnit);
+    const w = convertFromPx(el.width, currentUnit);
+    const h = convertFromPx(el.height, currentUnit);
+
+    const properties = {
+      ...el,
+      x: pos_x,
+      y: pos_y,
+      width: w,
+      height: h,
+      fontSize: el.fontSize ? convertFromPx(el.fontSize, currentUnit) : undefined,
+      borderWidth: el.borderWidth !== undefined ? convertFromPx(el.borderWidth, currentUnit) : undefined,
+      borderRadius: el.borderRadius !== undefined ? convertFromPx(el.borderRadius, currentUnit) : undefined,
+      letterSpacing: el.letterSpacing !== undefined ? convertFromPx(el.letterSpacing, currentUnit) : undefined,
+    };
+
+    // Also handles line points
+    if (el.x1 !== undefined) properties.x1 = convertFromPx(el.x1, currentUnit);
+    if (el.y1 !== undefined) properties.y1 = convertFromPx(el.y1, currentUnit);
+    if (el.x2 !== undefined) properties.x2 = convertFromPx(el.x2, currentUnit);
+    if (el.y2 !== undefined) properties.y2 = convertFromPx(el.y2, currentUnit);
 
     return {
       design_id: designId,
@@ -180,19 +209,11 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
       height: h,
       binding_type: el.binding_type || null,
       static_content: content || " ",
-      properties: {
-        ...el,
-        x: pos_x,
-        y: pos_y,
-        width: w,
-        height: h,
-        fontSize: el.fontSize ? Math.round(el.fontSize) : undefined,
-        borderWidth: el.borderWidth !== undefined ? Math.round(el.borderWidth) : undefined,
-        borderRadius: el.borderRadius !== undefined ? Math.round(el.borderRadius) : undefined,
-      },
+      properties,
       sort_order: el.zIndex || 0
     };
   };
+
 
   // ─── Zoom ───────────────────────────────────────────────────────────────
   const handleZoomChange = (newZoom) => setZoom(newZoom);
@@ -564,7 +585,7 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
                 className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider opacity-60"
                 style={{ color: theme.textMuted }}
               >
-                <span>{Math.round(labelSize.width)}×{Math.round(labelSize.height)} MM</span>
+                <span>{Math.round(labelSize.width * 100) / 100}×{Math.round(labelSize.height * 100) / 100} {labelSize.unit?.toUpperCase() || 'MM'}</span>
                 <span>·</span>
                 <span>{elements.length} Objects</span>
                 <span>·</span>
@@ -757,6 +778,8 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
             setSelectedBarcodeType={setSelectedBarcodeType}
             onBringForward={handleBringForward}
             onSendBackward={handleSendBackward}
+            labelSize={labelSize}
+            updateLabelSize={setLabelSize}
           />
         </div>
       </div>
