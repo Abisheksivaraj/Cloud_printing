@@ -1,4 +1,5 @@
-import { Trash2, Undo, Redo, Copy, Plus, Check, FileText, ArrowUp, ArrowDown, RotateCw, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, ChevronDown, ChevronUp, Layers, Image as ImageIcon, Settings, Ruler } from "lucide-react";
+import React, { useState } from "react";
+import { Trash2, Undo, Redo, Copy, Plus, Check, FileText, ArrowUp, ArrowDown, RotateCw, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, ChevronDown, ChevronUp, Layers, Image as ImageIcon, Settings, Ruler, X } from "lucide-react";
 import { useTheme } from "../../ThemeContext";
 import { convertToPx, convertFromPx } from "../../supabaseClient";
 
@@ -87,61 +88,67 @@ const PropertiesPanel = ({
 
   const unit = labelSize?.unit || "mm";
 
-  const SectionHeader = ({ children, color = "var(--color-primary)" }) => (
-    <h5 className="text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5" style={{ color }}>
-      {children}
-    </h5>
+  const SectionHeader = ({ children, color = "#60a5fa" }) => (
+    <div className="flex items-center gap-2 mb-4 group/header">
+      <div className="w-1 h-3 bg-blue-500 rounded-full group-hover/header:h-4 transition-all" />
+      <h5 className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2" style={{ color }}>
+        {children}
+      </h5>
+    </div>
   );
 
   const Label = ({ children }) => (
-    <label className="text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1 block uppercase tracking-widest">
+    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">
       {children}
     </label>
   );
 
   const NumInput = ({ label, value, onChange, min = 0, max, step = 0.01, isPx = true }) => {
-    // If the value is in pixels, convert it to the display unit
     const displayValue = isPx ? convertFromPx(value, unit) : value;
-    // Format to 2 decimal places for better readability in non-px units
     const formattedValue = isPx && unit !== 'px' ? Math.round(displayValue * 100) / 100 : displayValue;
 
     return (
-      <div>
-        <Label>{label} ({unit})</Label>
-        <input
-          type="number"
-          value={formattedValue ?? 0}
-          onChange={(e) => {
-            const val = Number(e.target.value);
-            onChange(isPx ? convertToPx(val, unit) : val);
-          }}
-          min={min}
-          max={max}
-          step={unit === 'px' ? 1 : 0.01}
-          className="input text-xs py-1.5 w-full"
-        />
+      <div className="group/input">
+        <Label>{label} <span className="opacity-40 font-mono">({unit})</span></Label>
+        <div className="relative">
+          <input
+            type="number"
+            value={formattedValue ?? 0}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              onChange(isPx ? convertToPx(val, unit) : val);
+            }}
+            min={min}
+            max={max}
+            step={unit === 'px' ? 1 : 0.01}
+            className="w-full bg-slate-800/50 border border-white/5 hover:border-blue-500/30 focus:border-blue-500/50 text-slate-200 text-xs py-2 px-3 rounded-xl transition-all outline-none font-mono"
+          />
+        </div>
       </div>
     );
   };
 
 
   const ColorPicker = ({ label, value, onChange }) => (
-    <div>
+    <div className="group/color">
       <Label>{label}</Label>
-      <div className="flex items-center gap-2 p-1.5 rounded border border-[var(--color-border)] bg-[var(--color-bg-main)]">
-        <input
-          type="color"
-          value={value === "transparent" ? "#ffffff" : (value || "#000000")}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-7 h-7 rounded cursor-pointer border-0 p-0"
-        />
-        <span className="text-[10px] font-mono opacity-70 truncate">{value === "transparent" ? "None" : value}</span>
+      <div className="flex items-center gap-3 p-1 rounded-xl border border-white/5 bg-slate-800/40 hover:bg-slate-800 transition-all">
+        <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-white/10 shadow-inner">
+          <input
+            type="color"
+            value={value === "transparent" ? "#ffffff" : (value || "#000000")}
+            onChange={(e) => onChange(e.target.value)}
+            className="absolute -inset-2 w-12 h-12 cursor-pointer border-0 p-0"
+          />
+          {value === "transparent" && <div className="absolute inset-0 bg-white flex items-center justify-center text-[8px] text-red-500 font-bold rotate-45 select-none">/</div>}
+        </div>
+        <span className="text-[10px] font-black font-mono text-slate-300 uppercase tracking-tighter shrink-0">{value === "transparent" ? "None" : value}</span>
         {value !== "transparent" && (
           <button
             onClick={() => onChange("transparent")}
-            className="text-[9px] text-gray-400 hover:text-red-400 ml-auto shrink-0"
+            className="w-6 h-6 flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg ml-auto transition-all"
             title="Set transparent"
-          >✕</button>
+          ><X size={10} /></button>
         )}
       </div>
     </div>
@@ -149,53 +156,58 @@ const PropertiesPanel = ({
 
   return (
     <div
-      className="w-80 border-l flex flex-col overflow-hidden shadow-lg z-20 transition-colors duration-200"
-      style={{ backgroundColor: theme.surface, borderColor: theme.border }}
+      className="flex flex-col h-full bg-slate-900/90 backdrop-blur-2xl text-slate-300"
     >
       {/* Top action bar */}
-      <div className="p-3 border-b shrink-0" style={{ borderColor: theme.border, backgroundColor: theme.bg }}>
-        <h3 className="font-black text-[10px] uppercase tracking-widest mb-2.5 px-1" style={{ color: theme.textMuted }}>
-          Properties
-        </h3>
+      <div className="p-6 border-b border-white/5 shrink-0 bg-slate-900/40">
+        <div className="flex items-center justify-between mb-6">
+            <h3 className="font-black text-[10px] uppercase tracking-[0.25em] text-slate-500">
+            Inspector
+            </h3>
+            <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                <span className="text-[9px] font-black uppercase tracking-widest text-blue-500/80">Live Engine</span>
+            </div>
+        </div>
 
-        <div className="flex gap-1.5">
+        <div className="flex gap-2">
           <button
             onClick={onUndo}
             disabled={!canUndo}
-            className={`flex-1 p-2 rounded-lg flex items-center justify-center gap-1 text-[10px] font-bold transition-all ${canUndo
-              ? "hover:bg-blue-500/10 text-blue-600 border border-blue-500/20 active:scale-95"
-              : "opacity-20 cursor-not-allowed border border-[var(--color-border)]"
+            className={`flex-1 h-9 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all ${canUndo
+              ? "bg-slate-800 hover:bg-slate-700 text-blue-400 border border-white/5 active:scale-95"
+              : "opacity-20 cursor-not-allowed border border-white/5 text-slate-600"
               }`}
             title="Undo (Ctrl+Z)"
           >
-            <Undo size={13} /> Undo
+            <Undo size={12} />
           </button>
           <button
             onClick={onRedo}
             disabled={!canRedo}
-            className={`flex-1 p-2 rounded-lg flex items-center justify-center gap-1 text-[10px] font-bold transition-all ${canRedo
-              ? "hover:bg-blue-500/10 text-blue-600 border border-blue-500/20 active:scale-95"
-              : "opacity-20 cursor-not-allowed border border-[var(--color-border)]"
+            className={`flex-1 h-9 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all ${canRedo
+              ? "bg-slate-800 hover:bg-slate-700 text-blue-400 border border-white/5 active:scale-95"
+              : "opacity-20 cursor-not-allowed border border-white/5 text-slate-600"
               }`}
             title="Redo (Ctrl+Y)"
           >
-            <Redo size={13} /> Redo
+            <Redo size={12} />
           </button>
           <button
             onClick={onDuplicate}
             disabled={!el}
-            className={`flex-1 p-2 rounded-lg flex items-center justify-center gap-1 text-[10px] font-bold transition-all ${el
-              ? "hover:bg-green-500/10 text-green-600 border border-green-500/20 active:scale-95"
-              : "opacity-20 cursor-not-allowed border border-[var(--color-border)]"
+            className={`flex-1 h-9 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all ${el
+              ? "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20 active:scale-95"
+              : "opacity-20 cursor-not-allowed bg-slate-800 text-slate-600"
               }`}
             title="Duplicate (Ctrl+D)"
           >
-            <Copy size={13} /> Copy
+            <Copy size={12} />
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-4">
+      <div className="flex-1 overflow-y-auto px-6 py-8 space-y-8 custom-scrollbar">
 
         {/* No selection state - Show Label Settings */}
         {!el && (

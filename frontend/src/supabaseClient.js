@@ -44,7 +44,9 @@ export const API_URLS = {
     GET_DESIGN: 'get-design',
     UPDATE_DESIGN: 'update-design',
     PUBLISH_DESIGN: 'publish-design',
+    DRAFT_DESIGN: 'draft-design',
     ARCHIVE_DESIGN: 'archive-design',
+    UNARCHIVE_DESIGN: 'unarchive-design',
     DELETE_DESIGN: 'delete-design',
     RESTORE_DESIGN: 'restore-design',
 
@@ -144,15 +146,15 @@ export const callEdgeFunction = async (functionName, body, retryCount = 0) => {
    UNIT CONVERSION UTILITIES (96 DPI assumption)
    ========================================================================== */
 
-const DPI = 96;
-const MM_TO_PX_RATIO = DPI / 25.4;
-const CM_TO_PX_RATIO = DPI / 2.54;
-const INCH_TO_PX_RATIO = DPI;
+export const DPI = 96;
+export const MM_TO_PX = DPI / 25.4;
+export const CM_TO_PX_RATIO = DPI / 2.54;
+export const INCH_TO_PX_RATIO = DPI;
 
 export const convertToPx = (value, unit) => {
     if (value === undefined || value === null) return value;
     switch (unit) {
-        case 'mm': return value * MM_TO_PX_RATIO;
+        case 'mm': return value * MM_TO_PX;
         case 'cm': return value * CM_TO_PX_RATIO;
         case 'inch': return value * INCH_TO_PX_RATIO;
         default: return value; // Default to px or unknown
@@ -162,7 +164,7 @@ export const convertToPx = (value, unit) => {
 export const convertFromPx = (px, unit) => {
     if (px === undefined || px === null) return px;
     switch (unit) {
-        case 'mm': return px / MM_TO_PX_RATIO;
+        case 'mm': return px / MM_TO_PX;
         case 'cm': return px / CM_TO_PX_RATIO;
         case 'inch': return px / INCH_TO_PX_RATIO;
         default: return px;

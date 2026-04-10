@@ -8,7 +8,8 @@ import React, {
 } from "react";
 import BarcodeElement from "../components/designer/code";
 import { useTheme } from "../ThemeContext";
-import { convertToPx } from "../supabaseClient";
+import { convertToPx, MM_TO_PX } from "../supabaseClient";
+import { RotateCw } from "lucide-react";
 
 const DesignCanvas = forwardRef(
   (
@@ -1235,89 +1236,48 @@ const DesignCanvas = forwardRef(
         const isDrawingAny = isDrawingText || isDrawingLine || isDrawingBarcode || isDrawingShape;
         if (isDrawingAny) return null;
 
-        const ROTATE_OFFSET = 28; // px above element
-        const handleSize = 7;      // uniform size for all handles
-        const handleHalf = Math.floor(handleSize / 2);
-        const handleColor = 'var(--color-primary)';
-
+        const ROTATE_OFFSET = 32;
         const handles = [
-          { pos: "nw", cursor: "nw-resize", style: { left: -handleHalf, top: -handleHalf } },
-          { pos: "n", cursor: "n-resize", style: { left: "50%", top: -handleHalf, transform: "translateX(-50%)" } },
-          { pos: "ne", cursor: "ne-resize", style: { right: -handleHalf, top: -handleHalf } },
-          { pos: "e", cursor: "e-resize", style: { right: -handleHalf, top: "50%", transform: "translateY(-50%)" } },
-          { pos: "se", cursor: "se-resize", style: { right: -handleHalf, bottom: -handleHalf } },
-          { pos: "s", cursor: "s-resize", style: { left: "50%", bottom: -handleHalf, transform: "translateX(-50%)" } },
-          { pos: "sw", cursor: "sw-resize", style: { left: -handleHalf, bottom: -handleHalf } },
-          { pos: "w", cursor: "w-resize", style: { left: -handleHalf, top: "50%", transform: "translateY(-50%)" } },
+          { pos: "nw", cursor: "nw-resize", style: { left: -6, top: -6 } },
+          { pos: "n", cursor: "n-resize", style: { left: "50%", top: -6, transform: "translateX(-50%)" } },
+          { pos: "ne", cursor: "ne-resize", style: { right: -6, top: -6 } },
+          { pos: "e", cursor: "e-resize", style: { right: -6, top: "50%", transform: "translateY(-50%)" } },
+          { pos: "se", cursor: "se-resize", style: { right: -6, bottom: -6 } },
+          { pos: "s", cursor: "s-resize", style: { left: "50%", bottom: -6, transform: "translateX(-50%)" } },
+          { pos: "sw", cursor: "sw-resize", style: { left: -6, bottom: -6 } },
+          { pos: "w", cursor: "w-resize", style: { left: -6, top: "50%", transform: "translateY(-50%)" } },
         ];
 
         return (
           <>
             {/* Rotation stem */}
             <div
-              style={{
-                position: 'absolute',
-                left: '50%',
-                top: -ROTATE_OFFSET,
-                width: 1,
-                height: ROTATE_OFFSET - 8,
-                background: handleColor,
-                opacity: 0.5,
-                transform: 'translateX(-50%)',
-                pointerEvents: 'none',
-                zIndex: 49,
-              }}
+              className="absolute left-1/2 -top-8 w-[1.5px] h-4 bg-blue-500/40 -translate-x-1/2 pointer-events-none z-40"
             />
             {/* Rotation handle */}
             <div
               title="Rotate (Shift = snap 15°)"
-              style={{
-                position: 'absolute',
-                left: '50%',
-                top: -ROTATE_OFFSET - 12,
-                transform: 'translateX(-50%)',
-                width: 22,
-                height: 22,
-                borderRadius: '50%',
-                background: 'white',
-                border: `1.5px solid ${handleColor}`,
-                cursor: 'grab',
-                zIndex: 51,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.20)',
-                pointerEvents: 'auto',
-                userSelect: 'none',
-              }}
+              className="absolute left-1/2 -top-12 -translate-x-1/2 w-8 h-8 rounded-full bg-white border-2 border-blue-500 shadow-xl flex items-center justify-center cursor-grab active:cursor-grabbing hover:scale-110 active:scale-95 transition-all z-50 group/rotate"
               onMouseDown={(e) => handleRotateMouseDown(e, element)}
             >
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                <path d="M2 6.5a4.5 4.5 0 1 1 4.5 4.5" stroke={handleColor} strokeWidth="1.6" strokeLinecap="round" fill="none" />
-                <polyline points="2,4.5 2,6.5 4,6.5" stroke={handleColor} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-              </svg>
+              <RotateCw size={14} className="text-blue-500 group-hover/rotate:rotate-180 transition-transform duration-700" />
             </div>
 
-            {/* Resize handles — uniform small squares */}
+            {/* Resize handles — circular knots */}
             {handles.map((handle) => (
               <div
                 key={handle.pos}
+                className="selection-knot absolute"
                 style={{
-                  position: 'absolute',
-                  width: handleSize,
-                  height: handleSize,
-                  background: 'white',
-                  border: `1.5px solid ${handleColor}`,
-                  borderRadius: 1,
-                  zIndex: 50,
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
                   cursor: handle.cursor,
-                  pointerEvents: 'auto',
                   ...handle.style,
                 }}
                 onMouseDown={(e) => handleResizeMouseDown(e, element, handle.pos)}
               />
             ))}
+
+            {/* Selection Outline Overlay (Visual Only) */}
+            <div className="absolute -inset-[1.5px] border-2 border-blue-500/40 pointer-events-none z-30 rounded-sm shadow-[0_0_15px_rgba(59,130,246,0.1)]" />
           </>
         );
       },
@@ -1807,13 +1767,12 @@ const DesignCanvas = forwardRef(
 
         return (
           <div
-            className="flex-shrink-0 transition-colors duration-200"
+            className="flex-shrink-0 relative bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
             style={{
               width: isHorizontal ? `${maxLength}px` : `${RULER_SIZE}px`,
               height: isHorizontal ? `${RULER_SIZE}px` : `${maxLength}px`,
-              backgroundColor: theme.bg,
-              borderRight: isHorizontal ? "none" : `1px solid ${theme.border}`,
-              borderBottom: isHorizontal ? `1px solid ${theme.border}` : "none",
+              borderRight: isHorizontal ? "none" : "1px solid",
+              borderBottom: isHorizontal ? "1px solid" : "none",
             }}
           >
             {marks.map((mark) => {
@@ -1826,28 +1785,20 @@ const DesignCanvas = forwardRef(
                   <div
                     className="absolute"
                     style={{
-                      ... (isHorizontal
+                      ...(isHorizontal
                         ? {
-                          left: `${position}px`,
-                          bottom: "0",
-                          width: "1px",
-                          height: isMajorMark
-                            ? "12px"
-                            : isMediumMark
-                              ? "8px"
-                              : "5px",
-                        }
+                            left: `${position}px`,
+                            bottom: "0",
+                            width: "1.5px",
+                            height: isMajorMark ? "100%" : isMediumMark ? "60%" : "30%",
+                          }
                         : {
-                          top: `${position}px`,
-                          right: "0",
-                          height: "1px",
-                          width: isMajorMark
-                            ? "12px"
-                            : isMediumMark
-                              ? "8px"
-                              : "5px",
-                        }),
-                      backgroundColor: isMajorMark ? theme.text : theme.border,
+                            top: `${position}px`,
+                            right: "0",
+                            height: "1.5px",
+                            width: isMajorMark ? "100%" : isMediumMark ? "60%" : "30%",
+                          }),
+                      backgroundColor: isMajorMark ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0.15)",
                     }}
                   />
 
@@ -1924,7 +1875,7 @@ const DesignCanvas = forwardRef(
           </div>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden relative">
           <div className="overflow-hidden relative flex-shrink-0">
             <div
               style={{
@@ -1938,21 +1889,14 @@ const DesignCanvas = forwardRef(
 
           <div
             ref={scrollContainerRef}
-            className="flex-1 overflow-auto bg-gray-100 dark:bg-gray-900/50"
+            className="flex-1 overflow-auto canvas-fixed-scroll bg-slate-50 dark:bg-slate-900/40 relative"
             style={{
-              scrollbarWidth: "thin",
-              backgroundColor: isDarkMode ? '#0f172a' : '#f3f4f6'
+              backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(0,0,0,0.05) 1px, transparent 0)',
+              backgroundSize: '32px 32px'
             }}
           >
             <div
-              style={{
-                padding: "120px",
-                minWidth: "fit-content",
-                minHeight: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
+              className="min-h-full min-w-full flex items-center justify-center py-[200px] px-[200px]"
             >
               <div
                 ref={canvasRef}

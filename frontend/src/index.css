@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -5,103 +6,146 @@
 }
 
 :root {
-  /* Brand Colors - Refined */
-  --color-primary: #39A3DD;
-  --color-primary-hover: #2A7FAF;
-  --color-secondary: #E85874;
-  --color-secondary-hover: #C4455D;
-
-  /* Neutral Colors */
-  --color-bg-main: #F3F4F6;
-  --color-bg-surface: #FFFFFF;
-  --color-text-main: #1F2937;
-  --color-text-muted: #6B7280;
-  --color-border: #E5E7EB;
+  /* Premium Palette - Sophisticated and Modern */
+  --color-primary: #0284c7; /* Professional Sky Blue */
+  --color-primary-hover: #0369a1;
+  --color-primary-soft: rgba(2, 132, 199, 0.1);
+  --color-secondary: #f43f5e; /* Rose */
+  --color-secondary-hover: #e11d48;
+  
+  /* Neutral Palette - Refined Grays */
+  --color-bg-main: #f8fafc;
+  --color-bg-surface: #ffffff;
+  --color-text-main: #0f172a;
+  --color-text-muted: #64748b;
+  --color-border: #e2e8f0;
+  --color-surface: #ffffff;
 
   /* Status Colors */
-  --color-success: #10B981;
-  --color-warning: #F59E0B;
-  --color-danger: #EF4444;
-  --color-info: #3B82F6;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #0ea5e9;
 
-  /* Shadows */
+  /* Elevated Shadows */
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.05);
 
   /* Radius */
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
 }
 
 .dark {
-  --color-bg-main: #0F172A;
-  --color-bg-surface: #1E293B;
-  --color-text-main: #F3F4F6;
-  --color-text-muted: #94A3B8;
-  --color-border: #334155;
+  --color-bg-main: #020617;
+  --color-bg-surface: #0f172a;
+  --color-text-main: #f1f5f9;
+  --color-text-muted: #94a3b8;
+  --color-border: #1e293b;
+  --color-surface: #1e293b;
 
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.3);
 }
 
 @layer base {
   body {
     @apply antialiased text-[var(--color-text-main)] bg-[var(--color-bg-main)] transition-colors duration-300;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   }
 }
 
 @layer components {
+  /* Professional Nav Item */
+  .nav-item {
+    @apply px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 hover:bg-[var(--color-primary-soft)] hover:text-[var(--color-primary)];
+  }
+  
+  .nav-item-active {
+    @apply bg-[var(--color-primary)] text-white shadow-lg shadow-sky-500/20 hover:bg-[var(--color-primary-hover)] hover:text-white;
+  }
 
   /* Modern Button */
   .btn {
-    @apply inline-flex items-center justify-center px-4 py-2 rounded-[var(--radius-md)] font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2;
+    @apply inline-flex items-center justify-center px-5 py-2.5 rounded-[var(--radius-md)] font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2;
   }
 
   .btn-primary {
-    @apply bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] focus:ring-[var(--color-primary)];
+    @apply bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] focus:ring-[var(--color-primary)] shadow-md hover:shadow-lg shadow-sky-500/10;
   }
 
   .btn-secondary {
-    @apply bg-[var(--color-secondary)] text-white hover:bg-[var(--color-secondary-hover)] focus:ring-[var(--color-secondary)];
+    @apply bg-[var(--color-secondary)] text-white hover:bg-[var(--color-secondary-hover)] focus:ring-[var(--color-secondary)] shadow-md hover:shadow-lg shadow-rose-500/10;
   }
 
   .btn-outline {
-    @apply border border-[var(--color-border)] text-[var(--color-text-main)] hover:bg-[var(--color-bg-main)] focus:ring-[var(--color-text-muted)];
+    @apply border border-[var(--color-border)] text-[var(--color-text-main)] bg-[var(--color-bg-surface)] hover:bg-[var(--color-bg-main)] focus:ring-[var(--color-text-muted)];
   }
 
   .btn-ghost {
-    @apply text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] hover:bg-[var(--color-border)]/20;
+    @apply text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] hover:bg-black/5 dark:hover:bg-white/5;
   }
 
   /* Modern Input */
   .input {
-    @apply w-full px-4 py-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-surface)] text-[var(--color-text-main)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent transition-shadow duration-200;
+    @apply w-full px-4 py-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-surface)] text-[var(--color-text-main)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent transition-all duration-200;
   }
 
   /* Modern Card */
   .card {
-    @apply bg-[var(--color-bg-surface)] rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-sm;
+    @apply bg-[var(--color-bg-surface)] rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden;
   }
 
-  /* Typography */
-  .h1 {
-    @apply text-3xl font-bold tracking-tight mb-4;
+  /* Glassmorphism */
+  .glass {
+    @apply backdrop-blur-lg bg-opacity-70 border border-opacity-30;
   }
 
-  .h2 {
-    @apply text-2xl font-bold tracking-tight mb-3;
+  /* Custom Scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-slate-200 dark:bg-slate-800 rounded-full hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors;
   }
 
-  .h3 {
-    @apply text-xl font-semibold tracking-tight mb-2;
+  /* Typography Scale */
+  .h1 { @apply text-4xl font-extrabold tracking-tight; }
+  .h2 { @apply text-2xl font-bold tracking-tight; }
+  .h3 { @apply text-lg font-semibold tracking-tight; }
+  .p { @apply text-sm text-[var(--color-text-muted)] leading-relaxed; }
+
+  /* Studio Specific Tokens */
+  .btn-primary-studio {
+    @apply bg-blue-600 text-white hover:bg-blue-500 shadow-[0_10px_20px_-5px_rgba(37,99,235,0.4)] transition-all duration-300;
   }
 
-  .p {
-    @apply text-[var(--color-text-muted)] leading-relaxed;
+  .badge-studio {
+    @apply flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all;
+  }
+
+  /* Professional Selection Knot (Handle) */
+  .selection-knot {
+    @apply w-3 h-3 bg-white border-2 border-blue-500 rounded-full shadow-[0_2px_10px_rgba(59,130,246,0.3)] hover:scale-125 hover:bg-blue-50 active:scale-95 transition-all cursor-pointer z-50;
+  }
+
+  .selection-knot-center {
+    @apply w-2.5 h-2.5 bg-blue-500 rounded-full border border-white shadow-[0_2px_10px_rgba(59,130,246,0.3)] hover:scale-125 transition-all cursor-move z-50;
+  }
+
+  .canvas-fixed-scroll {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .canvas-fixed-scroll::-webkit-scrollbar {
+    display: none;
   }
 }

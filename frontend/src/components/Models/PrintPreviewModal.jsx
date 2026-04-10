@@ -46,12 +46,12 @@ const RenderLabel = ({ label, noBorder = false }) => {
   return (
     <div
       style={{
-        width: labelW,
-        height: labelH,
+        width: `${labelW}px`,
+        height: `${labelH}px`,
         position: "relative",
         overflow: "hidden",
         boxSizing: "border-box",
-        border: noBorder ? "none" : "5px solid #000000",
+        border: noBorder ? "none" : "1px solid #000000",
       }}
     >
 
@@ -59,19 +59,19 @@ const RenderLabel = ({ label, noBorder = false }) => {
         // Elements are already normalized to pixels in supabaseClient.js
         const style = {
           position: "absolute",
-          left: element.x,
-          top: element.y,
-          width: element.width,
-          height: element.height,
-          fontSize: element.fontSize,
-          fontFamily: element.fontFamily,
-          fontWeight: element.fontWeight,
-          fontStyle: element.fontStyle,
-          textAlign: element.textAlign,
-          color: element.color,
-          backgroundColor: element.backgroundColor,
-          borderWidth: element.borderWidth || 0,
-          borderColor: element.borderColor,
+          left: `${element.x || 0}px`,
+          top: `${element.y || 0}px`,
+          width: `${element.width || 0}px`,
+          height: `${element.height || 0}px`,
+          fontSize: `${element.fontSize || 14}px`,
+          fontFamily: element.fontFamily || "Arial",
+          fontWeight: element.fontWeight || "normal",
+          fontStyle: element.fontStyle || "normal",
+          textAlign: element.textAlign || "left",
+          color: element.color || "#000000",
+          backgroundColor: element.backgroundColor || "transparent",
+          borderWidth: `${element.borderWidth || 0}px`,
+          borderColor: element.borderColor || "#000000",
           borderStyle: (element.borderWidth > 0) ? (element.borderStyle || "solid") : "none",
           borderRadius: element.borderRadius ? `${element.borderRadius}px` : undefined,
           boxSizing: "border-box",
@@ -420,37 +420,104 @@ const PrintPreviewModal = ({ label, onClose }) => {
       </div>
 
       {/* ================= PREVIEW UI ================= */}
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 print:hidden overflow-hidden p-6 animate-in fade-in duration-200">
+      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4 md:p-8 animate-in fade-in duration-300">
         <div
-          className="rounded-2xl shadow-2xl w-full max-w-[90vw] h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
-          style={{ backgroundColor: theme.surface, borderColor: theme.border }}
+          className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl w-full max-w-[1400px] h-full max-h-[900px] flex flex-col overflow-hidden border border-white/20 animate-in zoom-in-95 duration-300"
         >
           {/* Header */}
-          <div className="flex justify-between items-center border-b p-6" style={{ borderColor: theme.border }}>
-            <div>
-              <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: theme.text }}>
-                <Printer size={24} className="text-[var(--color-primary)]" />
-                Print Preview
-              </h2>
-              <p className="text-sm mt-1" style={{ color: theme.textMuted }}>
-                {config.name} • {Math.round(labelSize.width * 100) / 100}×{Math.round(labelSize.height * 100) / 100}{labelSize.unit || 'mm'}
-              </p>
+          <div className="flex justify-between items-center px-8 py-6 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-sky-50 dark:bg-sky-900/30 text-sky-600 rounded-2xl flex items-center justify-center shadow-sm">
+                <Printer size={24} />
+              </div>
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+                  Design Verification & Print
+                </h2>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-0.5">
+                  {config.name} • {Math.round(labelSize.width * 100) / 100}×{Math.round(labelSize.height * 100) / 100}{labelSize.unit || 'mm'}
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowSettings(!showSettings)}
-                className={`btn btn-outline flex items-center gap-2 ${showSettings ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)] border-[var(--color-primary)]' : ''}`}
+                className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${
+                  showSettings 
+                  ? 'bg-sky-50 text-sky-600 border border-sky-100 shadow-sm' 
+                  : 'text-slate-400 hover:bg-slate-50 border border-transparent'
+                }`}
+                title="Configuration"
               >
-                <Settings size={18} />
-                <span className="font-medium hidden sm:inline">Settings</span>
+                <Settings size={20} />
               </button>
+              <div className="w-px h-6 bg-slate-100 dark:bg-slate-800 mx-1"></div>
               <button
                 onClick={onClose}
-                className="p-2 rounded-full hover:bg-[var(--color-bg-main)] transition-colors"
-                style={{ color: theme.textMuted }}
+                className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all"
               >
                 <X size={24} />
               </button>
+            </div>
+          </div>
+          
+          {/* Print Options Toolbar */}
+          <div 
+            className="flex flex-wrap items-center gap-8 px-8 py-5 border-b border-slate-50 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-900/50" 
+          >
+            {/* Target Resolution */}
+            <div className="flex items-center gap-4">
+              <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 whitespace-nowrap">
+                Print Density
+              </label>
+              <select
+                value={selectedDpi}
+                onChange={(e) => setSelectedDpi(Number(e.target.value))}
+                className="input h-9 text-xs py-0 min-w-[120px] font-bold"
+              >
+                <option value={203}>203 DPI (Standard)</option>
+                <option value={300}>300 DPI (High)</option>
+                <option value={600}>600 DPI (Ultra)</option>
+              </select>
+            </div>
+
+            <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 hidden lg:block"></div>
+
+            {/* Print Destination */}
+            <div className="flex flex-wrap items-center gap-8">
+              <div className="flex items-center gap-4">
+                <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 whitespace-nowrap">
+                  Connector
+                </label>
+                <select
+                  value={selectedConnectorId || ""}
+                  onChange={(e) => setSelectedConnectorId(e.target.value)}
+                  className="input h-9 text-xs py-0 min-w-[180px] font-bold"
+                  disabled={isLoadingDevices}
+                >
+                  <option value="" disabled>Search Connector...</option>
+                  {connectors.map(c => (
+                    <option key={c.id} value={c.id}>{c.name || 'Cloud Connector'}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 whitespace-nowrap">
+                  Target Printer
+                </label>
+                <select
+                  value={selectedPrinterId || ""}
+                  onChange={(e) => setSelectedPrinterId(e.target.value)}
+                  className="input h-9 text-xs py-0 min-w-[220px] font-bold"
+                  disabled={isLoadingDevices || !selectedConnectorId}
+                >
+                  <option value="" disabled>Select Printer...</option>
+                  {printers.map(p => (
+                    <option key={p.id} value={p.id}>{p.printer_name || p.name || 'Industrial Printer'}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
@@ -458,81 +525,69 @@ const PrintPreviewModal = ({ label, onClose }) => {
             {/* Settings Panel */}
             {showSettings && (
               <div
-                className="w-80 border-r p-6 overflow-y-auto animate-in slide-in-from-left-4 duration-200"
-                style={{ backgroundColor: theme.bg, borderColor: theme.border }}
+                className="w-80 border-r border-slate-100 dark:border-slate-800 p-8 overflow-y-auto bg-white dark:bg-slate-900 animate-in slide-in-from-left-4 duration-300"
               >
-                <h3 className="font-bold text-sm uppercase tracking-wider mb-6" style={{ color: theme.textMuted }}>Configuration</h3>
+                <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-8">Layout & Geometry</h3>
 
                 {/* Multi-Up Layout */}
-                <div className="mb-8">
-                  <label className="block text-sm font-semibold mb-2" style={{ color: theme.text }}>
-                    Layout Configuration
+                <div className="mb-10">
+                  <label className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-2.5 block">
+                    Grid Setup
                   </label>
-                  <select
-                    value={multiUpConfig}
-                    onChange={(e) => setMultiUpConfig(e.target.value)}
-                    className="input text-sm"
-                  >
+                  <div className="grid grid-cols-1 gap-2">
                     {Object.entries(MULTI_UP_CONFIGS).map(([key, cfg]) => (
-                      <option key={key} value={key}>
+                      <button
+                        key={key}
+                        onClick={() => setMultiUpConfig(key)}
+                        className={`text-left px-4 py-2.5 rounded-xl text-xs font-bold transition-all border ${
+                          multiUpConfig === key 
+                          ? 'bg-sky-50 text-sky-600 border-sky-100 shadow-sm' 
+                          : 'bg-transparent text-slate-500 border-transparent hover:bg-slate-50 hover:text-slate-700'
+                        }`}
+                      >
                         {cfg.name}
-                      </option>
+                      </button>
                     ))}
-                  </select>
-                  <p className="text-xs mt-2" style={{ color: theme.textMuted }}>
-                    {cols * rows} labels per sheet
-                  </p>
+                  </div>
                 </div>
 
                 {/* Gaps */}
-                <div className="mb-8">
-                  <h4 className="font-semibold text-sm mb-3" style={{ color: theme.text }}>Spacing (mm)</h4>
+                <div className="mb-10">
+                  <h4 className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-4 block">Spacing (mm)</h4>
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs mb-1" style={{ color: theme.textMuted }}>
-                        Horizontal
-                      </label>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Horizontal</label>
                       <input
                         type="number"
                         value={horizontalGap}
                         onChange={(e) => setHorizontalGap(Number(e.target.value))}
-                        min="0"
-                        max="50"
-                        className="input text-sm py-1"
+                        className="input h-10 text-xs font-bold"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs mb-1" style={{ color: theme.textMuted }}>
-                        Vertical
-                      </label>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Vertical</label>
                       <input
                         type="number"
                         value={verticalGap}
                         onChange={(e) => setVerticalGap(Number(e.target.value))}
-                        min="0"
-                        max="50"
-                        className="input text-sm py-1"
+                        className="input h-10 text-xs font-bold"
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* Margins */}
-                <div className="mb-8">
-                  <h4 className="font-semibold text-sm mb-3" style={{ color: theme.text }}>Margins (mm)</h4>
-                  <div className="grid grid-cols-2 gap-3">
+                <div className="mb-10">
+                  <h4 className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-4 block">Retractions / Margins (mm)</h4>
+                  <div className="grid grid-cols-2 gap-4">
                     {Object.keys(margins).map((side) => (
-                      <div key={side}>
-                        <label className="block text-xs mb-1 capitalize" style={{ color: theme.textMuted }}>
-                          {side}
-                        </label>
+                      <div key={side} className="space-y-1.5">
+                        <label className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 capitalize">{side}</label>
                         <input
                           type="number"
                           value={margins[side]}
                           onChange={(e) => setMargins({ ...margins, [side]: Number(e.target.value) })}
-                          min="0"
-                          max="50"
-                          className="input text-sm py-1"
+                          className="input h-10 text-xs font-bold"
                         />
                       </div>
                     ))}
@@ -540,10 +595,10 @@ const PrintPreviewModal = ({ label, onClose }) => {
                 </div>
 
                 {/* Cut Marks */}
-                <div className="mb-8">
-                  <label className="flex items-center gap-3 cursor-pointer group">
-                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${showCutMarks ? 'bg-[var(--color-primary)] border-[var(--color-primary)]' : 'border-gray-400 group-hover:border-[var(--color-primary)]'}`}>
-                      {showCutMarks && <Check size={14} className="text-white" />}
+                <div className="mb-10">
+                  <label className="flex items-center gap-3 cursor-pointer group bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700/50 transition-all hover:border-sky-200">
+                    <div className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all ${showCutMarks ? 'bg-sky-500 border-sky-500 shadow-lg shadow-sky-500/20' : 'bg-white border-slate-300 group-hover:border-sky-400'}`}>
+                      {showCutMarks && <Check size={14} className="text-white" strokeWidth={3} />}
                     </div>
                     <input
                       type="checkbox"
@@ -551,111 +606,50 @@ const PrintPreviewModal = ({ label, onClose }) => {
                       onChange={(e) => setShowCutMarks(e.target.checked)}
                       className="hidden"
                     />
-                    <span className="text-sm font-medium" style={{ color: theme.text }}>Show Cut Marks</span>
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Show Boundary Codes</span>
                   </label>
-                </div>
-
-                {/* DPI Settings */}
-                <div className="mb-8">
-                  <label className="block text-sm font-semibold mb-2" style={{ color: theme.text }}>
-                    Target Resolution
-                  </label>
-                  <select
-                    value={selectedDpi}
-                    onChange={(e) => setSelectedDpi(Number(e.target.value))}
-                    className="input text-sm"
-                  >
-                    <option value={203}>203 DPI</option>
-                    <option value={300}>300 DPI</option>
-                    <option value={600}>600 DPI</option>
-                  </select>
-                  <p className="text-xs mt-2" style={{ color: theme.textMuted }}>
-                    Physical resolution of your printer
-                  </p>
-                </div>
-
-                {/* Device Selection */}
-                <div className="mb-8 border-t pt-6" style={{ borderColor: theme.border }}>
-                  <h4 className="font-semibold text-sm mb-4" style={{ color: theme.text }}>Print Destination</h4>
-
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs mb-1" style={{ color: theme.textMuted }}>
-                        Connector
-                      </label>
-                      <select
-                        value={selectedConnectorId || ""}
-                        onChange={(e) => setSelectedConnectorId(e.target.value)}
-                        className="input text-sm"
-                        disabled={isLoadingDevices}
-                      >
-                        <option value="" disabled>Select Connector</option>
-                        {connectors.map(c => (
-                          <option key={c.id} value={c.id}>{c.name || 'Unnamed Connector'}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs mb-1" style={{ color: theme.textMuted }}>
-                        Printer
-                      </label>
-                      <select
-                        value={selectedPrinterId || ""}
-                        onChange={(e) => setSelectedPrinterId(e.target.value)}
-                        className="input text-sm"
-                        disabled={isLoadingDevices || !selectedConnectorId}
-                      >
-                        <option value="" disabled>Select Printer</option>
-                        {printers.map(p => (
-                          <option key={p.id} value={p.id}>{p.printer_name || p.name || 'Unnamed Printer'}</option>
-                        ))}
-                      </select>
-                      {selectedConnectorId && printers.length === 0 && !isLoadingDevices && (
-                        <p className="text-[10px] mt-1 text-red-500">No printers found for this connector</p>
-                      )}
-                    </div>
-                  </div>
                 </div>
 
                 {/* Quick Presets */}
-                <div className="space-y-2">
+                <div className="space-y-2 pt-6 border-t border-slate-100 dark:border-slate-800">
                   <button
                     onClick={() => {
-                      setHorizontalGap(3);
-                      setVerticalGap(3);
+                      setHorizontalGap(3); setVerticalGap(3);
                       setMargins({ left: 5, top: 5, right: 5, bottom: 5 });
                     }}
-                    className="w-full btn btn-outline py-2 text-xs justify-start"
+                    className="w-full text-center py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-sky-600 transition-colors"
                   >
-                    Reset to Standard
+                    Load Enterprise Default
                   </button>
                   <button
                     onClick={() => {
-                      setHorizontalGap(0);
-                      setVerticalGap(0);
+                      setHorizontalGap(0); setVerticalGap(0);
                       setMargins({ left: 0, top: 0, right: 0, bottom: 0 });
                     }}
-                    className="w-full btn btn-outline py-2 text-xs justify-start"
+                    className="w-full text-center py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-rose-500 transition-colors"
                   >
-                    Reset to No Gaps
+                    Zero Geometry (Pure)
                   </button>
                 </div>
               </div>
             )}
 
             {/* Preview Area */}
-            <div className="flex-1 flex flex-col relative overflow-hidden bg-gray-100 dark:bg-gray-900/50">
-              {/* Toolbar */}
-              <div className="absolute top-4 right-4 z-10 bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-2 flex gap-2">
-                <button onClick={() => setShowSettings(!showSettings)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors" title={showSettings ? "Expand Preview" : "Show Settings"}>
-                  {showSettings ? <Maximize2 size={16} /> : <Minimize2 size={16} />}
+            <div className="flex-1 flex flex-col relative overflow-hidden bg-slate-50/50 dark:bg-slate-950/50 p-8">
+              {/* Floating Toolbar */}
+              <div className="absolute top-8 right-8 z-10 flex gap-2">
+                <button 
+                  onClick={() => setShowSettings(!showSettings)} 
+                  className="w-10 h-10 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-100 dark:border-slate-700 flex items-center justify-center text-slate-400 hover:text-sky-600 transition-all active:scale-95"
+                  title="Toggle Controls"
+                >
+                  {showSettings ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
                 </button>
               </div>
 
-              <div className="flex-1 overflow-auto flex items-center justify-center p-8">
+              <div className="flex-1 flex items-center justify-center">
                 <div
-                  className="bg-white shadow-2xl transition-all duration-300"
+                  className="bg-white shadow-[0_32px_64px_-16px_rgba(0,0,0,0.15)] transition-all duration-500 ease-out p-[1px] rounded-sm ring-1 ring-slate-200"
                   style={{
                     transform: `scale(${previewScale})`,
                     transformOrigin: "center",
@@ -671,14 +665,7 @@ const PrintPreviewModal = ({ label, onClose }) => {
                       gap: `${convertToPx(verticalGap, 'mm')}px ${convertToPx(horizontalGap, 'mm')}px`,
                       padding: `${convertToPx(margins.top, 'mm')}px ${convertToPx(margins.right, 'mm')}px ${convertToPx(margins.bottom, 'mm')}px ${convertToPx(margins.left, 'mm')}px`,
                       backgroundColor: "#fff",
-                      backgroundImage: `
-                            linear-gradient(45deg, #f0f0f0 25%, transparent 25%), 
-                            linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), 
-                            linear-gradient(45deg, transparent 75%, #f0f0f0 75%), 
-                            linear-gradient(-45deg, transparent 75%, #f0f0f0 75%)
-                        `,
-                      backgroundSize: '20px 20px',
-                      backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
+                      backgroundSize: '10px 10px',
                     }}
                   >
                     {Array.from({ length: cols * rows }).map((_, i) => (
@@ -689,7 +676,7 @@ const PrintPreviewModal = ({ label, onClose }) => {
                           height: labelH,
                           position: "relative",
                           background: "#fff",
-                          border: "1px dashed #e2e8f0", // Light border for preview
+                          border: "1px dashed rgba(0,0,0,0.05)",
                           overflow: "hidden",
                           boxSizing: "border-box",
                         }}
@@ -702,30 +689,33 @@ const PrintPreviewModal = ({ label, onClose }) => {
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-2 text-center text-xs text-gray-500">
-                Sheet Size: {(sheetWidth / (96 / 25.4)).toFixed(1)}mm × {(sheetHeight / (96 / 25.4)).toFixed(1)}mm
+              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 px-4 py-2 bg-slate-900/90 backdrop-blur-md text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-xl">
+                Canvas: {(sheetWidth / (96 / 25.4)).toFixed(1)}mm × {(sheetHeight / (96 / 25.4)).toFixed(1)}mm
               </div>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex justify-between items-center border-t p-6" style={{ borderColor: theme.border, backgroundColor: theme.surface }}>
-            <div className="text-sm" style={{ color: theme.textMuted }}>
-              Ready to print {cols * rows} labels
+          <div className="flex justify-between items-center px-10 py-8 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+            <div className="flex items-center gap-3">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                Verification Complete • Ready to Dispatch {cols * rows} Units
+              </p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-4">
               <button
                 onClick={onClose}
-                className="btn btn-ghost"
+                className="px-6 py-2.5 text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-widest"
               >
                 Cancel
               </button>
               <button
                 onClick={handlePrint}
-                className="btn btn-primary px-8"
+                className="btn btn-primary px-10 h-12 shadow-sky-500/20"
               >
-                <Printer size={18} className="mr-2" />
-                Print Labels
+                <Printer size={18} className="mr-3" />
+                Print
               </button>
             </div>
           </div>

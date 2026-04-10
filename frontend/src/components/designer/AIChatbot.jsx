@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "../../ThemeContext";
 import { generateLabel, explainPrompt } from "./labelEngine";
-import { callEdgeFunction, API_URLS } from "../../supabaseClient";
+import { callEdgeFunction, API_URLS, MM_TO_PX } from "../../supabaseClient";
 
 // ─── Quick prompts ────────────────────────────────────────────────────────────
 const QUICK_PROMPTS = [
@@ -23,7 +23,6 @@ const MSG = { USER: "user", BOT: "bot", ERROR: "error" };
 let _mc = 0;
 const mid = () => `m_${Date.now()}_${++_mc}`;
 
-const MM_TO_PX = 3.7795275591;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const AIChatbot = ({ onGenerateElements, labelSize, generateId, onCreateLabel }) => {

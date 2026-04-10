@@ -8,10 +8,9 @@ import {
   Target,
 } from "lucide-react";
 import BarcodeElement from "../designer/code";
-import { callEdgeFunction, API_URLS } from "../../supabaseClient";
+import { callEdgeFunction, API_URLS, MM_TO_PX } from "../../supabaseClient";
 
 
-const MM_TO_PX = 3.7795275591;
 
 /* =========================
    CUT MARKS

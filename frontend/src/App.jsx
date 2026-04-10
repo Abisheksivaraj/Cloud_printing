@@ -10,9 +10,8 @@ import PrintHistory from "./components/PrintHistory";
 import DeviceManagement from "./components/DeviceManagement";
 import AddPrinter from "./components/AddPrinter";
 import { useTheme } from "./ThemeContext";
-import { supabase, callEdgeFunction, API_URLS, normalizeDesign } from "./supabaseClient";
+import { supabase, callEdgeFunction, API_URLS, normalizeDesign, MM_TO_PX } from "./supabaseClient";
 
-const MM_TO_PX = 3.7795275591;
 import Toast from "./components/Toast";
 
 
@@ -210,11 +209,55 @@ const App = () => {
     setCurrentView("designer");
   };
 
+  const handleDraftLabel = async (label) => {
+    if (userRole === 'viewer') return;
+
+    const designId = getDesignId(label);
+    const version_major = label.version_major !== undefined ? label.version_major : 0;
+    const version_minor = label.version_minor !== undefined ? label.version_minor : 1;
+
+    try {
+      setIsLoading(true);
+      const result = await callEdgeFunction(API_URLS.DRAFT_DESIGN, {
+        design_id: designId,
+        from_version_major: version_major,
+        from_version_minor: version_minor
+      });
+
+      const draftDesign = normalizeDesign(result);
+
+      // Update local labels list
+      setLabels(prev => prev.map(l => getDesignId(l) === designId ? draftDesign : l));
+
+      setCurrentLabel(draftDesign);
+      setCurrentView("designer");
+      setToast({ message: "Draft version created", type: "success" });
+      return draftDesign;
+    } catch (error) {
+      console.error("Failed to create draft:", error);
+      setToast({ message: `Draft creation failed: ${error.message}`, type: "error" });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleEditLabel = async (label) => {
     if (userRole === 'viewer') {
       setCurrentLabel(normalizeDesign(label));
       setCurrentView("designer");
       return;
+    }
+
+    // If the label is published, we MUST create a draft before editing
+    if (label.status === 'published') {
+      try {
+        await handleDraftLabel(label);
+        return;
+      } catch (error) {
+        // Fallback to normal edit if draft fails (though it shouldn't)
+        console.warn("Draft auto-creation failed, falling back to direct edit", error);
+      }
     }
 
     const designId = getDesignId(label);
@@ -259,19 +302,37 @@ const App = () => {
       let successMsg;
 
       switch (status) {
-        case 'archived': endpoint = API_URLS.ARCHIVE_DESIGN; successMsg = "Label archived"; break;
+        case 'archived':
+          endpoint = API_URLS.ARCHIVE_DESIGN;
+          successMsg = "Label archived";
+          break;
         case 'restored':
-        case 'draft': endpoint = API_URLS.RESTORE_DESIGN; successMsg = "Label restored"; break;
-        default: endpoint = API_URLS.UPDATE_DESIGN; successMsg = "Status updated";
+        case 'draft':
+          // If restoring from archive, use unarchive endpoint
+          if (targetLabel?.status === 'archived') {
+            endpoint = API_URLS.UNARCHIVE_DESIGN;
+            successMsg = "Label restored from archive";
+          } else {
+            endpoint = API_URLS.RESTORE_DESIGN;
+            successMsg = "Label restored from trash";
+          }
+          break;
+        default:
+          endpoint = API_URLS.UPDATE_DESIGN;
+          successMsg = "Status updated";
       }
 
-      console.log("handleUpdateStatus — targets:", { actualDesignId, version_major: targetLabel?.version_major, version_minor: targetLabel?.version_minor });
+      console.log("handleUpdateStatus — targets:", { actualDesignId, endpoint, status });
 
-      const result = await callEdgeFunction(endpoint, {
-        design_id: actualDesignId,
-        version_major: targetLabel?.version_major !== undefined ? targetLabel.version_major : 0,
-        version_minor: targetLabel?.version_minor !== undefined ? targetLabel.version_minor : 1
-      });
+      const payload = { design_id: actualDesignId };
+
+      // Only add versions for non-unarchive endpoints if necessary (unarchive only needs design_id)
+      if (endpoint !== API_URLS.UNARCHIVE_DESIGN) {
+        payload.version_major = targetLabel?.version_major !== undefined ? targetLabel.version_major : 0;
+        payload.version_minor = targetLabel?.version_minor !== undefined ? targetLabel.version_minor : 1;
+      }
+
+      const result = await callEdgeFunction(endpoint, payload);
 
       const updatedFromResult = normalizeDesign(result);
 
@@ -419,6 +480,7 @@ const App = () => {
                 userRole={userRole}
                 onCreateLabel={handleCreateLabel}
                 onEditLabel={handleEditLabel}
+                onDraftLabel={handleDraftLabel}
                 onDeleteLabel={handleDeleteLabel}
                 onUpdateStatus={handleUpdateStatus}
                 onNavigate={navigateTo}
