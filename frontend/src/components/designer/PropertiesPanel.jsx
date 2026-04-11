@@ -88,29 +88,44 @@ const PropertiesPanel = ({
 
   const unit = labelSize?.unit || "mm";
 
-  const SectionHeader = ({ children, color = "#60a5fa" }) => (
-    <div className="flex items-center gap-2 mb-4 group/header">
-      <div className="w-1 h-3 bg-blue-500 rounded-full group-hover/header:h-4 transition-all" />
-      <h5 className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2" style={{ color }}>
+  const SectionHeader = ({ children, icon: Icon }) => (
+    <div className="flex items-center gap-2 mb-4 mt-6 first:mt-2 px-1">
+      {Icon && <Icon size={12} className="text-slate-400" />}
+      <h5 className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400 flex-1">
         {children}
       </h5>
+      <div className="h-px bg-slate-100 flex-1" />
     </div>
   );
 
-  const Label = ({ children }) => (
-    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">
+  const Label = ({ children, className = "" }) => (
+    <label className={`text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block ${className}`}>
       {children}
     </label>
   );
 
-  const NumInput = ({ label, value, onChange, min = 0, max, step = 0.01, isPx = true }) => {
+  const ControlGroup = ({ children, className = "" }) => (
+    <div className={`p-4 rounded-xl border border-slate-100 bg-white/50 backdrop-blur-sm space-y-4 ${className}`}>
+      {children}
+    </div>
+  );
+
+  const NumInput = ({ label, value, onChange, min = 0, max, step = 0.01, isPx = true, prefix }) => {
     const displayValue = isPx ? convertFromPx(value, unit) : value;
     const formattedValue = isPx && unit !== 'px' ? Math.round(displayValue * 100) / 100 : displayValue;
 
     return (
-      <div className="group/input">
-        <Label>{label} <span className="opacity-40 font-mono">({unit})</span></Label>
-        <div className="relative">
+      <div className="flex flex-col gap-1.5 flex-1">
+        <div className="flex items-center justify-between px-0.5">
+          <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
+          <span className="text-[8px] font-mono text-slate-300 lowercase">{unit}</span>
+        </div>
+        <div className="relative group/input">
+          {prefix && (
+            <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-300 uppercase select-none">
+              {prefix}
+            </div>
+          )}
           <input
             type="number"
             value={formattedValue ?? 0}
@@ -121,32 +136,36 @@ const PropertiesPanel = ({
             min={min}
             max={max}
             step={unit === 'px' ? 1 : 0.01}
-            className="w-full bg-slate-800/50 border border-white/5 hover:border-blue-500/30 focus:border-blue-500/50 text-slate-200 text-xs py-2 px-3 rounded-xl transition-all outline-none font-mono"
+            className={`w-full bg-slate-50/50 border border-slate-200/60 hover:border-slate-300 focus:border-slate-400 focus:bg-white text-slate-900 text-[11px] py-1.5 rounded-lg transition-all outline-none font-mono text-center ${prefix ? 'pl-7' : 'px-2'}`}
           />
         </div>
       </div>
     );
   };
 
-
   const ColorPicker = ({ label, value, onChange }) => (
-    <div className="group/color">
-      <Label>{label}</Label>
-      <div className="flex items-center gap-3 p-1 rounded-xl border border-white/5 bg-slate-800/40 hover:bg-slate-800 transition-all">
-        <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-white/10 shadow-inner">
+    <div className="flex flex-col gap-1.5 flex-1">
+      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest px-0.5">{label}</label>
+      <div className="flex items-center gap-2 p-1.5 rounded-lg border border-slate-200/60 bg-slate-50/50 hover:bg-white transition-all group/color">
+        <div className="relative w-5 h-5 rounded-md overflow-hidden border border-slate-200 shadow-sm shrink-0">
           <input
             type="color"
             value={value === "transparent" ? "#ffffff" : (value || "#000000")}
             onChange={(e) => onChange(e.target.value)}
-            className="absolute -inset-2 w-12 h-12 cursor-pointer border-0 p-0"
+            className="absolute -inset-2 w-10 h-10 cursor-pointer border-0 p-0"
           />
-          {value === "transparent" && <div className="absolute inset-0 bg-white flex items-center justify-center text-[8px] text-red-500 font-bold rotate-45 select-none">/</div>}
+          {value === "transparent" && <div className="absolute inset-0 bg-white flex items-center justify-center text-[10px] text-red-500 font-bold rotate-45 select-none">/</div>}
         </div>
-        <span className="text-[10px] font-black font-mono text-slate-300 uppercase tracking-tighter shrink-0">{value === "transparent" ? "None" : value}</span>
+        <input 
+          type="text"
+          value={value === "transparent" ? "None" : value}
+          onChange={(e) => onChange(e.target.value)}
+          className="bg-transparent border-0 p-0 text-[10px] font-mono font-bold text-slate-600 uppercase tracking-tighter w-full outline-none"
+        />
         {value !== "transparent" && (
           <button
             onClick={() => onChange("transparent")}
-            className="w-6 h-6 flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg ml-auto transition-all"
+            className="p-1 text-slate-300 hover:text-red-500 transition-colors"
             title="Set transparent"
           ><X size={10} /></button>
         )}
@@ -156,27 +175,17 @@ const PropertiesPanel = ({
 
   return (
     <div
-      className="flex flex-col h-full bg-slate-900/90 backdrop-blur-2xl text-slate-300"
+      className="flex flex-col h-full bg-white/90 backdrop-blur-2xl text-slate-700"
     >
       {/* Top action bar */}
-      <div className="p-6 border-b border-white/5 shrink-0 bg-slate-900/40">
-        <div className="flex items-center justify-between mb-6">
-            <h3 className="font-black text-[10px] uppercase tracking-[0.25em] text-slate-500">
-            Inspector
-            </h3>
-            <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-                <span className="text-[9px] font-black uppercase tracking-widest text-blue-500/80">Live Engine</span>
-            </div>
-        </div>
-
+      <div className="p-6 border-b border-slate-200 shrink-0 bg-slate-50/50">
         <div className="flex gap-2">
           <button
             onClick={onUndo}
             disabled={!canUndo}
             className={`flex-1 h-9 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all ${canUndo
-              ? "bg-slate-800 hover:bg-slate-700 text-blue-400 border border-white/5 active:scale-95"
-              : "opacity-20 cursor-not-allowed border border-white/5 text-slate-600"
+              ? "bg-white hover:bg-slate-50 text-blue-600 border border-slate-200 shadow-sm active:scale-95"
+              : "opacity-40 cursor-not-allowed border border-slate-200 text-slate-400 bg-slate-50"
               }`}
             title="Undo (Ctrl+Z)"
           >
@@ -186,8 +195,8 @@ const PropertiesPanel = ({
             onClick={onRedo}
             disabled={!canRedo}
             className={`flex-1 h-9 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all ${canRedo
-              ? "bg-slate-800 hover:bg-slate-700 text-blue-400 border border-white/5 active:scale-95"
-              : "opacity-20 cursor-not-allowed border border-white/5 text-slate-600"
+              ? "bg-white hover:bg-slate-50 text-blue-600 border border-slate-200 shadow-sm active:scale-95"
+              : "opacity-40 cursor-not-allowed border border-slate-200 text-slate-400 bg-slate-50"
               }`}
             title="Redo (Ctrl+Y)"
           >
@@ -197,8 +206,8 @@ const PropertiesPanel = ({
             onClick={onDuplicate}
             disabled={!el}
             className={`flex-1 h-9 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all ${el
-              ? "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20 active:scale-95"
-              : "opacity-20 cursor-not-allowed bg-slate-800 text-slate-600"
+              ? "bg-blue-600 hover:bg-blue-500 text-white shadow-md active:scale-95"
+              : "opacity-40 cursor-not-allowed bg-slate-100 text-slate-400 border border-slate-200"
               }`}
             title="Duplicate (Ctrl+D)"
           >
@@ -209,510 +218,518 @@ const PropertiesPanel = ({
 
       <div className="flex-1 overflow-y-auto px-6 py-8 space-y-8 custom-scrollbar">
 
-        {/* No selection state - Show Label Settings */}
         {!el && (
           <div className="space-y-6">
-            <div className="rounded-lg p-4 border bg-blue-500/5" style={{ borderColor: theme.border }}>
-              <SectionHeader color="var(--color-primary)"><Settings size={12} className="mr-0.5" /> Label Settings</SectionHeader>
+            <ControlGroup>
+              <SectionHeader icon={Settings}>Label Properties</SectionHeader>
               
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {/* Unit Selection */}
-                <div>
-                  <Label>Design Unit</Label>
-                  <div className="flex bg-[var(--color-bg-main)] p-0.5 rounded-lg border border-[var(--color-border)]">
-                    {['mm', 'cm', 'inch'].map((u) => (
+                <div className="flex flex-col gap-2">
+                  <Label>Measurement System</Label>
+                  <div className="flex bg-slate-100/50 p-1 rounded-lg border border-slate-200/50">
+                    {['mm', 'cm', 'inch', 'px'].map((u) => (
                       <button
                         key={u}
                         onClick={() => updateLabelSize({ ...labelSize, unit: u })}
-                        className={`flex-1 py-1.5 rounded flex items-center justify-center text-[10px] font-black uppercase tracking-widest transition-all ${unit === u ? 'bg-white dark:bg-gray-700 shadow-sm text-[var(--color-primary)]' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`flex-1 py-1.5 rounded-md flex items-center justify-center text-[10px] font-black uppercase tracking-widest transition-all ${unit === u ? 'bg-white shadow-sm text-slate-900 ring-1 ring-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
                       >
                         {u}
                       </button>
                     ))}
                   </div>
-                  <p className="text-[9px] text-gray-400 mt-1.5 leading-tight italic">
-                    Switching units converts all positions and sizes to the new system.
-                  </p>
                 </div>
 
                 {/* Label Dimensions */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="flex gap-4">
                   <NumInput 
                     isPx={false} 
-                    label="Label Width" 
+                    label="Width" 
                     value={labelSize.width} 
                     onChange={(v) => updateLabelSize({ ...labelSize, width: v })} 
                   />
                   <NumInput 
                     isPx={false} 
-                    label="Label Height" 
+                    label="Height" 
                     value={labelSize.height} 
                     onChange={(v) => updateLabelSize({ ...labelSize, height: v })} 
                   />
                 </div>
+                
+                <p className="text-[10px] text-slate-400 leading-relaxed italic px-1 border-l-2 border-slate-100">
+                  Changing units translates all design coordinates. Pixel values assume 96 DPI standard.
+                </p>
               </div>
-            </div>
+            </ControlGroup>
 
-            <div className="flex flex-col items-center justify-center h-24 text-center text-gray-400 opacity-60">
+            <div className="flex flex-col items-center justify-center py-12 text-center">
               {(isDrawingLine || isDrawingBarcode || isDrawingShape) ? (
-                <>
-                  <div className="animate-pulse mb-2 text-2xl">✏️</div>
-                  <p className="font-bold text-xs">Drawing Mode Active</p>
-                  <p className="text-[10px] mt-1">Click and drag on the canvas</p>
-                </>
+                <div className="space-y-3 animate-in fade-in zoom-in-95 duration-500">
+                  <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mx-auto border border-slate-100">
+                    <Ruler size={20} className="text-slate-400 animate-pulse" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-black text-[11px] uppercase tracking-widest text-slate-600">Drawing Active</p>
+                    <p className="text-[10px] text-slate-400">Click and drag on the canvas paper</p>
+                  </div>
+                </div>
               ) : (
-                <>
-                  <div className="mb-2 text-2xl">🖱️</div>
-                  <p className="font-bold text-xs">No Element Selected</p>
-                  <p className="text-[10px] mt-1">Select an object or customize label above</p>
-                </>
+                <div className="space-y-3 opacity-40">
+                  <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mx-auto border border-slate-100">
+                    <Layers size={20} className="text-slate-300" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-black text-[11px] uppercase tracking-widest text-slate-400">Queue Empty</p>
+                    <p className="text-[10px] text-slate-400">Select an element to inspect properties</p>
+                  </div>
+                </div>
               )}
             </div>
           </div>
         )}
 
-
         {/* Placeholder Widget */}
-        <div className="rounded-lg p-3 border" style={{ backgroundColor: 'rgba(245,158,11,0.05)', borderColor: 'rgba(245,158,11,0.25)' }}>
-          <h4 className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-            📦 Add Placeholder
-          </h4>
+        <ControlGroup className="bg-amber-50/30 border-amber-100/50">
+          <SectionHeader icon={Plus}>Placeholder</SectionHeader>
           <div className="flex gap-2">
             <input
               type="text"
               value={placeholderName}
               onChange={(e) => setPlaceholderName(e.target.value)}
               onKeyPress={(e) => e.key === "Enter" && handleAddPlaceholder()}
-              placeholder="field_name"
-              className="input text-xs py-1.5 h-8 w-full"
+              placeholder="field_id"
+              className="flex-1 bg-white border border-amber-200/50 hover:border-amber-400 focus:border-amber-500 text-slate-900 text-[11px] font-mono py-1.5 px-3 rounded-lg transition-all outline-none"
             />
             <button
               onClick={handleAddPlaceholder}
               disabled={!placeholderName.trim()}
-              className="btn btn-primary h-8 w-8 p-0 flex items-center justify-center shrink-0 text-xs"
+              className="w-9 h-9 flex items-center justify-center rounded-lg bg-amber-500 hover:bg-amber-600 text-white shadow-sm shadow-amber-200 disabled:opacity-30 disabled:grayscale transition-all active:scale-95"
             >
-              <Plus size={14} />
+              <Plus size={16} />
             </button>
           </div>
-        </div>
+        </ControlGroup>
 
         {/* Barcode Selector Widget */}
         {showBarcodeSelector && (
-          <div className="rounded-lg p-3 border" style={{ backgroundColor: 'rgba(59,130,246,0.05)', borderColor: 'rgba(59,130,246,0.25)' }}>
-            <h4 className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-              📊 Barcode Type
-            </h4>
-            <select
-              onChange={(e) => handleBarcodeTypeSelection(e.target.value)}
-              value={selectedBarcodeType || ""}
-              className="input text-sm"
-            >
-              <option value="" disabled>Select Type...</option>
-              {barcodeTypes.map((type) => (
-                <option key={type.value} value={type.value}>{type.label}</option>
-              ))}
-            </select>
-            <div className={`mt-2 text-[10px] flex items-center gap-1.5 ${!selectedBarcodeType ? 'text-orange-500' : 'text-blue-500'}`}>
-              {selectedBarcodeType ? (
-                <><Check size={10} /> Ready — drag on canvas to place</>
-              ) : (
-                <><span className="animate-pulse">●</span> Select type first to enable drawing</>
-              )}
+          <ControlGroup className="bg-indigo-50/30 border-indigo-100/50">
+            <SectionHeader icon={Info}>Barcode Symbology</SectionHeader>
+            <div className="space-y-3">
+              <select
+                onChange={(e) => handleBarcodeTypeSelection(e.target.value)}
+                value={selectedBarcodeType || ""}
+                className="w-full bg-white border border-indigo-200/50 hover:border-indigo-400 focus:border-indigo-500 text-slate-900 text-[11px] font-bold py-1.5 px-2 rounded-lg transition-all outline-none appearance-none"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
+              >
+                <option value="" disabled>Select Format...</option>
+                {barcodeTypes.map((type) => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </select>
+              <div className={`text-[9px] font-bold uppercase tracking-widest flex items-center gap-2 ${!selectedBarcodeType ? 'text-amber-500/80' : 'text-indigo-500/80'}`}>
+                <div className={`w-1.5 h-1.5 rounded-full ${!selectedBarcodeType ? 'bg-amber-500 animate-pulse' : 'bg-indigo-500'}`} />
+                {selectedBarcodeType ? "Drawing Mode Armed" : "Symbology Required"}
+              </div>
             </div>
-          </div>
+          </ControlGroup>
         )}
 
         {/* Shape Selector Widget */}
         {showShapeSelector && (
-          <div className="rounded-lg p-3 border" style={{ backgroundColor: 'rgba(147,51,234,0.05)', borderColor: 'rgba(147,51,234,0.25)' }}>
-            <h4 className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-              ⬜ Shape Type
-            </h4>
+          <ControlGroup className="bg-purple-50/30 border-purple-100/50">
+            <SectionHeader icon={Grid}>Shape Geometry</SectionHeader>
             <select
               onChange={(e) => {
                 handleShapeSelection(e.target.value);
                 e.target.value = "";
               }}
               defaultValue=""
-              className="input text-sm"
+              className="w-full bg-white border border-purple-200/50 hover:border-purple-400 focus:border-purple-500 text-slate-900 text-[11px] font-bold py-1.5 px-2 rounded-lg transition-all outline-none appearance-none"
+              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
             >
-              {shapeTypes.map((type) => (
-                <option key={type.value} value={type.value} disabled={!type.value}>
-                  {type.label}
-                </option>
+              <option value="" disabled>Choose Primitive...</option>
+              {shapeTypes.filter(s => s.value).map((type) => (
+                <option key={type.value} value={type.value}>{type.label}</option>
               ))}
             </select>
-          </div>
+          </ControlGroup>
         )}
 
         {/* Table Creator Widget */}
         {showTableCreator && (
-          <div className="rounded-lg p-3 border" style={{ backgroundColor: 'rgba(16,185,129,0.05)', borderColor: 'rgba(16,185,129,0.25)' }}>
-            <h4 className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-              📋 Insert Table
-            </h4>
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <div>
-                <Label>Rows</Label>
-                <input type="number" value={tableRows} onChange={(e) => setTableRows(Number(e.target.value))} min="1" max="20" className="input text-sm py-1" />
-              </div>
-              <div>
-                <Label>Cols</Label>
-                <input type="number" value={tableColumns} onChange={(e) => setTableColumns(Number(e.target.value))} min="1" max="20" className="input text-sm py-1" />
-              </div>
+          <ControlGroup className="bg-emerald-50/30 border-emerald-100/50">
+            <SectionHeader icon={Grid}>Grid System</SectionHeader>
+            <div className="flex gap-4">
+              <NumInput isPx={false} label="Rows" value={tableRows} onChange={(v) => setTableRows(v)} unit="qty" />
+              <NumInput isPx={false} label="Cols" value={tableColumns} onChange={(v) => setTableColumns(v)} unit="qty" />
             </div>
             <button
               onClick={() => onAddTable(tableRows, tableColumns)}
-              className="w-full py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
+              className="w-full py-2 rounded-lg text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-200 transition-all active:scale-[0.98]"
             >
-              ＋ Create {tableRows}×{tableColumns} Table
+              Generate Object
             </button>
-          </div>
+          </ControlGroup>
         )}
 
         {/* ─── ELEMENT PROPERTIES ─── */}
         {el && (
-          <div className="space-y-4">
+          <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500 pb-20">
 
             {/* Element Header */}
-            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: theme.border }}>
-              <div>
-                <h4 className="font-black text-sm capitalize flex items-center gap-2" style={{ color: theme.text }}>
-                  {el.type === 'text' && <FileText size={15} className="text-blue-500" />}
-                  {el.type === 'image' && <ImageIcon size={15} className="text-green-500" />}
-                  {el.type === 'barcode' && <span className="text-sm">📊</span>}
-                  {el.type === 'rectangle' && <span className="text-sm">▭</span>}
-                  {el.type === 'circle' && <span className="text-sm">⭕</span>}
-                  {el.type === 'line' && <span className="text-sm">╱</span>}
-                  {el.type === 'table' && <span className="text-sm">⊞</span>}
-                  {el.type === 'placeholder' && <span className="text-sm">📦</span>}
-                  {el.type}
-                </h4>
-                <p className="text-[9px] text-gray-400 font-mono mt-0.5">#{id?.slice(-8)}</p>
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center border border-slate-100">
+                  {el.type === 'text' && <FileText size={18} className="text-blue-500" />}
+                  {el.type === 'image' && <ImageIcon size={18} className="text-emerald-500" />}
+                  {el.type === 'barcode' && <Search size={18} className="text-indigo-500" />}
+                  {el.type === 'rectangle' && <div className="w-4 h-3 border-2 border-purple-500 rounded-sm" />}
+                  {el.type === 'circle' && <div className="w-4 h-4 border-2 border-purple-500 rounded-full" />}
+                  {el.type === 'line' && <Minus size={18} className="text-amber-500 rotate-45" />}
+                  {el.type === 'table' && <Grid size={18} className="text-cyan-500" />}
+                  {el.type === 'placeholder' && <Plus size={18} className="text-amber-600" />}
+                </div>
+                <div>
+                  <h4 className="font-black text-xs uppercase tracking-widest text-slate-800">
+                    {el.type} <span className="text-slate-300 font-mono ml-1 font-normal select-none">/</span> <span className="text-slate-400 font-mono text-[10px] lowercase">obj_{id?.slice(-4)}</span>
+                  </h4>
+                  <p className="text-[9px] text-slate-400 font-bold tracking-tight mt-0.5 uppercase tracking-widest">Active Component</p>
+                </div>
               </div>
               <button
                 onClick={deleteElement}
-                className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                title="Delete Element (Del)"
+                className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all active:scale-90"
+                title="Destroy Object"
               >
                 <Trash2 size={16} />
               </button>
             </div>
 
             {/* Layer Control */}
-            <div className="rounded-lg p-3 border" style={{ borderColor: theme.border }}>
-              <SectionHeader><Layers size={10} className="mr-0.5" /> Layer Order</SectionHeader>
+            <ControlGroup groupName="Arrangement">
+              <SectionHeader icon={Layers}>Arrangement</SectionHeader>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={onBringForward}
-                  className="flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-bold border transition-colors hover:bg-[var(--color-primary)]/10 hover:border-[var(--color-primary)]/40"
-                  style={{ borderColor: theme.border, color: theme.text }}
-                  title="Bring Forward"
+                  className="flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest bg-white border border-slate-200 text-slate-600 hover:border-slate-400 hover:text-slate-900 transition-all active:scale-95"
                 >
-                  <ArrowUp size={12} /> Bring Up
+                  <ArrowUp size={12} /> Forward
                 </button>
                 <button
                   onClick={onSendBackward}
-                  className="flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-bold border transition-colors hover:bg-[var(--color-primary)]/10 hover:border-[var(--color-primary)]/40"
-                  style={{ borderColor: theme.border, color: theme.text }}
-                  title="Send Backward"
+                  className="flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest bg-white border border-slate-200 text-slate-600 hover:border-slate-400 hover:text-slate-900 transition-all active:scale-95"
                 >
-                  <ArrowDown size={12} /> Send Back
+                  <ArrowDown size={12} /> Backward
                 </button>
               </div>
-            </div>
+            </ControlGroup>
 
             {/* Position & Size */}
-            <div className="rounded-lg p-3 border space-y-3" style={{ borderColor: theme.border }}>
-              <SectionHeader>Position & Size</SectionHeader>
-              <div className="grid grid-cols-2 gap-2">
-                <NumInput label="X" value={el.x} onChange={(v) => updateElement(id, { x: v })} />
-                <NumInput label="Y" value={el.y} onChange={(v) => updateElement(id, { y: v })} />
+            <ControlGroup>
+              <SectionHeader icon={Ruler}>Geometrics</SectionHeader>
+              <div className="flex flex-col gap-4">
+                <div className="flex gap-4">
+                  <NumInput label="X-Axis" value={el.x} onChange={(v) => updateElement(id, { x: v })} prefix="X" />
+                  <NumInput label="Y-Axis" value={el.y} onChange={(v) => updateElement(id, { y: v })} prefix="Y" />
+                </div>
                 {el.type !== 'line' && (
-                  <>
-                    <NumInput label="Width" value={el.width} onChange={(v) => updateElement(id, { width: Math.max(10, v) })} min={1} />
-                    <NumInput label="Height" value={el.height} onChange={(v) => updateElement(id, { height: Math.max(10, v) })} min={1} />
-                  </>
+                  <div className="flex gap-4">
+                    <NumInput label="Width" value={el.width} onChange={(v) => updateElement(id, { width: Math.max(1, v) })} prefix="W" />
+                    <NumInput label="Height" value={el.height} onChange={(v) => updateElement(id, { height: Math.max(1, v) })} prefix="H" />
+                  </div>
+                )}
+                
+                {/* Rotation */}
+                {el.type !== 'line' && (
+                  <div className="pt-2 border-t border-slate-100/50">
+                    <div className="flex items-center justify-between mb-2 px-1">
+                      <Label className="mb-0">Orientation</Label>
+                      <span className="text-[10px] font-mono font-bold text-slate-400">{(el.rotation || 0)}°</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="range"
+                        min={-180}
+                        max={180}
+                        value={el.rotation || 0}
+                        onChange={(e) => updateElement(id, { rotation: Number(e.target.value) })}
+                        className="flex-1 h-1.5 bg-slate-100 rounded-full appearance-none cursor-pointer accent-slate-400"
+                      />
+                      <button 
+                        onClick={() => updateElement(id, { rotation: 0 })}
+                        className="text-[9px] font-black text-slate-300 hover:text-slate-600 uppercase tracking-widest transition-colors"
+                      >Reset</button>
+                    </div>
+                  </div>
                 )}
               </div>
-              {/* Rotation */}
-              {el.type !== 'line' && (
-                <div>
-                  <Label>Rotation (°)</Label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="range"
-                      min={-180}
-                      max={180}
-                      value={el.rotation || 0}
-                      onChange={(e) => updateElement(id, { rotation: Number(e.target.value) })}
-                      className="flex-1 h-1.5 accent-[var(--color-primary)]"
-                    />
-                    <input
-                      type="number"
-                      value={el.rotation || 0}
-                      onChange={(e) => updateElement(id, { rotation: Number(e.target.value) })}
-                      min={-180}
-                      max={180}
-                      className="input text-xs py-1 w-16 text-center"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
+            </ControlGroup>
 
             {/* Content Editor */}
             {(['text', 'barcode', 'placeholder'].includes(el.type)) && (
-              <div className="rounded-lg p-3 border space-y-2" style={{ borderColor: theme.border }}>
-                <SectionHeader>Content</SectionHeader>
+              <ControlGroup>
+                <SectionHeader icon={FileText}>Encoded Data</SectionHeader>
                 <textarea
                   value={el.content || ""}
                   onChange={(e) => updateElement(id, { content: e.target.value })}
-                  className="input min-h-[70px] text-sm resize-none"
-                  placeholder="Enter content..."
+                  className="w-full bg-slate-50/50 border border-slate-200/60 focus:border-slate-400 focus:bg-white text-slate-900 text-xs py-2.5 px-3 rounded-lg transition-all outline-none font-mono min-h-[80px] leading-relaxed"
+                  placeholder="Insert value..."
                 />
-              </div>
+              </ControlGroup>
             )}
 
-            {/* ── TEXT TYPOGRAPHY ── */}
+            {/* Typography */}
             {(['text', 'placeholder'].includes(el.type)) && (
-              <div className="rounded-lg p-3 border space-y-3" style={{ borderColor: theme.border }}>
-                <SectionHeader><FileText size={10} className="mr-0.5" /> Typography</SectionHeader>
-
-                {/* Font Family */}
-                <div>
-                  <Label>Font Family</Label>
-                  <select
-                    value={el.fontFamily || "Arial"}
-                    onChange={(e) => updateElement(id, { fontFamily: e.target.value })}
-                    className="input text-xs py-1.5"
-                  >
-                    {fontFamilies.map(f => <option key={f} value={f}>{f}</option>)}
-                  </select>
-                </div>
-
-                {/* Size + Color row */}
-                <div className="grid grid-cols-2 gap-2">
-                  <NumInput label="Font Size" value={el.fontSize || 14} onChange={(v) => updateElement(id, { fontSize: Math.max(1, v) })} min={1} max={500} />
-                  <ColorPicker label="Text Color" value={el.color || "#000000"} onChange={(v) => updateElement(id, { color: v })} />
-                </div>
-
-                {/* Style toggles */}
-                <div>
-                  <Label>Style</Label>
-                  <div className="flex gap-1.5">
-                    {[
-                      { key: 'fontWeight', on: 'bold', off: 'normal', icon: <Bold size={13} />, title: 'Bold' },
-                      { key: 'fontStyle', on: 'italic', off: 'normal', icon: <Italic size={13} />, title: 'Italic' },
-                      { key: 'textDecoration', on: 'underline', off: 'none', icon: <Underline size={13} />, title: 'Underline' },
-                    ].map(({ key, on, off, icon, title }) => (
-                      <button
-                        key={key}
-                        title={title}
-                        onClick={() => updateElement(id, { [key]: el[key] === on ? off : on })}
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center border transition-all ${el[key] === on ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]' : 'border-[var(--color-border)] hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-                      >{icon}</button>
-                    ))}
+              <ControlGroup>
+                <SectionHeader icon={Bold}>Typography</SectionHeader>
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-1.5 px-0.5">
+                    <Label className="mb-0">Typeface</Label>
+                    <select
+                      value={el.fontFamily || "Arial"}
+                      onChange={(e) => updateElement(id, { fontFamily: e.target.value })}
+                      className="w-full bg-white border border-slate-200/60 hover:border-slate-400 text-slate-900 text-[11px] font-bold py-1.5 px-2 rounded-lg outline-none appearance-none"
+                      style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
+                    >
+                      {fontFamilies.map(f => <option key={f} value={f}>{f}</option>)}
+                    </select>
                   </div>
-                </div>
 
-                {/* Alignment */}
-                <div>
-                  <Label>Alignment</Label>
-                  <div className="flex bg-[var(--color-bg-main)] p-0.5 rounded-lg border border-[var(--color-border)]">
-                    {[
-                      { val: 'left', icon: <AlignLeft size={13} /> },
-                      { val: 'center', icon: <AlignCenter size={13} /> },
-                      { val: 'right', icon: <AlignRight size={13} /> },
-                    ].map(({ val, icon }) => (
-                      <button
-                        key={val}
-                        onClick={() => updateElement(id, { textAlign: val })}
-                        title={val}
-                        className={`flex-1 py-1.5 rounded flex items-center justify-center transition-all ${(el.textAlign || 'left') === val ? 'bg-white dark:bg-gray-700 shadow-sm text-[var(--color-primary)]' : 'text-gray-400 hover:text-gray-600'}`}
-                      >{icon}</button>
-                    ))}
+                  <div className="flex gap-4">
+                    <NumInput label="Pt Size" value={el.fontSize || 14} onChange={(v) => updateElement(id, { fontSize: Math.max(1, v) })} min={1} max={500} unit="pt" isPx={false} />
+                    <ColorPicker label="Fill Color" value={el.color || "#000000"} onChange={(v) => updateElement(id, { color: v })} />
                   </div>
-                </div>
 
-                {/* Spacing */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label>Letter Spacing</Label>
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="range" min={-3} max={20} step={0.5}
-                        value={el.letterSpacing || 0}
-                        onChange={(e) => updateElement(id, { letterSpacing: Number(e.target.value) })}
-                        className="flex-1 h-1.5 accent-[var(--color-primary)]"
-                      />
-                      <span className="text-[10px] w-7 text-center font-mono">{el.letterSpacing || 0}</span>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <Label className="mb-0 px-0.5">Character Style</Label>
+                      <div className="flex gap-1">
+                        {[
+                          { key: 'fontWeight', on: 'bold', off: 'normal', icon: <Bold size={12} />, title: 'Bold' },
+                          { key: 'fontStyle', on: 'italic', off: 'normal', icon: <Italic size={12} />, title: 'Italic' },
+                          { key: 'textDecoration', on: 'underline', off: 'none', icon: <Underline size={12} />, title: 'Underline' },
+                        ].map(({ key, on, off, icon, title }) => (
+                          <button
+                            key={key}
+                            title={title}
+                            onClick={() => updateElement(id, { [key]: el[key] === on ? off : on })}
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center border transition-all ${el[key] === on ? 'bg-slate-800 text-white border-slate-800 shadow-sm' : 'bg-white border-slate-200 hover:border-slate-400'}`}
+                          >{icon}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label className="mb-0 px-0.5">Alignment</Label>
+                      <div className="flex bg-slate-100/50 p-1 rounded-lg border border-slate-200/50">
+                        {[
+                          { val: 'left', icon: <AlignLeft size={12} /> },
+                          { val: 'center', icon: <AlignCenter size={12} /> },
+                          { val: 'right', icon: <AlignRight size={12} /> },
+                        ].map(({ val, icon }) => (
+                          <button
+                            key={val}
+                            onClick={() => updateElement(id, { textAlign: val })}
+                            title={val}
+                            className={`flex-1 py-1 rounded-md flex items-center justify-center transition-all ${(el.textAlign || 'left') === val ? 'bg-white shadow-sm text-slate-900 border border-slate-200/50' : 'text-slate-400'}`}
+                          >{icon}</button>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <Label>Line Height</Label>
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="range" min={0.8} max={3} step={0.1}
-                        value={el.lineHeight || 1.2}
-                        onChange={(e) => updateElement(id, { lineHeight: Number(e.target.value) })}
-                        className="flex-1 h-1.5 accent-[var(--color-primary)]"
-                      />
-                      <span className="text-[10px] w-7 text-center font-mono">{(el.lineHeight || 1.2).toFixed(1)}</span>
+
+                  {/* Spacing */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <Label className="mb-0 px-0.5">Kerning</Label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="range" min={-2} max={15} step={0.5}
+                          value={el.letterSpacing || 0}
+                          onChange={(e) => updateElement(id, { letterSpacing: Number(e.target.value) })}
+                          className="flex-1 h-1 bg-slate-100 rounded-full appearance-none cursor-pointer accent-slate-400"
+                        />
+                        <span className="text-[9px] w-6 text-center font-mono font-bold text-slate-400">{(el.letterSpacing || 0)}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label className="mb-0 px-0.5">Leading</Label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="range" min={0.5} max={3} step={0.1}
+                          value={el.lineHeight || 1.2}
+                          onChange={(e) => updateElement(id, { lineHeight: Number(e.target.value) })}
+                          className="flex-1 h-1 bg-slate-100 rounded-full appearance-none cursor-pointer accent-slate-400"
+                        />
+                        <span className="text-[9px] w-6 text-center font-mono font-bold text-slate-400">{(el.lineHeight || 1.2).toFixed(1)}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              </ControlGroup>
             )}
 
-            {/* ── BARCODE EXTENDED ── */}
+            {/* Barcode Parameters */}
             {el.type === "barcode" && (
-              <div className="rounded-lg p-3 border space-y-3" style={{ borderColor: theme.border }}>
-                <SectionHeader>📊 Barcode Settings</SectionHeader>
-                <div>
-                  <Label>Symbology</Label>
-                  <select
-                    value={el.barcodeType || "CODE128"}
-                    onChange={(e) => onBarcodeTypeChange(e.target.value)}
-                    className="input text-sm"
-                  >
-                    {barcodeTypes.map((type) => (
-                      <option key={type.value} value={type.value}>{type.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <NumInput
-                    label="Bar Width"
-                    value={el.barcodeWidth || 2}
-                    onChange={(v) => updateElement(id, { barcodeWidth: Math.max(1, v) })}
-                    min={1} max={5}
-                  />
-                  <NumInput
-                    label="Bar Height %"
-                    value={el.barcodeBarHeight || 70}
-                    onChange={(v) => updateElement(id, { barcodeBarHeight: Math.max(20, Math.min(100, v)) })}
-                    min={20} max={100}
-                  />
-                </div>
-                <div>
-                  <Label>Show Value Text</Label>
-                  <div className="flex gap-2">
-                    {['Yes', 'No'].map(opt => (
-                      <button
-                        key={opt}
-                        onClick={() => updateElement(id, { showBarcodeText: opt === 'Yes' })}
-                        className={`flex-1 py-1 rounded-lg text-xs font-bold border transition-all ${(el.showBarcodeText !== false ? 'Yes' : 'No') === opt ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]' : 'border-[var(--color-border)]'}`}
-                      >{opt}</button>
-                    ))}
+              <ControlGroup>
+                <SectionHeader icon={Info}>Format Details</SectionHeader>
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-1.5 px-0.5">
+                    <Label className="mb-0">Symbology</Label>
+                    <select
+                      value={el.barcodeType || "CODE128"}
+                      onChange={(e) => onBarcodeTypeChange(e.target.value)}
+                      className="w-full bg-white border border-slate-200/60 hover:border-slate-400 text-slate-900 text-[11px] font-bold py-1.5 px-2 rounded-lg outline-none appearance-none"
+                      style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
+                    >
+                      {barcodeTypes.map((type) => (
+                        <option key={type.value} value={type.value}>{type.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex gap-4">
+                    <NumInput label="Mod Width" value={el.barcodeWidth || 2} onChange={(v) => updateElement(id, { barcodeWidth: Math.max(1, v) })} min={1} max={5} unit="px" isPx={false} />
+                    <NumInput label="Ratio %" value={el.barcodeBarHeight || 70} onChange={(v) => updateElement(id, { barcodeBarHeight: Math.max(20, Math.min(100, v)) })} min={20} max={100} unit="%" isPx={false} />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label className="mb-0 px-0.5">Value Visibility</Label>
+                    <div className="flex bg-slate-100/50 p-1 rounded-lg border border-slate-200/50">
+                      {[
+                        { label: 'Shown', val: true },
+                        { label: 'Hidden', val: false },
+                      ].map(opt => (
+                        <button
+                          key={opt.label}
+                          onClick={() => updateElement(id, { showBarcodeText: opt.val })}
+                          className={`flex-1 py-1 rounded-md text-[10px] font-black uppercase tracking-widest transition-all ${(el.showBarcodeText !== false ? true : false) === opt.val ? 'bg-white shadow-sm text-slate-900 border border-slate-200/50' : 'text-slate-400'}`}
+                        >{opt.label}</button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
+              </ControlGroup>
             )}
 
-            {/* ── IMAGE PROPERTIES ── */}
+            {/* Optics for Images */}
             {el.type === "image" && (
-              <div className="rounded-lg p-3 border space-y-3" style={{ borderColor: theme.border }}>
-                <SectionHeader><ImageIcon size={10} className="mr-0.5" /> Image Settings</SectionHeader>
-                <div>
-                  <Label>Opacity ({Math.round((el.opacity ?? 1) * 100)}%)</Label>
-                  <input
-                    type="range" min={0} max={1} step={0.01}
-                    value={el.opacity ?? 1}
-                    onChange={(e) => updateElement(id, { opacity: Number(e.target.value) })}
-                    className="w-full h-1.5 accent-[var(--color-primary)]"
-                  />
-                </div>
-                <div>
-                  <Label>Lock Aspect Ratio</Label>
-                  <div className="flex gap-2">
-                    {['Locked', 'Free'].map(opt => (
-                      <button
-                        key={opt}
-                        onClick={() => updateElement(id, { lockAspectRatio: opt === 'Locked' })}
-                        className={`flex-1 py-1 rounded-lg text-xs font-bold border transition-all ${(el.lockAspectRatio !== false ? 'Locked' : 'Free') === opt ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]' : 'border-[var(--color-border)]'}`}
-                      >{opt}</button>
-                    ))}
+              <ControlGroup>
+                <SectionHeader icon={ImageIcon}>Visual Parameters</SectionHeader>
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex justify-between px-0.5">
+                      <Label className="mb-0">Opacity</Label>
+                      <span className="text-[10px] font-mono font-bold text-slate-400">{Math.round((el.opacity ?? 1) * 100)}%</span>
+                    </div>
+                    <input
+                      type="range" min={0} max={1} step={0.01}
+                      value={el.opacity ?? 1}
+                      onChange={(e) => updateElement(id, { opacity: Number(e.target.value) })}
+                      className="w-full h-1 bg-slate-100 rounded-full appearance-none cursor-pointer accent-slate-400"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label className="mb-0 px-0.5">Proportion Lock</Label>
+                    <div className="flex bg-slate-100/50 p-1 rounded-lg border border-slate-200/50">
+                      {[
+                        { label: 'Proportional', val: true },
+                        { label: 'Freeform', val: false },
+                      ].map(opt => (
+                        <button
+                          key={opt.label}
+                          onClick={() => updateElement(id, { lockAspectRatio: opt.val })}
+                          className={`flex-1 py-1 rounded-md text-[10px] font-black uppercase tracking-widest transition-all ${(el.lockAspectRatio !== false ? true : false) === opt.val ? 'bg-white shadow-sm text-slate-900 border border-slate-200/50' : 'text-slate-400'}`}
+                        >{opt.label}</button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
+              </ControlGroup>
             )}
 
-            {/* ── LINE STYLE ── */}
+            {/* Path Styles for Lines */}
             {el.type === "line" && (
-              <div className="rounded-lg p-3 border space-y-3" style={{ borderColor: theme.border }}>
-                <SectionHeader>╱ Stroke Style</SectionHeader>
-                <div className="grid grid-cols-2 gap-2">
-                  <NumInput label="Thickness" value={el.borderWidth || 1} onChange={(v) => updateElement(id, { borderWidth: Math.max(0, v) })} min={0} max={100} />
-                  <ColorPicker label="Color" value={el.borderColor || "#000000"} onChange={(v) => updateElement(id, { borderColor: v })} />
-                </div>
-                <div>
-                  <Label>Line Style</Label>
-                  <div className="flex gap-2">
-                    {['solid', 'dashed', 'dotted'].map(style => (
-                      <button
-                        key={style}
-                        onClick={() => updateElement(id, { borderStyle: style })}
-                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold border capitalize transition-all ${(el.borderStyle || 'solid') === style ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]' : 'border-[var(--color-border)]'}`}
-                      >{style}</button>
-                    ))}
+              <ControlGroup>
+                <SectionHeader icon={Minus}>Line Attributes</SectionHeader>
+                <div className="space-y-4">
+                  <div className="flex gap-4">
+                    <NumInput label="Weight" value={el.borderWidth || 1} onChange={(v) => updateElement(id, { borderWidth: Math.max(0, v) })} min={0} max={100} prefix="T" />
+                    <ColorPicker label="Stroke" value={el.borderColor || "#000000"} onChange={(v) => updateElement(id, { borderColor: v })} />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label className="mb-0 px-0.5">Dash Pattern</Label>
+                    <div className="flex bg-slate-100/50 p-1 rounded-lg border border-slate-200/50">
+                      {['solid', 'dashed', 'dotted'].map(style => (
+                        <button
+                          key={style}
+                          onClick={() => updateElement(id, { borderStyle: style })}
+                          className={`flex-1 py-1 rounded-md text-[10px] font-black uppercase tracking-widest transition-all ${(el.borderStyle || 'solid') === style ? 'bg-white shadow-sm text-slate-900 border border-slate-200/50' : 'text-slate-400'}`}
+                        >{style}</button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
+              </ControlGroup>
             )}
 
-            {/* ── SHAPE STYLE ── */}
+            {/* Primitive Geometry Styles */}
             {['rectangle', 'circle'].includes(el.type) && (
-              <div className="rounded-lg p-3 border space-y-3" style={{ borderColor: theme.border }}>
-                <SectionHeader>◻ Shape Style</SectionHeader>
-                <div className="grid grid-cols-2 gap-2">
-                  <ColorPicker label="Fill Color" value={el.backgroundColor || "transparent"} onChange={(v) => updateElement(id, { backgroundColor: v })} />
-                  <ColorPicker label="Border Color" value={el.borderColor || "#000000"} onChange={(v) => updateElement(id, { borderColor: v })} />
-                  <NumInput label="Border Width" value={el.borderWidth || 0} onChange={(v) => updateElement(id, { borderWidth: Math.max(0, v) })} min={0} max={100} />
-                  {el.type === 'rectangle' && (
-                    <NumInput label="Corner Radius" value={el.borderRadius || 0} onChange={(v) => updateElement(id, { borderRadius: Math.max(0, v) })} min={0} max={200} />
-                  )}
-                </div>
-                <div>
-                  <Label>Border Style</Label>
-                  <div className="flex gap-2">
-                    {['solid', 'dashed', 'dotted'].map(style => (
-                      <button
-                        key={style}
-                        onClick={() => updateElement(id, { borderStyle: style })}
-                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold border capitalize transition-all ${(el.borderStyle || 'solid') === style ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]' : 'border-[var(--color-border)]'}`}
-                      >{style}</button>
-                    ))}
+              <ControlGroup>
+                <SectionHeader icon={Grid}>Primitive Style</SectionHeader>
+                <div className="space-y-4">
+                  <div className="flex gap-4">
+                    <ColorPicker label="Fill" value={el.backgroundColor || "transparent"} onChange={(v) => updateElement(id, { backgroundColor: v })} />
+                    <ColorPicker label="Stroke" value={el.borderColor || "#000000"} onChange={(v) => updateElement(id, { borderColor: v })} />
+                  </div>
+                  <div className="flex gap-4">
+                    <NumInput label="Weight" value={el.borderWidth || 0} onChange={(v) => updateElement(id, { borderWidth: Math.max(0, v) })} min={0} max={100} prefix="T" />
+                    {el.type === 'rectangle' && (
+                      <NumInput label="Corners" value={el.borderRadius || 0} onChange={(v) => updateElement(id, { borderRadius: Math.max(0, v) })} min={0} max={200} prefix="R" />
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label className="mb-0 px-0.5">Pattern</Label>
+                    <div className="flex bg-slate-100/50 p-1 rounded-lg border border-slate-200/50">
+                      {['solid', 'dashed', 'dotted'].map(style => (
+                        <button
+                          key={style}
+                          onClick={() => updateElement(id, { borderStyle: style })}
+                          className={`flex-1 py-1 rounded-md text-[10px] font-black uppercase tracking-widest transition-all ${(el.borderStyle || 'solid') === style ? 'bg-white shadow-sm text-slate-900 border border-slate-200/50' : 'text-slate-400'}`}
+                        >{style}</button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
+              </ControlGroup>
             )}
 
-            {/* ── TABLE SETTINGS ── */}
+            {/* Table Settings */}
             {el.type === "table" && (
-              <div className="rounded-lg p-3 border space-y-3" style={{ borderColor: theme.border }}>
-                <SectionHeader>⊞ Table Style</SectionHeader>
-                <div className="grid grid-cols-2 gap-2">
-                  <NumInput label="Cell Width" value={el.cellWidth || 60} onChange={(v) => updateElement(id, { cellWidth: Math.max(1, v) })} min={1} />
-                  <NumInput label="Cell Height" value={el.cellHeight || 25} onChange={(v) => updateElement(id, { cellHeight: Math.max(1, v) })} min={1} />
-                  <NumInput label="Border Width" value={el.borderWidth || 1} onChange={(v) => updateElement(id, { borderWidth: Math.max(0, v) })} min={0} />
-                  <ColorPicker label="Border Color" value={el.borderColor || "#000000"} onChange={(v) => updateElement(id, { borderColor: v })} />
+              <ControlGroup>
+                <SectionHeader icon={Grid}>Grid Array Parameters</SectionHeader>
+                <div className="space-y-4">
+                  <div className="flex gap-4">
+                    <NumInput label="Cell W" value={el.cellWidth || 60} onChange={(v) => updateElement(id, { cellWidth: Math.max(1, v) })} min={1} prefix="W" />
+                    <NumInput label="Cell H" value={el.cellHeight || 25} onChange={(v) => updateElement(id, { cellHeight: Math.max(1, v) })} min={1} prefix="H" />
+                  </div>
+                  <div className="flex gap-4">
+                    <NumInput label="Weight" value={el.borderWidth || 1} onChange={(v) => updateElement(id, { borderWidth: Math.max(0, v) })} min={0} prefix="T" />
+                    <ColorPicker label="Stroke" value={el.borderColor || "#000000"} onChange={(v) => updateElement(id, { borderColor: v })} />
+                  </div>
+                  <ColorPicker label="Cell Fill" value={el.backgroundColor || "transparent"} onChange={(v) => updateElement(id, { backgroundColor: v })} />
                 </div>
-                <ColorPicker label="Background" value={el.backgroundColor || "transparent"} onChange={(v) => updateElement(id, { backgroundColor: v })} />
-              </div>
+              </ControlGroup>
             )}
 
-            {/* ── GENERAL COLOURS (text/placeholder/barcode bg) ── */}
+            {/* General Aesthetics */}
             {!['line', 'rectangle', 'circle', 'table'].includes(el.type) && (
-              <div className="rounded-lg p-3 border space-y-3" style={{ borderColor: theme.border }}>
-                <SectionHeader>🎨 Appearance</SectionHeader>
-                <div className="grid grid-cols-2 gap-2">
+              <ControlGroup>
+                <SectionHeader icon={Palette}>Global Aesthetics</SectionHeader>
+                <div className="flex gap-4">
                   {!['text', 'placeholder'].includes(el.type) && (
-                    <ColorPicker label="Foreground" value={el.color || "#000000"} onChange={(v) => updateElement(id, { color: v })} />
+                    <ColorPicker label="Primary" value={el.color || "#000000"} onChange={(v) => updateElement(id, { color: v })} />
                   )}
-                  <ColorPicker label="Background" value={el.backgroundColor || "transparent"} onChange={(v) => updateElement(id, { backgroundColor: v })} />
+                  <ColorPicker label="Surface" value={el.backgroundColor || "transparent"} onChange={(v) => updateElement(id, { backgroundColor: v })} />
                 </div>
-              </div>
+              </ControlGroup>
             )}
 
           </div>

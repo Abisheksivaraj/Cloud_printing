@@ -9,6 +9,7 @@ import AdminDashboard from "./components/admin/AdminDashboard";
 import PrintHistory from "./components/PrintHistory";
 import DeviceManagement from "./components/DeviceManagement";
 import AddPrinter from "./components/AddPrinter";
+import ProfileSettings from "./components/ProfileSettings";
 import { useTheme } from "./ThemeContext";
 import { supabase, callEdgeFunction, API_URLS, normalizeDesign, MM_TO_PX } from "./supabaseClient";
 
@@ -81,7 +82,7 @@ const App = () => {
         const isAdmin = parsedUserData?.role?.toLowerCase() === 'admin';
 
         // Restore saved view if it exists and is valid for the role
-        if (savedView && savedView !== "login" && savedView !== "signup" && savedView !== "logout") {
+        if (savedView && savedView !== "login" && savedView !== "signup" && savedView !== "logout" && savedView !== "profile") {
           if (savedView === "admin_dashboard" && !isAdmin) {
             setCurrentView("library");
           } else {
@@ -440,7 +441,7 @@ const App = () => {
   return (
     <div className="min-h-screen w-full transition-colors duration-300 flex flex-col bg-white">
       {/* Navigation / Header - Only show for main app functionality */}
-      {(isAuthenticated || currentView === "library" || currentView === "designer" || currentView === "admin_dashboard") && !isLoading && (
+      {(isAuthenticated || currentView === "library" || currentView === "designer" || currentView === "admin_dashboard" || currentView === "profile") && !isLoading && (
         <AppHeader
           onNavigate={navigateTo}
           currentView={currentView}
@@ -472,6 +473,10 @@ const App = () => {
 
             {currentView === "admin_dashboard" && (
               <AdminDashboard userRole={userRole} />
+            )}
+
+            {currentView === "profile" && (
+              <ProfileSettings userRole={userRole} userData={userData} onBack={handleBackToLibrary} />
             )}
 
             {currentView === "library" && (

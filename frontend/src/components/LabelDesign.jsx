@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { 
-  ArrowLeft, Save, Minus, X, Grid, ZoomIn, ZoomOut, 
-  RefreshCw, Search, Plus, Trash2, LayoutGrid, Check, 
-  ChevronRight, FileText, Settings, History, Layers, 
-  Monitor, Info, Palette 
+import {
+  ArrowLeft, Save, Minus, X, Grid, ZoomIn, ZoomOut,
+  RefreshCw, Search, Plus, Trash2, LayoutGrid, Check,
+  ChevronRight, FileText, Settings, History, Layers,
+  Monitor, Info, Palette
 } from "lucide-react";
 
 import DesignCanvas from "./DesignCanvas";
@@ -23,12 +23,13 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [pendingBindingElement, setPendingBindingElement] = useState(null);
-  
+  const [pendingImageProps, setPendingImageProps] = useState(null);
+
   const getInitialDimensions = (l) => {
     if (l?.labelSize) return l.labelSize;
     if (l?.dimensions) return l.dimensions;
     if (l?.width && l?.height) return { width: l.width, height: l.height, unit: l.unit || 'mm' };
-    return { width: 100, height: 150, unit: 'mm' }; 
+    return { width: 100, height: 150, unit: 'mm' };
   };
 
   const [elements, setElements] = useState(label?.elements || []);
@@ -40,9 +41,11 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
   const [isDrawingBarcode, setIsDrawingBarcode] = useState(false);
   const [isDrawingShape, setIsDrawingShape] = useState(false);
   const [isDrawingText, setIsDrawingText] = useState(false);
+  const [isDrawingImage, setIsDrawingImage] = useState(false);
+  const [isDrawingTable, setIsDrawingTable] = useState(false);
   const [currentShapeType, setCurrentShapeType] = useState(null);
   const [selectedTool, setSelectedTool] = useState(null);
-  const [zoom, setZoom] = useState(100);
+  const [zoom, setZoom] = useState(150);
   const [isPropertiesExpanded, setIsPropertiesExpanded] = useState(true); // Default open for professional feel
 
   const measureText = useCallback((text, style) => {
@@ -52,15 +55,15 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     const fontStyle = style.fontStyle || 'normal';
     const fontSize = style.fontSize || 14;
     const fontFamily = style.fontFamily || 'Arial';
-    
+
     context.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
     const metrics = context.measureText(text || '');
-    const paddingX = 12; 
+    const paddingX = 12;
     const paddingY = 8;
-    
-    return { 
-      width: Math.max(20, metrics.width + paddingX), 
-      height: Math.max(20, (fontSize * (style.lineHeight || 1.2)) + paddingY) 
+
+    return {
+      width: Math.max(20, metrics.width + paddingX),
+      height: Math.max(20, (fontSize * (style.lineHeight || 1.2)) + paddingY)
     };
   }, []);
 
@@ -71,26 +74,16 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
       try {
         const data = await callEdgeFunction(API_URLS.GET_DESIGN, { design_id: designId });
         const normalized = normalizeDesign(data);
-        let repairedElements = normalized.elements || [];
-        const hasRectangleBorder = repairedElements.some(el => el.type === 'rectangle' && (el.id === 'label-border' || el.isSystem));
-        const hasLineBorders = repairedElements.some(el => el.type === 'line' && (el.id?.startsWith('border-') || el.isSystem));
-        
-        if (hasRectangleBorder || !hasLineBorders) {
-          repairedElements = repairedElements.filter(el => !(el.type === 'rectangle' && (el.id === 'label-border' || el.isSystem)));
-          const { width, height, unit } = normalized.labelSize;
-          const widthPx = convertToPx(width, unit);
-          const heightPx = convertToPx(height, unit);
-          const newBorders = [
-            { id: `border-top`, type: 'line', x: 0, y: 0, x1: 0, y1: 0, x2: widthPx, y2: 0, borderWidth: 2, borderColor: "#000000", isSystem: true, locked: true, zIndex: 0 },
-            { id: `border-bottom`, type: 'line', x: 0, y: heightPx, x1: 0, y1: heightPx, x2: widthPx, y2: heightPx, borderWidth: 2, borderColor: "#000000", isSystem: true, locked: true, zIndex: 0 },
-            { id: `border-left`, type: 'line', x: 0, y: 0, x1: 0, y1: 0, x2: 0, y2: heightPx, borderWidth: 2, borderColor: "#000000", isSystem: true, locked: true, zIndex: 0 },
-            { id: `border-right`, type: 'line', x: widthPx, y: 0, x1: widthPx, y1: 0, x2: widthPx, y2: heightPx, borderWidth: 2, borderColor: "#000000", isSystem: true, locked: true, zIndex: 0 },
-          ];
-          const otherElements = repairedElements.filter(el => !el.id?.startsWith('border-'));
-          repairedElements = [...newBorders, ...otherElements];
-        }
+        const repairedElements = (normalized.elements || []).filter(el => !el.isSystem && !el.id?.startsWith('border-'));
         setElements(repairedElements);
         setLabelSize(normalized.labelSize);
+
+        // Apply size-specific initial zoom
+        if (normalized.labelSize?.width === 100 && normalized.labelSize?.height === 150) {
+          setZoom(100);
+        } else {
+          setZoom(150);
+        }
       } catch (error) { console.error("Fetch failure:", error); }
       setSelectedElementId(null);
     };
@@ -119,18 +112,42 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     setIsDrawingText(false);
     setIsDrawingShape(false);
     setIsDrawingLine(false);
+    setIsDrawingImage(false);
+    setIsDrawingTable(false);
     setSelectedElementId(null);
     setIsPropertiesExpanded(true);
   };
 
   const activateShapeDrawing = (shapeType) => {
     setIsDrawingShape(true);
-    setCurrentShapeType(shapeType);
     setIsDrawingText(false);
     setIsDrawingBarcode(false);
     setIsDrawingLine(false);
+    setIsDrawingImage(false);
+    setIsDrawingTable(false);
+    setCurrentShapeType(shapeType);
     setSelectedElementId(null);
     setIsPropertiesExpanded(true);
+  };
+
+  const activateImageDrawing = () => {
+    setIsDrawingImage(true);
+    setIsDrawingText(false);
+    setIsDrawingBarcode(false);
+    setIsDrawingLine(false);
+    setIsDrawingShape(false);
+    setIsDrawingTable(false);
+    setSelectedElementId(null);
+  };
+
+  const activateTableDrawing = () => {
+    setIsDrawingTable(true);
+    setIsDrawingText(false);
+    setIsDrawingBarcode(false);
+    setIsDrawingLine(false);
+    setIsDrawingShape(false);
+    setIsDrawingImage(false);
+    setSelectedElementId(null);
   };
 
   const handleSave = async (status = null) => {
@@ -176,21 +193,35 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     };
   };
 
-  const handleZoomChange = (newZoom) => setZoom(newZoom);
+  const handleZoomChange = useCallback((newZoom) => setZoom(newZoom), []);
 
   const addElement = async (type, extra = {}) => {
-    if (type === "image") { imageInputRef.current?.click(); return; }
+    if (type === "image") { 
+      setPendingImageProps(extra);
+      imageInputRef.current?.click(); 
+      return; 
+    }
     let newElement = {
-      id: generateId(), type, x: 38, y: 38, width: 151, height: 76, zIndex: elements.length, rotation: 0, ...extra
+      id: generateId(), type, x: extra.x || 38, y: extra.y || 38, width: extra.width || 151, height: extra.height || 76, zIndex: elements.length, rotation: 0, ...extra
     };
     if (type === "table") {
       const rows = extra.rows || 2, cols = extra.cols || 2;
-      newElement = { ...newElement, rows, cols, cellWidth: 60, cellHeight: 25, width: cols * 60, height: rows * 25, tableData: Array.from({ length: rows }, () => Array.from({ length: cols }, () => "")), borderColor: "#000000", borderWidth: 1, borderStyle: "solid", fontSize: 11 };
+      const width = extra.width || (cols * 60);
+      const height = extra.height || (rows * 25);
+      newElement = { 
+        ...newElement, 
+        rows, cols, 
+        width, height,
+        cellWidth: width / cols, 
+        cellHeight: height / rows, 
+        tableData: Array.from({ length: rows }, () => Array.from({ length: cols }, () => "")), 
+        borderColor: "#000000", borderWidth: 1, borderStyle: "solid", fontSize: 11 
+      };
     } else if (type === "rectangle" || type === "circle") {
-      newElement = { ...newElement, width: 113, height: 76, borderWidth: 2, borderColor: "#000000", borderStyle: "solid", backgroundColor: "transparent" };
+      newElement = { ...newElement, borderWidth: 2, borderColor: "#000000", borderStyle: "solid", backgroundColor: "transparent" };
     } else if (type === "text" || type === "barcode") {
       newElement = { ...newElement, width: extra.width || (type === "text" ? 151 : 227), height: extra.height || (type === "text" ? 30 : 95), content: extra.content || (type === "text" ? "Sample Text" : "123456789"), barcodeType: type === "barcode" ? (extra.barcodeType || "CODE128") : undefined, fontSize: extra.fontSize || 14, fontFamily: extra.fontFamily || "Arial" };
-      if (type === "text") { const dims = measureText(newElement.content, newElement); newElement.width = dims.width; newElement.height = dims.height; }
+      if (type === "text" && !extra.width) { const dims = measureText(newElement.content, newElement); newElement.width = dims.width; newElement.height = dims.height; }
     } else if (type === "line" && Object.keys(extra).length === 0) { setIsDrawingLine(true); return; }
     setElements((prev) => [...prev, newElement]);
     setSelectedElementId(newElement.id);
@@ -221,9 +252,30 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     reader.onload = (ev) => {
       const img = new Image();
       img.onload = () => {
-        const w = Math.min(200, img.width), h = Math.round(w * (img.height / img.width));
-        const element = { id: generateId(), type: "image", x: 189, y: 189, width: w * MM_TO_PX, height: h * MM_TO_PX, src: ev.target.result, opacity: 1, lockAspectRatio: true, rotation: 0, zIndex: elements.length };
-        setElements((prev) => [...prev, element]); setSelectedElementId(element.id); setPendingBindingElement(element);
+        const defaultW = Math.min(200, img.width);
+        const defaultH = Math.round(defaultW * (img.height / img.width));
+        
+        const props = pendingImageProps || {};
+        const width = props.width || (defaultW * MM_TO_PX);
+        const height = props.height || (defaultH * MM_TO_PX);
+        const x = props.x !== undefined ? props.x : 189;
+        const y = props.y !== undefined ? props.y : 189;
+
+        const element = { 
+          id: generateId(), 
+          type: "image", 
+          x, y, 
+          width, height, 
+          src: ev.target.result, 
+          opacity: 1, 
+          lockAspectRatio: true, 
+          rotation: 0, 
+          zIndex: elements.length 
+        };
+        setElements((prev) => [...prev, element]); 
+        setSelectedElementId(element.id); 
+        setPendingBindingElement(element);
+        setPendingImageProps(null);
       };
       img.src = ev.target.result;
     };
@@ -291,12 +343,14 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     }
   };
 
-  const activateLineDrawing = () => { 
-    setIsDrawingLine(true); 
+  const activateLineDrawing = () => {
+    setIsDrawingLine(true);
     setIsDrawingText(false);
-    setIsDrawingShape(false); 
-    setIsDrawingBarcode(false); 
-    setSelectedElementId(null); 
+    setIsDrawingShape(false);
+    setIsDrawingBarcode(false);
+    setIsDrawingImage(false);
+    setIsDrawingTable(false);
+    setSelectedElementId(null);
   };
 
   const handleBarcodeTypeChange = (newType) => {
@@ -334,12 +388,12 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
   const selectedElement = elements.find((el) => el.id === selectedElementId);
 
   return (
-    <div className="fixed inset-0 top-12 md:top-14 flex overflow-hidden bg-slate-900">
-      
+    <div className="fixed inset-0 top-12 md:top-14 flex overflow-hidden bg-slate-100">
+
       <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
 
       {/* ─── Premium Workspace Rail (Smarter Sidebar) ─── */}
-      <div className="flex flex-col border-r border-slate-800 bg-slate-900 z-30 shadow-2xl relative">
+      <div className="flex flex-col border-r border-slate-200 bg-white z-30 shadow-md relative">
         <ToolsPalette
           onAddElement={addElement}
           onActivateLineDrawing={activateLineDrawing}
@@ -354,34 +408,39 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
           onActivateShapeDrawing={activateShapeDrawing}
           isDrawingShape={isDrawingShape}
           currentShapeType={currentShapeType}
+          onActivateImageDrawing={activateImageDrawing}
+          isDrawingImage={isDrawingImage}
+          onActivateTableDrawing={activateTableDrawing}
+          isDrawingTable={isDrawingTable}
+          onDeleteElement={deleteElement}
         />
       </div>
 
       {/* ─── Main Content Surface ─── */}
       <div className="flex-1 flex flex-col relative min-w-0">
-        
+
         {/* ─── Studio Toolbar (Floating Glass Header) ─── */}
-        <div className="px-5 py-3 glass z-20 flex items-center justify-between border-b border-white/5 shadow-[0_4px_30px_rgba(0,0,0,0.1)] mx-4 mt-4 rounded-2xl bg-slate-900/60 backdrop-blur-xl">
-          
+        <div className="px-5 py-3 glass z-20 flex items-center justify-between border-b border-slate-200 shadow-sm mx-4 mt-4 rounded-2xl bg-white/90 backdrop-blur-xl">
+
           {/* Section: Breadcrumbs & Identity */}
           <div className="flex items-center gap-5">
             <button
               onClick={() => onBack && onBack()}
-              className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-800/50 hover:bg-slate-700 text-slate-400 hover:text-white transition-all active:scale-95 group border border-white/5"
+              className="w-9 h-9 flex items-center justify-center rounded-xl bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-900 transition-all active:scale-95 group border border-slate-200"
             >
               <ArrowLeft size={18} className="group-hover:-translate-x-0.5 transition-transform" />
             </button>
-            
+
             <div className="flex items-center gap-3">
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Workspace</span>
-                  <ChevronRight size={10} className="text-slate-600" />
-                  <h2 className="text-sm font-black text-white tracking-tight">{label?.name || "Untitled Template"}</h2>
+                  <ChevronRight size={10} className="text-slate-400" />
+                  <h2 className="text-sm font-black text-slate-900 tracking-tight">{label?.name || "Untitled Template"}</h2>
                 </div>
                 <div className="flex items-center gap-2 text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-0.5">
-                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/40 animate-pulse" />
-                   {labelSize.width} × {labelSize.height} {labelSize.unit?.toUpperCase()} <span className="text-slate-700">•</span> {elements.length} LAYERS
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/40 animate-pulse" />
+                  {labelSize.width} × {labelSize.height} {labelSize.unit?.toUpperCase()} <span className="text-slate-700">•</span> {elements.length} LAYERS
                 </div>
               </div>
             </div>
@@ -389,41 +448,49 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
 
           {/* Section: Active Intelligence & Mode Indicators */}
           <div className="hidden xl:flex items-center gap-3">
-             {!(isDrawingText || isDrawingLine || isDrawingBarcode || isDrawingShape) ? (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/40 border border-white/5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  <Monitor size={14} className="text-blue-500/70" /> Ready for Interaction
-                </div>
-             ) : (
-                <div className="flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
-                  {isDrawingText && <div className="badge-studio bg-sky-500/10 text-sky-400 border-sky-500/20"><FileText size={12} /> Text Mode</div>}
-                  {isDrawingLine && <div className="badge-studio bg-amber-500/10 text-amber-400 border-amber-500/20"><Minus size={12} /> Line Tool</div>}
-                  {isDrawingBarcode && <div className="badge-studio bg-indigo-500/10 text-indigo-400 border-indigo-500/20"><Search size={12} /> {selectedBarcodeType}</div>}
-                  {isDrawingShape && <div className="badge-studio bg-emerald-500/10 text-emerald-400 border-emerald-500/20"><LayoutGrid size={12} /> Shape Tool</div>}
-                  <button onClick={() => { setIsDrawingText(false); setIsDrawingLine(false); setIsDrawingBarcode(false); setIsDrawingShape(false); }} className="w-7 h-7 flex items-center justify-center rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all">
-                     <X size={14} />
-                  </button>
-                </div>
-             )}
+            {!(isDrawingText || isDrawingLine || isDrawingBarcode || isDrawingShape || isDrawingImage || isDrawingTable) ? (
+             <div></div>
+             
+            ) : (
+              <div className="flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                {isDrawingText && <div className="badge-studio bg-sky-500/10 text-sky-400 border-sky-500/20"><FileText size={12} /> Text Mode</div>}
+                {isDrawingLine && <div className="badge-studio bg-amber-500/10 text-amber-400 border-amber-500/20"><Minus size={12} /> Line Tool</div>}
+                {isDrawingBarcode && <div className="badge-studio bg-indigo-500/10 text-indigo-400 border-indigo-500/20"><Search size={12} /> {selectedBarcodeType}</div>}
+                {isDrawingShape && <div className="badge-studio bg-emerald-500/10 text-emerald-400 border-emerald-500/20"><LayoutGrid size={12} /> Shape Tool</div>}
+                {isDrawingImage && <div className="badge-studio bg-pink-500/10 text-pink-400 border-pink-500/20"><ImageIcon size={12} /> Image Frame</div>}
+                {isDrawingTable && <div className="badge-studio bg-cyan-500/10 text-cyan-400 border-cyan-500/20"><Table size={12} /> Table Grid</div>}
+                <button onClick={() => { setIsDrawingText(false); setIsDrawingLine(false); setIsDrawingBarcode(false); setIsDrawingShape(false); setIsDrawingImage(false); setIsDrawingTable(false); }} className="w-7 h-7 flex items-center justify-center rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all">
+                  <X size={14} />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Section: Render Engine Controls */}
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-1.5 bg-slate-800/30 rounded-xl p-1 border border-white/5">
-                <button onClick={() => canvasRef.current?.handleZoomOut()} className="p-1.5 text-slate-500 hover:text-white transition-colors"><ZoomOut size={16} /></button>
-                <div className="w-11 text-center text-[10px] font-black text-slate-400 tracking-tighter">{zoom}%</div>
-                <button onClick={() => canvasRef.current?.handleZoomIn()} className="p-1.5 text-slate-500 hover:text-white transition-colors"><ZoomIn size={16} /></button>
-                <button onClick={() => canvasRef.current?.handleZoomReset()} className="p-1.5 text-slate-500 hover:text-blue-400 transition-colors"><RefreshCw size={12} /></button>
+            <div className="flex items-center gap-1.5 bg-white rounded-xl p-1 border border-slate-200 shadow-sm">
+              <button onClick={() => canvasRef.current?.handleZoomOut()} className="p-1.5 text-slate-500 hover:text-slate-900 transition-colors"><ZoomOut size={16} /></button>
+              <div className="w-14 text-center text-[11px] font-black text-slate-700 tracking-tight">{zoom}%</div>
+              <button onClick={() => canvasRef.current?.handleZoomIn()} className="p-1.5 text-slate-500 hover:text-slate-900 transition-colors"><ZoomIn size={16} /></button>
+              <button 
+                onClick={() => canvasRef.current?.handleZoomToWidth()} 
+                className="p-1.5 text-slate-500 hover:text-indigo-600 transition-colors border-l border-slate-100 pl-2"
+                title="Fit to Width"
+              >
+                <Monitor size={14} />
+              </button>
+              <button onClick={() => canvasRef.current?.handleZoomReset()} className="p-1.5 text-slate-500 hover:text-blue-500 transition-colors pr-2"><RefreshCw size={12} /></button>
             </div>
 
             <button
               onClick={() => setShowGrid(!showGrid)}
-              className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all border ${showGrid ? "bg-blue-500/10 text-blue-400 border-blue-500/30" : "bg-slate-800/40 text-slate-500 border-white/5"}`}
+              className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all border ${showGrid ? "bg-blue-50 text-blue-600 border-blue-200" : "bg-slate-100 text-slate-500 border-slate-200"}`}
               title="Toggle Grid"
             >
               <Grid size={18} />
             </button>
 
-            <div className="h-6 w-px bg-white/5 mx-1" />
+            <div className="h-6 w-px bg-slate-200 mx-1" />
 
             <div className="flex items-center gap-2">
               <button onClick={() => handleSave()} className="btn btn-primary h-9 px-4 text-[10px] uppercase tracking-widest font-black gap-2">
@@ -454,6 +521,10 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
             setIsDrawingBarcode={setIsDrawingBarcode}
             isDrawingShape={isDrawingShape}
             setIsDrawingShape={setIsDrawingShape}
+            isDrawingImage={isDrawingImage}
+            setIsDrawingImage={setIsDrawingImage}
+            isDrawingTable={isDrawingTable}
+            setIsDrawingTable={setIsDrawingTable}
             currentShapeType={currentShapeType}
             isDrawingText={isDrawingText}
             setIsDrawingText={setIsDrawingText}
@@ -468,7 +539,7 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
             onInteraction={() => setIsPropertiesExpanded(false)}
             onElementSelected={() => setIsPropertiesExpanded(true)}
           />
-          
+
           {/* AIChatbot positioned floating in studio */}
           <div className="absolute left-6 bottom-6 z-20">
             <AIChatbot labelId={label?.id} />
@@ -478,47 +549,56 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
 
       {/* ─── Inspector Sheet (Properties) ─── */}
       <div
-        className={`fixed top-[72px] bottom-4 right-4 z-40 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] rounded-2xl overflow-hidden border border-white/5 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] ${isPropertiesExpanded ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-[calc(100%+20px)] opacity-0 scale-95'}`}
-        style={{ width: "340px", backgroundColor: "rgba(15, 23, 42, 0.95)", backdropFilter: "blur(20px)" }}
+        className={`fixed top-[72px] bottom-4 right-4 z-40 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] rounded-2xl overflow-hidden border border-slate-200 shadow-xl ${isPropertiesExpanded ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-[calc(100%+20px)] opacity-0 scale-95'}`}
+        style={{ width: "340px", backgroundColor: "rgba(255, 255, 255, 0.95)", backdropFilter: "blur(20px)" }}
       >
         <button
           onClick={() => setIsPropertiesExpanded(!isPropertiesExpanded)}
-          className="absolute -left-10 top-1/2 -translate-y-1/2 w-10 h-24 bg-slate-900/80 border border-white/5 border-r-0 rounded-l-2xl flex items-center justify-center hover:bg-slate-800 transition-all shadow-[-10px_0_20px_rgba(0,0,0,0.2)] group"
+          className="absolute -left-10 top-1/2 -translate-y-1/2 w-10 h-24 bg-white border border-slate-200 border-r-0 rounded-l-2xl flex items-center justify-center hover:bg-slate-50 transition-all shadow-[-5px_0_15px_rgba(0,0,0,0.05)] group"
         >
-          <div className={`transition-transform duration-700 ${isPropertiesExpanded ? 'rotate-180' : ''}`} style={{ color: theme.textMuted }}>
+          <div className={`transition-transform duration-700 ${isPropertiesExpanded ? 'rotate-180' : ''}`} style={{ color: '#475569' }}>
             <ArrowLeft size={20} className="group-hover:-translate-x-0.5 transition-transform" />
           </div>
         </button>
 
         <div className="h-full flex flex-col">
-            <div className="px-8 py-5 border-b border-white/5 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Palette size={14} className="text-blue-500" />
-                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Inspector</h3>
-                </div>
-                {selectedElementId && (
-                   <span className="text-[9px] font-bold text-slate-500 uppercase px-2 py-0.5 rounded-lg bg-white/5">Layer Active</span>
-                )}
+          <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Palette size={14} className="text-blue-500" />
+              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Inspector</h3>
             </div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
-                <PropertiesPanel
-                    selectedElement={selectedElement}
-                    updateElement={updateElement}
-                    deleteElement={deleteElement}
-                    onBarcodeTypeChange={handleBarcodeTypeChange}
-                    isDrawingLine={isDrawingLine}
-                    isDrawingBarcode={isDrawingBarcode}
-                    isDrawingShape={isDrawingShape}
-                    onActivateBarcodeDrawing={activateBarcodeDrawing}
-                    onActivateShapeDrawing={activateShapeDrawing}
-                    selectedBarcodeType={selectedBarcodeType}
-                    setSelectedBarcodeType={setSelectedBarcodeType}
-                    onBringForward={handleBringForward}
-                    onSendBackward={handleSendBackward}
-                    labelSize={labelSize}
-                    updateLabelSize={setLabelSize}
-                />
+            <div className="flex items-center gap-2">
+              {selectedElementId && (
+                <span className="text-[9px] font-bold text-slate-600 uppercase px-2 py-0.5 rounded-lg bg-slate-100 border border-slate-200">Layer Active</span>
+              )}
+              <button
+                onClick={() => setIsPropertiesExpanded(false)}
+                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-all border border-transparent hover:border-slate-200"
+                title="Close Panel"
+              >
+                <X size={16} />
+              </button>
             </div>
+          </div>
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
+            <PropertiesPanel
+              selectedElement={selectedElement}
+              updateElement={updateElement}
+              deleteElement={deleteElement}
+              onBarcodeTypeChange={handleBarcodeTypeChange}
+              isDrawingLine={isDrawingLine}
+              isDrawingBarcode={isDrawingBarcode}
+              isDrawingShape={isDrawingShape}
+              onActivateBarcodeDrawing={activateBarcodeDrawing}
+              onActivateShapeDrawing={activateShapeDrawing}
+              selectedBarcodeType={selectedBarcodeType}
+              setSelectedBarcodeType={setSelectedBarcodeType}
+              onBringForward={handleBringForward}
+              onSendBackward={handleSendBackward}
+              labelSize={labelSize}
+              updateLabelSize={setLabelSize}
+            />
+          </div>
         </div>
       </div>
 
@@ -530,7 +610,7 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
 
       <style jsx="true">{`
         .glass {
-          background: rgba(15, 23, 42, 0.7);
+          background: rgba(255, 255, 255, 0.8);
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);
         }

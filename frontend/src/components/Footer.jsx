@@ -55,8 +55,8 @@ const Footer = () => {
 
           {/* Security Badge */}
           <div
-            className="flex items-center gap-2 px-4 py-2 rounded-full border bg-opacity-50 shadow-sm"
-            style={{ borderColor: theme.border, backgroundColor: theme.bg }}
+            className="flex items-center gap-2 px-4 py-2 rounded-full border shadow-sm"
+            style={{ borderColor: theme.border, backgroundColor: `${theme.bg}80` }}
           >
             <Shield size={14} className="text-[var(--color-success)]" />
             <span className="text-[10px] font-black uppercase tracking-widest opacity-80" style={{ color: theme.text }}>

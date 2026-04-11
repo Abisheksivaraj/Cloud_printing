@@ -91,15 +91,14 @@ const AdminDashboard = ({ userRole }) => {
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8">
                 <div className="space-y-2">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-slate-900 dark:bg-white rounded-2xl flex items-center justify-center shadow-xl">
+                        <div className="w-10 h-10 bg-slate-900 dark:bg-white rounded-2xl flex items-center justify-center shadow-md">
                             <Users size={20} className="text-white dark:text-slate-900" />
                         </div>
                         <div>
-                            <h1 className="text-xl font-black  dark:text-white tracking-tight">Users</h1>
-                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.3em]">Access Management Registry</p>
+                            <h1 className="text-xl font-black dark:text-white tracking-tight">Users</h1>
+                            <p className="text-xs font-bold text-slate-400 mt-1">Manage team members and roles</p>
                         </div>
                     </div>
-
                 </div>
 
                 <div className="flex items-center gap-4 w-full lg:w-auto">
@@ -107,7 +106,7 @@ const AdminDashboard = ({ userRole }) => {
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input
                             type="text"
-                            placeholder="Filter resources..."
+                            placeholder="Search users..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="input pl-12 pr-6 py-3 min-w-[300px]"
@@ -115,10 +114,10 @@ const AdminDashboard = ({ userRole }) => {
                     </div>
                     <button
                         onClick={() => setShowAddModal(true)}
-                        className="btn btn-primary h-[46px] px-8 gap-2 text-[10px] uppercase tracking-widest whitespace-nowrap shadow-xl shadow-blue-500/20"
+                        className="btn btn-primary h-[46px] px-8 gap-2 text-sm font-bold shadow-md"
                     >
-                        <UserPlus size={16} strokeWidth={3} />
-                        Invite Identity
+                        <UserPlus size={16} strokeWidth={2.5} />
+                        Invite User
                     </button>
                 </div>
             </div>
@@ -126,21 +125,18 @@ const AdminDashboard = ({ userRole }) => {
             {/* Metrics Dashboard */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[
-                    { label: "Total Assets", value: "1,284", icon: Layers, trend: "+12.5%", color: "text-blue-500" },
-                    { label: "Active Registry", value: fetchLoading ? "..." : users.length, icon: Users, trend: "Stable", color: "text-emerald-500" },
-                    { label: "System Uptime", value: "99.9%", icon: Activity, trend: "Verified", color: "text-blue-500" },
-                    { label: "Security Level", value: "Verified", icon: Shield, trend: "Encrypted", color: "text-slate-500" },
+                    { label: "Total Users", value: fetchLoading ? "..." : users.length, icon: Users, color: "text-blue-500" },
+                    { label: "Active Accounts", value: fetchLoading ? "..." : users.filter(u => (u.is_active !== undefined ? u.is_active : u.status === 'Active')).length, icon: Activity, color: "text-emerald-500" },
+                    { label: "Administrators", value: fetchLoading ? "..." : users.filter(u => u.role?.toLowerCase() === 'admin').length, icon: Shield, color: "text-indigo-500" },
+                    { label: "Operators", value: fetchLoading ? "..." : users.filter(u => u.role?.toLowerCase() === 'operator').length, icon: Layers, color: "text-sky-500" },
                 ].map((stat, i) => (
-                    <div key={i} className="card-premium p-6 bg-white dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-5 group hover:border-blue-500/30 transition-all">
+                    <div key={i} className="card-premium p-6 bg-white dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-5 group hover:border-blue-500/30 transition-all shadow-sm">
                         <div className="w-12 h-12 rounded-xl bg-slate-50 dark:bg-slate-900 flex items-center justify-center text-slate-400 group-hover:text-blue-500 transition-colors">
                             <stat.icon size={22} />
                         </div>
                         <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">{stat.label}</p>
-                            <div className="flex items-baseline gap-2">
-                                <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter">{stat.value}</h3>
-                                <span className={`text-[9px] font-bold uppercase tracking-tighter ${stat.color} opacity-60`}>{stat.trend}</span>
-                            </div>
+                            <p className="text-xs font-bold text-slate-500 mb-1">{stat.label}</p>
+                            <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter">{stat.value}</h3>
                         </div>
                     </div>
                 ))}
@@ -148,19 +144,12 @@ const AdminDashboard = ({ userRole }) => {
 
             {/* Registry Table */}
             <div className="card-premium overflow-hidden rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-sm transition-all shadow-blue-500/[0.02]">
-                <div className="px-8 py-5 border-b border-slate-50 dark:border-slate-900 flex items-center justify-between bg-slate-50/30 dark:bg-slate-900/10">
-                    <div className="flex items-center gap-2">
-                        <Layout size={14} className="text-blue-500" />
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Enterprise Registry Audit</h4>
-                    </div>
-                    <button className="p-2 text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all"><MoreVertical size={16} /></button>
-                </div>
                 <div className="overflow-x-auto custom-scrollbar">
                     <table className="w-full text-left border-collapse min-w-[900px]">
                         <thead>
                             <tr className="border-b border-slate-50 dark:border-slate-900">
-                                {["Identity Signature", "Access Metadata", "Authorization Role", "Identity Status", "Action"].map((head) => (
-                                    <th key={head} className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                {["User", "Contact Info", "Role", "Status", "Actions"].map((head) => (
+                                    <th key={head} className="px-8 py-5 text-xs font-black uppercase tracking-wider text-slate-400">
                                         {head}
                                     </th>
                                 ))}
@@ -171,14 +160,14 @@ const AdminDashboard = ({ userRole }) => {
                                 <tr>
                                     <td colSpan="5" className="px-8 py-24 text-center">
                                         <Loader2 className="animate-spin mx-auto text-blue-500/20 mb-4" size={40} />
-                                        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-300">Synchronizing Team Registry</p>
+                                        <p className="text-xs font-bold text-slate-400">Loading users...</p>
                                     </td>
                                 </tr>
                             ) : filteredUsers.length === 0 ? (
                                 <tr>
                                     <td colSpan="5" className="px-8 py-24 text-center">
-                                        <Fingerprint size={48} className="mx-auto mb-4 text-slate-100 dark:text-slate-900" />
-                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-300">No Resource Signatures Detected</p>
+                                        <Users size={48} className="mx-auto mb-4 text-slate-200 dark:text-slate-800" />
+                                        <p className="text-xs font-bold text-slate-400">No users found.</p>
                                     </td>
                                 </tr>
                             ) : (
@@ -191,42 +180,42 @@ const AdminDashboard = ({ userRole }) => {
                                                 </div>
                                                 <div>
                                                     <p className="font-bold text-sm text-slate-900 dark:text-white tracking-tight">
-                                                        {user.first_name || 'Provisioning...'} {user.last_name || ''}
+                                                        {user.first_name || 'Pending Login'} {user.last_name || ''}
                                                     </p>
-                                                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-tighter">ID Signature: {user.id?.slice(0, 8)}</p>
+                                                    <p className="text-xs font-medium text-slate-400 mt-0.5">ID: {user.id?.slice(0, 8)}</p>
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-8 py-5">
-                                            <div className="space-y-1.5 grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all">
-                                                <div className="flex items-center gap-2 text-[11px] font-bold text-slate-600 dark:text-slate-400">
-                                                    <AtSign size={12} className="text-blue-500" /> {user.email}
+                                            <div className="space-y-1.5 opacity-80 group-hover:opacity-100 transition-all">
+                                                <div className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400">
+                                                    <Mail size={14} className="text-slate-400" /> {user.email}
                                                 </div>
-                                                <div className="flex items-center gap-2 text-[10px] font-medium text-slate-400">
-                                                    <Phone size={11} className="text-emerald-500" /> {user.phone || 'No Linked Endpoint'}
+                                                <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
+                                                    <Phone size={14} className="text-slate-300/80" /> {user.phone || 'No Phone Number'}
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-8 py-5">
-                                            <span className={`inline-flex px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${user.role?.toLowerCase() === 'admin' ? 'bg-blue-500/10 text-blue-500 border-blue-500/10' :
-                                                    user.role?.toLowerCase() === 'operator' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/10' :
-                                                        'bg-slate-100 dark:bg-slate-900 text-slate-500 border-slate-200 dark:border-slate-800'
+                                            <span className={`inline-flex px-3 py-1 rounded-lg text-xs font-bold uppercase border ${user.role?.toLowerCase() === 'admin' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                                    user.role?.toLowerCase() === 'operator' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                                        'bg-slate-50 dark:bg-slate-900 text-slate-500 border-slate-200 dark:border-slate-800'
                                                 }`}>
                                                 {user.role}
                                             </span>
                                         </td>
                                         <td className="px-8 py-5">
-                                            <div className="flex items-center gap-4">
+                                            <div className="flex items-center gap-3">
                                                 <button
                                                     onClick={() => handleToggleUserStatus(user.id, user.is_active !== undefined ? user.is_active : (user.status === 'Active'))}
-                                                    className={`relative inline-flex h-5 w-10 items-center rounded-full transition-all ring-offset-2 focus:ring-2 focus:ring-blue-500 ${(user.is_active !== undefined ? user.is_active : (user.status === 'Active')) ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-800'
+                                                    className={`relative inline-flex h-5 w-10 items-center rounded-full transition-all ring-offset-2 focus:ring-2 focus:ring-blue-500 ${(user.is_active !== undefined ? user.is_active : (user.status === 'Active')) ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-800'
                                                         }`}
                                                 >
-                                                    <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow-sm transition-transform ${(user.is_active !== undefined ? user.is_active : (user.status === 'Active')) ? 'translate-x-6' : 'translate-x-1'
+                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${(user.is_active !== undefined ? user.is_active : (user.status === 'Active')) ? 'translate-x-5' : 'translate-x-1'
                                                         }`} />
                                                 </button>
-                                                <span className={`text-[10px] font-black uppercase tracking-wider ${(user.is_active !== undefined ? user.is_active : (user.status === 'Active')) ? 'text-blue-500' : 'text-slate-400'}`}>
-                                                    {user.is_active !== undefined ? (user.is_active ? 'Authorized' : 'Suspended') : (user.status || 'Verified')}
+                                                <span className={`text-xs font-bold ${(user.is_active !== undefined ? user.is_active : (user.status === 'Active')) ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                                    {user.is_active !== undefined ? (user.is_active ? 'Active' : 'Inactive') : (user.status || 'Active')}
                                                 </span>
                                             </div>
                                         </td>
@@ -245,42 +234,41 @@ const AdminDashboard = ({ userRole }) => {
 
             {/* Redesigned Identity Invitation Modal */}
             {showAddModal && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[500] p-4 animate-in fade-in duration-300">
-                    <div className="w-full max-w-xl bg-white dark:bg-slate-950 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-200 dark:border-slate-800">
-                        <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 dark:border-slate-900 bg-slate-50/50 dark:bg-slate-900/50">
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[500] p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800">
+                        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-slate-900 dark:bg-white rounded-xl flex items-center justify-center shadow-lg">
-                                    <UserPlus size={20} className="text-white dark:text-slate-900" />
+                                <div className="w-10 h-10 bg-blue-50 dark:bg-blue-900/30 rounded-xl flex items-center justify-center text-blue-600">
+                                    <UserPlus size={20} />
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Invite Identity</h3>
-                                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Enterprise Access Protocol</p>
+                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">Invite User</h3>
+                                    <p className="text-xs font-medium text-slate-400">Send an invitation to join the team</p>
                                 </div>
                             </div>
-                            <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-slate-200/50 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-400">
-                                <X size={24} />
+                            <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-400">
+                                <X size={20} />
                             </button>
                         </div>
 
-                        <form onSubmit={handleAddUser} className="p-10 space-y-10">
-                            <div className="space-y-3">
-                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1 flex items-center gap-2">
-                                    <AtSign size={12} className="text-blue-500" /> Targeted Communication Address
+                        <form onSubmit={handleAddUser} className="p-6 space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                    Email Address
                                 </label>
                                 <input
                                     required
                                     type="email"
-                                    placeholder="e.g. signature@enterprise.com"
-                                    className="input-premium py-4 text-sm font-bold bg-white dark:bg-slate-900"
+                                    placeholder="Enter user's email address"
+                                    className="input py-3 w-full"
                                     value={newUser.email}
                                     onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                                 />
-                                <p className="text-[10px] font-medium text-slate-400 ml-1">An automated access link will be transmitted to this identity.</p>
                             </div>
 
-                            <div className="space-y-4">
-                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1 flex items-center gap-2">
-                                    <Fingerprint size={12} className="text-blue-500" /> Designated Access Authority
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                    Access Role
                                 </label>
                                 <div className="grid grid-cols-3 gap-3">
                                     {["admin", "operator", "viewer"].map((role) => (
@@ -288,7 +276,7 @@ const AdminDashboard = ({ userRole }) => {
                                             key={role}
                                             type="button"
                                             onClick={() => setNewUser({ ...newUser, role })}
-                                            className={`py-4 rounded-xl border-2 transition-all font-black uppercase tracking-widest text-[10px] ${newUser.role === role ? 'border-blue-500 text-blue-500 bg-blue-500/5' : 'border-slate-100 dark:border-slate-800 text-slate-400 hover:border-slate-200'}`}
+                                            className={`py-3 rounded-xl border transition-all font-bold text-xs capitalize ${newUser.role === role ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}
                                         >
                                             {role}
                                         </button>
@@ -296,10 +284,10 @@ const AdminDashboard = ({ userRole }) => {
                                 </div>
                             </div>
 
-                            <div className="flex gap-4 pt-6 border-t border-slate-50 dark:border-slate-900">
-                                <button type="button" onClick={() => setShowAddModal(false)} className="btn btn-ghost flex-1 h-12 uppercase text-[10px] tracking-widest font-bold">Discard</button>
-                                <button type="submit" disabled={loading} className="btn btn-primary flex-1 h-12 uppercase tracking-[0.2em] font-black text-[10px] shadow-xl shadow-blue-500/20">
-                                    {loading ? <Loader2 className="animate-spin" size={20} /> : "Transmit Invitation"}
+                            <div className="flex gap-3 pt-6">
+                                <button type="button" onClick={() => setShowAddModal(false)} className="btn btn-ghost flex-1 py-3 font-bold text-sm">Cancel</button>
+                                <button type="submit" disabled={loading} className="btn btn-primary flex-1 py-3 font-bold text-sm shadow-md transition-transform active:scale-95">
+                                    {loading ? <Loader2 className="animate-spin mx-auto" size={20} /> : "Send Invitation"}
                                 </button>
                             </div>
                         </form>

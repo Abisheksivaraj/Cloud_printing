@@ -50,6 +50,11 @@ export const API_URLS = {
     DELETE_DESIGN: 'delete-design',
     RESTORE_DESIGN: 'restore-design',
 
+    // Bulk Import / Print
+    UPLOAD_IMPORT: 'upload-import',
+    GET_IMPORT_JOBS: 'get-import-jobs',
+    CONFIRM_IMPORT: 'confirm-import',
+
     // Elements
     ADD_ELEMENT: 'add-element',
     UPDATE_ELEMENT: 'update-element',

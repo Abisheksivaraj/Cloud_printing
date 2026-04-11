@@ -8,8 +8,9 @@ export const AppHeader = ({ onNavigate, currentView, userRole, userData }) => {
 
   const navItems = [
     { id: "library", label: "Design Library", short: "L" },
+     { id: "device_management", label: "Printer Management", short: "D" },
     { id: "print_history", label: "Print History", short: "H" },
-    { id: "device_management", label: "Device Management", short: "D" },
+   
     { id: "admin_dashboard", label: "User Management", short: "A", adminOnly: true },
   ].filter(item => !item.adminOnly || userRole === 'admin');
 
@@ -91,18 +92,14 @@ export const AppHeader = ({ onNavigate, currentView, userRole, userData }) => {
               </nav>
 
               {/* Profile Block */}
-              <div className="hidden sm:flex items-center gap-3 bg-white dark:bg-slate-800 pl-3 pr-1.5 py-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all">
-                <div className="flex flex-col items-end">
-                  <span className="text-xs font-bold tracking-tight text-slate-700 dark:text-slate-200">
-                    {displayName}
-                  </span>
-                  <span className="text-[10px] font-semibold text-[var(--color-primary)] opacity-90">
-                    {displayRole}
-                  </span>
-                </div>
-                <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 flex items-center justify-center text-xs font-bold border border-slate-200 dark:border-slate-600 uppercase shadow-inner">
+              <div className="hidden sm:flex items-center gap-3 pl-3 pr-1.5 py-1.5 transition-all">
+                <button 
+                  onClick={() => onNavigate("profile")}
+                  title={`Profile Settings (${displayName})`}
+                  className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 text-[var(--color-primary)] flex items-center justify-center text-sm font-bold border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:scale-105 hover:border-[var(--color-primary)] hover:shadow-md cursor-pointer uppercase"
+                >
                   {displayName[0]}
-                </div>
+                </button>
               </div>
 
               {/* Theme Toggle & Logout */}

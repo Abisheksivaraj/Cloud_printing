@@ -1,32 +1,34 @@
 import React, { useState } from "react";
-import { Mail, Lock, Loader2, ArrowRight, ShieldCheck, Zap, UserPlus } from "lucide-react";
-import { useTheme } from "../../ThemeContext";
+import { Mail, Lock, Loader2, ArrowRight, Cloud, ShieldCheck, Zap, BarChart2, Eye, EyeOff } from "lucide-react";
 import { useLanguage } from "../../LanguageContext";
 import { toast, Toaster } from "react-hot-toast";
 import { callEdgeFunction, API_URLS, supabase } from "../../supabaseClient";
 import { motion } from "framer-motion";
-import logo from "../../assets/companyLogo.png";
+import logo from "../../assets/logo.png";
+import cloudPattern from "../../assets/bg.png";
 
-const Login = ({ onLogin, onSwitchToSignup }) => {
-    const { theme } = useTheme();
+const Login = ({ onLogin }) => {
     const { t } = useLanguage();
     const [formData, setFormData] = useState({
         email: "",
         password: "",
+        rememberMe: false,
     });
 
-    const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-        setError("");
+        const { name, value, type, checked } = e.target;
+        setFormData({ 
+            ...formData, 
+            [name]: type === "checkbox" ? checked : value 
+        });
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setError("");
 
         try {
             const data = await callEdgeFunction(API_URLS.LOGIN, {
@@ -47,140 +49,168 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
             if (data.admin) sessionStorage.setItem("userData", JSON.stringify(data.admin));
             if (data.user) sessionStorage.setItem("userData", JSON.stringify(data.user));
 
-            toast.success("Identity Verified. Welcome back!");
+            toast.success("Welcome back! Signing you in...");
             onLogin(data.admin || data.user);
         } catch (err) {
             console.error("Login error:", err);
             const errorMessage = err.message || "Invalid credentials.";
-            setError(errorMessage);
             toast.error(errorMessage);
         } finally {
             setLoading(false);
         }
     };
 
+    const sidebarFeatures = [
+        { icon: <Cloud size={20} />, title: "Cloud Printing", desc: "Access from any device" },
+        { icon: <ShieldCheck size={20} />, title: "Secure", desc: "Enterprise-grade protection" },
+        { icon: <Zap size={20} />, title: "Fast & Reliable", desc: "High-speed workflows" },
+        { icon: <BarChart2 size={20} />, title: "Smart Analytics", desc: "Insightful print tracking" },
+    ];
+
     return (
-        <div className="h-screen w-full flex bg-white overflow-hidden font-inter">
-            {/* Left Design - Fixed Hero (ALWAYS VISIBLE) */}
-            <div className="hidden lg:flex lg:w-4/12 flex-col justify-between p-10 xl:p-12 relative bg-white border-r border-gray-100 z-20">
-                <div className="max-w-md w-full">
+        <div className="h-screen w-full flex bg-white font-inter overflow-hidden">
+            {/* Sidebar Section */}
+            <div className="hidden lg:flex lg:w-4/12 flex-col justify-between p-12 relative bg-gradient-to-br from-[#1b437c] to-[#0d213f] text-white">
+                <div className="relative z-10">
                     <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="mb-8"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.6 }}
+                        className="space-y-12"
                     >
-                        <img src={logo} alt="Archery Technocrats" className="h-10 mb-8" />
-                        <h1 className="text-5xl font-black text-[#38474F] mb-4 leading-tight font-oswald uppercase tracking-tight">
-                            Member <br /><span className="text-[#39A3DD]">Portal.</span>
-                        </h1>
-                        <p className="text-sm text-[#8A9BA5] leading-relaxed font-medium mb-8">
-                            Efficiently manage and design professional labels in a seamless enterprise environment.
-                        </p>
+                        <div className="space-y-4">
+                            <h1 className="text-4xl font-black tracking-tight leading-tight uppercase font-oswald">
+                                Management <br />
+                                <span className="text-[#39A3DD]">Portal.</span>
+                            </h1>
+                            <p className="text-blue-100/60 font-medium text-sm leading-relaxed max-w-xs">
+                                Professional label management and high-speed cloud printing infrastructure.
+                            </p>
+                        </div>
 
-                        {/* NAV LINK MOVED TO HERO FOR VISIBILITY */}
-                        <button
-                            onClick={onSwitchToSignup}
-                            className="inline-flex items-center gap-3 px-6 py-3 border-2 border-gray-100 rounded-xl text-xs font-black text-[#38474F] hover:bg-[#38474F] hover:text-white hover:border-[#38474F] transition-all uppercase tracking-widest group"
-                        >
-                            <UserPlus size={16} className="group-hover:scale-110 transition-transform" />
-                            Create Account
-                        </button>
+                        <div className="space-y-10">
+                            {sidebarFeatures.map((feature, idx) => (
+                                <div key={idx} className="flex items-start gap-4">
+                                    <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm text-[#39A3DD]">
+                                        {feature.icon}
+                                    </div>
+                                    <div className="space-y-1">
+                                        <h3 className="text-sm font-bold uppercase tracking-wider">{feature.title}</h3>
+                                        <p className="text-blue-100/40 text-xs font-medium">{feature.desc}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </motion.div>
-
-                    <div className="space-y-3 mt-12">
-                        <div className="flex items-center gap-3 p-4 rounded-xl bg-slate-50 border-l-4 border-[#39A3DD]">
-                            <div className="text-[#39A3DD] font-black"><Zap size={18} /></div>
-                            <div>
-                                <h3 className="text-[10px] font-black text-[#38474F] uppercase tracking-wider">Fast Setup</h3>
-                                <p className="text-[#8A9BA5] text-[9px] font-medium leading-tight">Instant deployment across your global network.</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3 p-4 rounded-xl bg-slate-50 border-l-4 border-[#E85874]">
-                            <div className="text-[#E85874] font-black"><ShieldCheck size={18} /></div>
-                            <div>
-                                <h3 className="text-[10px] font-black text-[#38474F] uppercase tracking-wider">Secure Data</h3>
-                                <p className="text-[#8A9BA5] text-[9px] font-medium leading-tight">Industry-leading security protocols enabled.</p>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
-                <div className="pt-6 border-t border-gray-50 flex items-center justify-between">
-                    <span className="text-[9px] font-black uppercase text-[#8A9BA5] tracking-[0.3em]">v2.4.0 • PRODUCTION</span>
+                <div className="relative z-10 border-t border-white/10 pt-8">
+                    <p className="text-[10px] font-bold text-blue-100/30 uppercase tracking-[0.2em]">
+                        v2.5.0 ENTERPRISE • PRODUCTION
+                    </p>
                 </div>
+
+                {/* Decorative Background Elements */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-[#39A3DD]/5 rounded-full blur-3xl -mr-32 -mt-32" />
+                <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl -ml-48 -mb-48" />
             </div>
 
-            {/* Right Form - Skewed Section */}
-            <div className="w-full lg:w-8/12 flex flex-col justify-center p-8 md:p-12 lg:p-24 relative z-10 bg-[#F5F7F9] overflow-hidden">
-                {/* Skewed Decoration */}
-                <div className="absolute top-0 left-0 w-32 h-full bg-white -ml-16 skew-x-[-15deg] border-r border-gray-100 shadow-[20px_0_60px_rgba(0,0,0,0.03)] hidden lg:block z-0"></div>
+            {/* Main Form Section */}
+            <div className="flex-1 flex flex-col justify-center items-center bg-white p-6 relative overflow-hidden">
+                {/* Primary Background Image Layer */}
+                <div 
+                    className="absolute inset-0 opacity-[1] pointer-events-none"
+                    style={{ 
+                        backgroundImage: `url(${cloudPattern})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        filter: 'contrast(1.1) brightness(0.95)'
+                    }}
+                />
 
-                <div className="max-w-md w-full mx-auto relative z-10">
-                    <div className="lg:hidden mb-12 text-center flex flex-col items-center gap-4">
-                        <img src={logo} alt="Archery Technocrats" className="h-8 mx-auto" />
-                        <button onClick={onSwitchToSignup} className="text-[10px] font-black text-[#39A3DD] uppercase tracking-widest underline">Create New Account</button>
+                <div className="w-full max-w-md space-y-12 relative z-10">
+                    
+                    {/* Logo Area */}
+                    <div className="flex flex-col items-center space-y-6">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.5 }}
+                        >
+                            <img src={logo} alt="Perfect Labeler" className="h-40 w-auto object-contain" />
+                        </motion.div>
+                        <div className="text-center space-y-2">
+                            <h2 className="text-3xl font-black text-[#1e293b] tracking-tight uppercase">Welcome Back</h2>
+                            <p className="text-slate-400 font-medium text-sm">Sign in to manage your workstation</p>
+                        </div>
                     </div>
 
-                    <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="text-center lg:text-left mb-10"
-                    >
-                        <h2 className="text-5xl font-black text-[#38474F] mb-3 font-oswald uppercase tracking-tight">Welcome Back..!</h2>
-                        <p className="text-[#8A9BA5] font-medium italic text-lg opacity-80 whitespace-nowrap">Enter credentials to access the console.</p>
-                    </motion.div>
-
-                    <form onSubmit={handleSubmit} className="space-y-8">
+                    {/* Login Form */}
+                    <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8A9BA5] ml-1">E-mail</label>
+                            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 ml-1">E-mail Address</label>
                             <div className="relative group">
-                                <Mail className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#39A3DD] transition-colors" size={20} />
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#39A3DD] transition-colors" size={18} />
                                 <input
                                     required
                                     type="email"
                                     name="email"
                                     value={formData.email}
                                     onChange={handleChange}
-                                    placeholder="your@email.com"
-                                    className="w-full bg-transparent border-b-2 border-gray-200 py-4 pl-10 text-lg text-[#38474F] font-bold outline-none focus:border-[#39A3DD] transition-colors"
+                                    placeholder="name@work.com"
+                                    className="w-full bg-white border border-slate-200 rounded-2xl py-4 pl-12 pr-4 text-[#1e293b] font-semibold outline-none focus:border-[#39A3DD] focus:ring-4 focus:ring-blue-500/5 transition-all text-[15px]"
                                 />
                             </div>
                         </div>
 
                         <div className="space-y-2">
                             <div className="flex items-center justify-between px-1">
-                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8A9BA5]">Password</label>
-                                <button type="button" className="text-[10px] font-black uppercase text-[#39A3DD] hover:underline tracking-widest">Reset Password ?</button>
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Security Password</label>
+                                <button type="button" className="text-[11px] font-black uppercase text-[#39A3DD] hover:text-[#2A7FAF] transition-colors tracking-tighter">Reset Access?</button>
                             </div>
                             <div className="relative group">
-                                <Lock className="absolute left-0 top-1/2 -translate-y-1/2 text-[#8A9BA5] group-focus-within:text-[#39A3DD] transition-colors" size={20} />
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#39A3DD] transition-colors" size={18} />
                                 <input
                                     required
-                                    type="password"
+                                    type={showPassword ? "text" : "password"}
                                     name="password"
                                     value={formData.password}
                                     onChange={handleChange}
                                     placeholder="••••••••"
-                                    className="w-full bg-transparent border-b-2 border-gray-200 py-4 pl-10 text-lg text-[#38474F] font-bold outline-none focus:border-[#39A3DD] transition-colors"
+                                    className="w-full bg-white border border-slate-200 rounded-2xl py-4 pl-12 pr-12 text-[#1e293b] font-semibold outline-none focus:border-[#39A3DD] focus:ring-4 focus:ring-blue-500/5 transition-all text-[15px]"
                                 />
+                                <button 
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
                             </div>
                         </div>
 
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-6 bg-[#39A3DD] hover:bg-[#2A7FAF] text-white font-black uppercase tracking-[0.4em] text-sm mt-10 rounded-xl shadow-2xl shadow-blue-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
+                            className="w-full relative group overflow-hidden bg-[#39A3DD] text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-sm shadow-xl shadow-blue-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
                         >
-                            {loading ? <Loader2 className="animate-spin" size={24} /> : (
-                                <>
-                                    <span>ACCESS ACCOUNT</span>
-                                    <ArrowRight size={20} className="opacity-50" />
-                                </>
-                            )}
+                            <span className="relative z-10">{loading ? "Authenticating..." : "Establish Session"}</span>
+                            {!loading && <ArrowRight size={20} className="relative z-10 group-hover:translate-x-1 transition-transform" />}
+                            
+                            {/* Hover Liquid Effect */}
+                            <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity" />
                         </button>
                     </form>
+
+                    {/* Footer */}
+                    <div className="text-center">
+                        <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                            &copy; 2026 ARCHERY TECHNOCRATS • ALL RIGHTS RESERVED
+                        </p>
+                    </div>
                 </div>
             </div>
+
             <Toaster position="top-right" />
         </div>
     );

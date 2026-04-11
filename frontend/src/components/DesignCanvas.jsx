@@ -26,6 +26,10 @@ const DesignCanvas = forwardRef(
       setIsDrawingBarcode,
       isDrawingShape = false,
       setIsDrawingShape,
+      isDrawingImage = false,
+      setIsDrawingImage,
+      isDrawingTable = false,
+      setIsDrawingTable,
       currentShapeType,
       isDrawingText = false,
       setIsDrawingText,
@@ -63,8 +67,13 @@ const DesignCanvas = forwardRef(
     const [barcodeDrawStart, setBarcodeDrawStart] = useState(null);
     const [tempBarcode, setTempBarcode] = useState(null);
     const [scrollOffset, setScrollOffset] = useState({ x: 0, y: 0 });
+    const [canvasBaseOffset] = useState({ x: 0, y: 0 });
     const [shapeDrawStart, setShapeDrawStart] = useState(null);
     const [tempShape, setTempShape] = useState(null);
+    const [imageDrawStart, setImageDrawStart] = useState(null);
+    const [tempImage, setTempImage] = useState(null);
+    const [tableDrawStart, setTableDrawStart] = useState(null);
+    const [tempTable, setTempTable] = useState(null);
 
     const [isDraggingLinePoint, setIsDraggingLinePoint] = useState(false);
     const [draggedLinePoint, setDraggedLinePoint] = useState(null);
@@ -203,7 +212,7 @@ const DesignCanvas = forwardRef(
       }
 
       requestAnimationFrame(() => {
-        const margin = 100;
+        const margin = 48;
 
         const containerWidth = containerRef.current.clientWidth;
         const containerHeight = containerRef.current.clientHeight;
@@ -217,17 +226,34 @@ const DesignCanvas = forwardRef(
         const zoomX = (availableWidth / canvasWidthPx) * 100;
         const zoomY = (availableHeight / canvasHeightPx) * 100;
 
-        const fittedZoom = Math.min(zoomX, zoomY, 400);
+        // If portrait (height > width), prioritize fitting to width for a "Big Label" scroll-down experience
+        // specifically for the requested 100x150 or similar tall ratios
+        const isPortrait = canvasHeightPx > canvasWidthPx;
+        let fittedZoom = isPortrait ? zoomX : Math.min(zoomX, zoomY, 400);
 
-        const minZoom = 20;
+        // Sanity check: don't let it be TOO big or too small
+        const minZoom = 25;
+        const maxZoom = 400;
         const finalZoom = Math.max(
           minZoom,
-          Math.min(Math.floor(fittedZoom), 300),
+          Math.min(Math.floor(fittedZoom), maxZoom),
         );
 
         onZoomChange(finalZoom);
       });
     }, [canvasPixelSize.width, canvasPixelSize.height, onZoomChange]);
+
+    const handleZoomToWidth = useCallback(() => {
+      if (!containerRef.current || !onZoomChange) return;
+
+      const margin = 48;
+      const containerWidth = containerRef.current.clientWidth;
+      const availableWidth = containerWidth - RULER_SIZE - margin;
+      const canvasWidthPx = canvasPixelSize.width;
+
+      const zoomLevel = Math.min((availableWidth / canvasWidthPx) * 100, 300);
+      onZoomChange(Math.floor(zoomLevel));
+    }, [canvasPixelSize.width, onZoomChange]);
 
     useEffect(() => {
       const timer = setTimeout(() => {
@@ -280,6 +306,7 @@ const DesignCanvas = forwardRef(
       handleZoomOut,
       handleZoomReset,
       fitCanvasToScreen,
+      handleZoomToWidth,
       containerRef,
       canUndo: historyIndex > 0,
       canRedo: historyIndex < history.length - 1,
@@ -783,6 +810,14 @@ const DesignCanvas = forwardRef(
           setShapeDrawStart({ x, y });
           setTempShape({ x, y, width: 0, height: 0, type: currentShapeType });
           e.stopPropagation();
+        } else if (isDrawingImage) {
+          setImageDrawStart({ x, y });
+          setTempImage({ x, y, width: 0, height: 0 });
+          e.stopPropagation();
+        } else if (isDrawingTable) {
+          setTableDrawStart({ x, y });
+          setTempTable({ x, y, width: 0, height: 0 });
+          e.stopPropagation();
         } else {
           // User clicked on empty canvas area — collapse properties panel
           if (onInteraction) onInteraction();
@@ -794,6 +829,8 @@ const DesignCanvas = forwardRef(
         isDrawingLine,
         isDrawingBarcode,
         isDrawingShape,
+        isDrawingImage,
+        isDrawingTable,
         currentShapeType,
         displayZoom,
         onInteraction,
@@ -810,8 +847,8 @@ const DesignCanvas = forwardRef(
         let x = (e.clientX - rect.left) / scale;
         let y = (e.clientY - rect.top) / scale;
 
-        // Track mouse for adaptive guidelines
-        if (isDrawingLine) setLineMousePos({ x, y });
+        // Track mouse for adaptive guidelines and ruler indicators
+        setLineMousePos({ x, y });
 
         if (isDrawingText && textDrawStart) {
           const width = Math.abs(x - textDrawStart.x);
@@ -860,6 +897,24 @@ const DesignCanvas = forwardRef(
             height,
             type: currentShapeType,
           });
+        } else if (isDrawingImage && imageDrawStart) {
+          const width = Math.abs(x - imageDrawStart.x);
+          const height = Math.abs(y - imageDrawStart.y);
+          setTempImage({
+            x: Math.min(imageDrawStart.x, x),
+            y: Math.min(imageDrawStart.y, y),
+            width,
+            height,
+          });
+        } else if (isDrawingTable && tableDrawStart) {
+          const width = Math.abs(x - tableDrawStart.x);
+          const height = Math.abs(y - tableDrawStart.y);
+          setTempTable({
+            x: Math.min(tableDrawStart.x, x),
+            y: Math.min(tableDrawStart.y, y),
+            width,
+            height,
+          });
         }
       },
       [
@@ -871,6 +926,10 @@ const DesignCanvas = forwardRef(
         barcodeDrawStart,
         isDrawingShape,
         shapeDrawStart,
+        isDrawingImage,
+        imageDrawStart,
+        isDrawingTable,
+        tableDrawStart,
         currentShapeType,
         displayZoom,
       ],
@@ -1050,6 +1109,50 @@ const DesignCanvas = forwardRef(
             setTempShape(null);
             saveToHistory(newElements);
           }
+        } else if (isDrawingImage && imageDrawStart) {
+          const width = Math.abs(x - imageDrawStart.x);
+          const height = Math.abs(y - imageDrawStart.y);
+          if (width < 20 || height < 20) {
+            setIsDrawingImage(false);
+            setImageDrawStart(null);
+            setTempImage(null);
+            return;
+          }
+          const props = {
+            x: Math.min(imageDrawStart.x, x),
+            y: Math.min(imageDrawStart.y, y),
+            width: Math.max(width, 50),
+            height: Math.max(height, 50),
+          };
+          if (onAddElement) {
+            onAddElement("image", props);
+            setIsDrawingImage(false);
+            setImageDrawStart(null);
+            setTempImage(null);
+          }
+        } else if (isDrawingTable && tableDrawStart) {
+          const width = Math.abs(x - tableDrawStart.x);
+          const height = Math.abs(y - tableDrawStart.y);
+          if (width < 30 || height < 20) {
+            setIsDrawingTable(false);
+            setTableDrawStart(null);
+            setTempTable(null);
+            return;
+          }
+          const props = {
+            x: Math.min(tableDrawStart.x, x),
+            y: Math.min(tableDrawStart.y, y),
+            width: Math.max(width, 100),
+            height: Math.max(height, 60),
+            rows: 2,
+            cols: 2
+          };
+          if (onAddElement) {
+            onAddElement("table", props);
+            setIsDrawingTable(false);
+            setTableDrawStart(null);
+            setTempTable(null);
+          }
         }
       },
       [
@@ -1061,6 +1164,10 @@ const DesignCanvas = forwardRef(
         barcodeDrawStart,
         isDrawingShape,
         shapeDrawStart,
+        isDrawingImage,
+        imageDrawStart,
+        isDrawingTable,
+        tableDrawStart,
         currentShapeType,
         displayZoom,
         generateId,
@@ -1072,8 +1179,11 @@ const DesignCanvas = forwardRef(
         setIsDrawingLine,
         setIsDrawingBarcode,
         setIsDrawingShape,
+        setIsDrawingImage,
+        setIsDrawingTable,
         saveToHistory,
         onElementCreated,
+        onAddElement,
       ],
     );
 
@@ -1238,29 +1348,28 @@ const DesignCanvas = forwardRef(
 
         const ROTATE_OFFSET = 32;
         const handles = [
-          { pos: "nw", cursor: "nw-resize", style: { left: -6, top: -6 } },
-          { pos: "n", cursor: "n-resize", style: { left: "50%", top: -6, transform: "translateX(-50%)" } },
-          { pos: "ne", cursor: "ne-resize", style: { right: -6, top: -6 } },
-          { pos: "e", cursor: "e-resize", style: { right: -6, top: "50%", transform: "translateY(-50%)" } },
-          { pos: "se", cursor: "se-resize", style: { right: -6, bottom: -6 } },
-          { pos: "s", cursor: "s-resize", style: { left: "50%", bottom: -6, transform: "translateX(-50%)" } },
-          { pos: "sw", cursor: "sw-resize", style: { left: -6, bottom: -6 } },
-          { pos: "w", cursor: "w-resize", style: { left: -6, top: "50%", transform: "translateY(-50%)" } },
+          { pos: "nw", cursor: "nw-resize", style: { left: -4, top: -4 } },
+          { pos: "n", cursor: "n-resize", style: { left: "50%", top: -4, transform: "translateX(-50%)" } },
+          { pos: "ne", cursor: "ne-resize", style: { right: -4, top: -4 } },
+          { pos: "e", cursor: "e-resize", style: { right: -4, top: "50%", transform: "translateY(-50%)" } },
+          { pos: "se", cursor: "se-resize", style: { right: -4, bottom: -4 } },
+          { pos: "s", cursor: "s-resize", style: { left: "50%", bottom: -4, transform: "translateX(-50%)" } },
+          { pos: "sw", cursor: "sw-resize", style: { left: -4, bottom: -4 } },
+          { pos: "w", cursor: "w-resize", style: { left: -4, top: "50%", transform: "translateY(-50%)" } },
         ];
 
         return (
           <>
-            {/* Rotation stem */}
+            {/* Technical Rotation Handle */}
             <div
-              className="absolute left-1/2 -top-8 w-[1.5px] h-4 bg-blue-500/40 -translate-x-1/2 pointer-events-none z-40"
+              className="absolute left-1/2 -top-6 w-px h-3 bg-slate-400 -translate-x-1/2 pointer-events-none z-40"
             />
-            {/* Rotation handle */}
             <div
-              title="Rotate (Shift = snap 15°)"
-              className="absolute left-1/2 -top-12 -translate-x-1/2 w-8 h-8 rounded-full bg-white border-2 border-blue-500 shadow-xl flex items-center justify-center cursor-grab active:cursor-grabbing hover:scale-110 active:scale-95 transition-all z-50 group/rotate"
+              title="Rotate"
+              className="absolute left-1/2 -top-10 -translate-x-1/2 w-8 h-8 rounded-full bg-white border border-slate-400 shadow-sm flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-slate-50 transition-all z-50 group/rotate"
               onMouseDown={(e) => handleRotateMouseDown(e, element)}
             >
-              <RotateCw size={14} className="text-blue-500 group-hover/rotate:rotate-180 transition-transform duration-700" />
+              <RotateCw size={14} className="text-slate-600 group-hover/rotate:rotate-180 transition-transform duration-700" />
             </div>
 
             {/* Resize handles — circular knots */}
@@ -1276,8 +1385,15 @@ const DesignCanvas = forwardRef(
               />
             ))}
 
-            {/* Selection Outline Overlay (Visual Only) */}
-            <div className="absolute -inset-[1.5px] border-2 border-blue-500/40 pointer-events-none z-30 rounded-sm shadow-[0_0_15px_rgba(59,130,246,0.1)]" />
+            {/* Selection Outline Overlay (Technical Thin Dashed Gray) */}
+            <div
+              className="absolute pointer-events-none z-30 rounded-sm"
+              style={{
+                inset: 0,
+                border: `1px dashed #94a3b8`,
+                boxShadow: "none"
+              }}
+            />
           </>
         );
       },
@@ -1321,27 +1437,27 @@ const DesignCanvas = forwardRef(
               }}
             >
               <line
-              x1={x1}
-              y1={y1}
-              x2={x2}
-              y2={y2}
-              stroke={element.borderColor || "#000000"}
-              strokeWidth={element.borderWidth || 1}
-              strokeDasharray={
-                element.borderStyle === "dashed"
-                  ? `${5},${5}`
-                  : element.borderStyle === "dotted"
-                    ? `${2},${2}`
-                    : "none"
-              }
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                stroke={element.borderColor || "#000000"}
+                strokeWidth={element.borderWidth || 1}
+                strokeDasharray={
+                  element.borderStyle === "dashed"
+                    ? `${5},${5}`
+                    : element.borderStyle === "dotted"
+                      ? `${2},${2}`
+                      : "none"
+                }
                 style={{
                   cursor: isDragging ? "grabbing" : "move",
                 }}
                 onMouseDown={(e) => {
                   const rect = canvasRef.current.getBoundingClientRect();
                   const scale = displayZoom / 100;
-                   const clickX = (e.clientX - rect.left) / scale;
-                   const clickY = (e.clientY - rect.top) / scale;
+                  const clickX = (e.clientX - rect.left) / scale;
+                  const clickY = (e.clientY - rect.top) / scale;
 
                   const distToStart = Math.sqrt(
                     Math.pow(clickX - x1, 2) + Math.pow(clickY - y1, 2),
@@ -1350,7 +1466,7 @@ const DesignCanvas = forwardRef(
                     Math.pow(clickX - x2, 2) + Math.pow(clickY - y2, 2),
                   );
 
-                   if (distToStart > 10 && distToEnd > 10) {
+                  if (distToStart > 10 && distToEnd > 10) {
                     handleElementMouseDown(e, element);
                   }
                 }}
@@ -1359,7 +1475,7 @@ const DesignCanvas = forwardRef(
               {isSelected &&
                 !isDrawingLine &&
                 !isDrawingBarcode &&
-                !isDrawingShape && 
+                !isDrawingShape &&
                 !element.isSystem && (
                   <>
                     <circle
@@ -1462,10 +1578,10 @@ const DesignCanvas = forwardRef(
                       !isDrawingLine &&
                       !isDrawingBarcode &&
                       !isDrawingShape
-                      ? "2px dashed var(--color-primary)"
+                      ? "none"
                       : "1px dashed rgba(0,0,0,0.2)",
                   backgroundColor: isSelected
-                    ? "rgba(59,130,246,0.05)"
+                    ? "rgba(0,0,0,0.02)"
                     : "rgba(251,191,36,0.05)",
                   overflow: "visible",   // allow rotation handle to show above
                   display: "flex",
@@ -1498,10 +1614,8 @@ const DesignCanvas = forwardRef(
                 style={{
                   ...style,
                   border: isSelected && !isDrawingLine && !isDrawingBarcode && !isDrawingShape
-                    ? editingElementId === element.id
-                      ? '1.5px solid #1a73e8'
-                      : '1.5px dashed #1a73e8'
-                    : '1px dashed rgba(0,0,0,0.35)',
+                    ? 'none'
+                    : '1px dashed rgba(0,0,0,0.1)',
                   boxShadow: 'none',
                   fontWeight: element.fontWeight || "normal",
                   fontStyle: element.fontStyle || "normal",
@@ -1644,7 +1758,7 @@ const DesignCanvas = forwardRef(
                   cursor: isDragging ? "grabbing" : isDrawingLine || isDrawingBarcode || isDrawingShape ? "crosshair" : "move",
                   pointerEvents: isDrawingLine || isDrawingBarcode || isDrawingShape ? "none" : "auto",
                   userSelect: "none",
-                  border: isSelected && !isDrawingLine && !isDrawingBarcode && !isDrawingShape ? "2px solid var(--color-primary)" : "none",
+                  border: "none",
                   overflow: "visible",   // allow rotation handle above
                   boxSizing: "border-box",
                 }}
@@ -1757,11 +1871,10 @@ const DesignCanvas = forwardRef(
         const isHorizontal = orientation === "horizontal";
         const marks = [];
 
-        const actualLengthMM = isHorizontal
-          ? labelSize?.width || 100
-          : labelSize?.height || 80;
+        const scale = displayZoom / 100;
+        const endMM = Math.ceil(maxLength / (unit * scale));
 
-        for (let i = 0; i <= actualLengthMM; i++) {
+        for (let i = 0; i <= endMM; i++) {
           marks.push(i);
         }
 
@@ -1777,8 +1890,9 @@ const DesignCanvas = forwardRef(
           >
             {marks.map((mark) => {
               const position = mark * unit * (displayZoom / 100);
-              const isMajorMark = mark % 10 === 0;
-              const isMediumMark = mark % 5 === 0;
+              const absMark = Math.abs(mark);
+              const isMajorMark = absMark % 10 === 0;
+              const isMediumMark = absMark % 5 === 0;
 
               return (
                 <div key={mark}>
@@ -1787,17 +1901,17 @@ const DesignCanvas = forwardRef(
                     style={{
                       ...(isHorizontal
                         ? {
-                            left: `${position}px`,
-                            bottom: "0",
-                            width: "1.5px",
-                            height: isMajorMark ? "100%" : isMediumMark ? "60%" : "30%",
-                          }
+                          left: `${position}px`,
+                          bottom: "0",
+                          width: "1.5px",
+                          height: isMajorMark ? "100%" : isMediumMark ? "60%" : "30%",
+                        }
                         : {
-                            top: `${position}px`,
-                            right: "0",
-                            height: "1.5px",
-                            width: isMajorMark ? "100%" : isMediumMark ? "60%" : "30%",
-                          }),
+                          top: `${position}px`,
+                          right: "0",
+                          height: "1.5px",
+                          width: isMajorMark ? "100%" : isMediumMark ? "60%" : "30%",
+                        }),
                       backgroundColor: isMajorMark ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0.15)",
                     }}
                   />
@@ -1847,7 +1961,7 @@ const DesignCanvas = forwardRef(
       <div
         ref={containerRef}
         className="h-full w-full flex flex-col relative overflow-hidden transition-colors duration-200"
-        style={{ backgroundColor: theme.bg }}
+        style={{ backgroundColor: "#f1f5f9" }}
       >
         <div className="flex flex-shrink-0">
           <div
@@ -1855,7 +1969,7 @@ const DesignCanvas = forwardRef(
             style={{
               width: `${RULER_SIZE}px`,
               height: `${RULER_SIZE}px`,
-              backgroundColor: theme.bg,
+              backgroundColor: "#f1f5f9",
               borderRight: `1px solid ${theme.border}`,
               borderBottom: `1px solid ${theme.border}`,
             }}
@@ -1863,40 +1977,58 @@ const DesignCanvas = forwardRef(
             <span className="text-[10px] font-bold" style={{ color: "var(--color-primary)" }}>MM</span>
           </div>
 
-          <div className="flex-1 overflow-hidden relative">
+          <div className="flex-1 relative">
             <div
               style={{
-                width: `${maxRulerLength}px`,
-                marginLeft: `-${scrollOffset.x}px`,
+                width: `100%`,
+                marginLeft: `0px`,
+                overflow: 'hidden'
               }}
             >
-              <Ruler orientation="horizontal" maxLength={maxRulerLength} />
+              <Ruler orientation="horizontal" maxLength={2000} />
             </div>
+
+            {/* Mouse position indicator (horizontal) */}
+            {lineMousePos && (
+              <div
+                className="absolute top-0 bottom-0 w-px bg-blue-500 z-20 pointer-events-none"
+                style={{ left: `${canvasBaseOffset.x + lineMousePos.x * (displayZoom / 100) - scrollOffset.x}px` }}
+              />
+            )}
           </div>
         </div>
 
         <div className="flex flex-1 overflow-hidden relative">
-          <div className="overflow-hidden relative flex-shrink-0">
+          <div className="relative flex-shrink-0">
             <div
               style={{
-                height: `${maxRulerHeightLength}px`,
-                marginTop: `-${scrollOffset.y}px`,
+                height: `100%`,
+                marginTop: `0px`,
+                overflow: 'hidden'
               }}
             >
-              <Ruler orientation="vertical" maxLength={maxRulerHeightLength} />
+              <Ruler orientation="vertical" maxLength={2000} />
             </div>
+
+            {/* Mouse position indicator (vertical) */}
+            {lineMousePos && (
+              <div
+                className="absolute left-0 right-0 h-px bg-blue-500 z-20 pointer-events-none"
+                style={{ top: `${canvasBaseOffset.y + lineMousePos.y * (displayZoom / 100) - scrollOffset.y}px` }}
+              />
+            )}
           </div>
 
           <div
             ref={scrollContainerRef}
-            className="flex-1 overflow-auto canvas-fixed-scroll bg-slate-50 dark:bg-slate-900/40 relative"
+            className="flex-1 overflow-y-auto overflow-x-hidden bg-slate-100 relative custom-scrollbar"
             style={{
               backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(0,0,0,0.05) 1px, transparent 0)',
               backgroundSize: '32px 32px'
             }}
           >
             <div
-              className="min-h-full min-w-full flex items-center justify-center py-[200px] px-[200px]"
+              className="min-h-full min-w-full flex flex-col items-center justify-start p-12"
             >
               <div
                 ref={canvasRef}
@@ -1936,21 +2068,22 @@ const DesignCanvas = forwardRef(
               >
                 {elements.map(renderElement)}
 
-                {/* ── Adaptive guidelines + line preview ── */}
-                {tempLine && (
-                  <svg
-                    style={{
-                      position: "absolute",
-                      left: 0,
-                      top: 0,
-                      width: "100%",
-                      height: "100%",
-                      pointerEvents: "none",
-                      overflow: "visible",
-                    }}
-                  >
-                    {/* Horizontal guideline across full canvas */}
-                    {lineMousePos && (
+                {/* ── Persistent Adaptive Guidelines (Full Canvas Crosshairs) ── */}
+                <svg
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    width: "100%",
+                    height: "100%",
+                    pointerEvents: "none",
+                    overflow: "visible",
+                    zIndex: 40,
+                  }}
+                >
+                  {lineMousePos && (
+                    <>
+                      {/* X-Axis Guideline */}
                       <line
                         x1={0}
                         y1={lineMousePos.y}
@@ -1959,11 +2092,9 @@ const DesignCanvas = forwardRef(
                         stroke="#e74c3c"
                         strokeWidth="0.6"
                         strokeDasharray="4 3"
-                        opacity="0.55"
+                        opacity="0.4"
                       />
-                    )}
-                    {/* Vertical guideline across full canvas */}
-                    {lineMousePos && (
+                      {/* Y-Axis Guideline */}
                       <line
                         x1={lineMousePos.x}
                         y1={0}
@@ -1972,77 +2103,103 @@ const DesignCanvas = forwardRef(
                         stroke="#e74c3c"
                         strokeWidth="0.6"
                         strokeDasharray="4 3"
-                        opacity="0.55"
+                        opacity="0.4"
                       />
-                    )}
-                    {/* Start point crosshair */}
-                    {lineDrawStart && (
-                      <>
-                        <line
-                          x1={0} y1={lineDrawStart.y}
-                          x2={canvasPixelSize.width} y2={lineDrawStart.y}
-                          stroke="#3498db" strokeWidth="0.5"
-                          strokeDasharray="3 4" opacity="0.4"
-                        />
-                        <line
-                          x1={lineDrawStart.x} y1={0}
-                          x2={lineDrawStart.x} y2={canvasPixelSize.height}
-                          stroke="#3498db" strokeWidth="0.5"
-                          strokeDasharray="3 4" opacity="0.4"
-                        />
-                        {/* Start dot */}
-                        <circle cx={lineDrawStart.x} cy={lineDrawStart.y} r="3" fill="#3498db" opacity="0.8" />
-                      </>
-                    )}
-                    {/* The actual line preview */}
-                    <line
-                      x1={tempLine.x1}
-                      y1={tempLine.y1}
-                      x2={tempLine.x2}
-                      y2={tempLine.y2}
-                      stroke="var(--color-primary)"
-                      strokeWidth="1"
-                      opacity="0.9"
-                    />
-                    {/* Angle + length badge near end point */}
-                    {lineMousePos && lineDrawStart && (() => {
-                      const dx = tempLine.x2 - tempLine.x1;
-                      const dy = tempLine.y2 - tempLine.y1;
-                      const len = Math.sqrt(dx * dx + dy * dy);
-                      const angleDeg = Math.round(Math.atan2(dy, dx) * (180 / Math.PI));
-                      const lenMm = Math.round((len / MM_TO_PX) * 10) / 10;
-                      if (len < 5) return null;
-                      return (
-                        <>
-                          {/* End dot */}
-                          <circle cx={tempLine.x2} cy={tempLine.y2} r="3" fill="var(--color-primary)" />
-                          {/* Badge */}
-                          <foreignObject
-                            x={tempLine.x2 + 8}
-                            y={tempLine.y2 - 14}
-                            width="90" height="28"
-                          >
-                            <div
-                              xmlns="http://www.w3.org/1999/xhtml"
-                              style={{
-                                background: 'rgba(15,23,42,0.85)',
-                                color: '#fff',
-                                fontSize: 10,
-                                fontFamily: 'monospace',
-                                padding: '2px 6px',
-                                borderRadius: 4,
-                                whiteSpace: 'nowrap',
-                                lineHeight: 1.5,
-                              }}
+
+                      {/* Global Position Badge */}
+                      <foreignObject
+                        x={lineMousePos.x + 8}
+                        y={lineMousePos.y + 8}
+                        width="80" height="24"
+                      >
+                        <div
+                          xmlns="http://www.w3.org/1999/xhtml"
+                          style={{
+                            background: 'rgba(59, 130, 246, 0.9)',
+                            color: '#fff',
+                            fontSize: 9,
+                            fontWeight: '900',
+                            fontFamily: 'Inter, sans-serif',
+                            padding: '1px 5px',
+                            borderRadius: 4,
+                            whiteSpace: 'nowrap',
+                            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                          }}
+                        >
+                          {Math.round(lineMousePos.x / MM_TO_PX)} × {Math.round(lineMousePos.y / MM_TO_PX)} mm
+                        </div>
+                      </foreignObject>
+                    </>
+                  )}
+
+                  {/* Drawing-specific start point crosshair */}
+                  {lineDrawStart && (
+                    <>
+                      <line
+                        x1={0} y1={lineDrawStart.y}
+                        x2={canvasPixelSize.width} y2={lineDrawStart.y}
+                        stroke="#3498db" strokeWidth="0.5"
+                        strokeDasharray="3 4" opacity="0.3"
+                      />
+                      <line
+                        x1={lineDrawStart.x} y1={0}
+                        x2={lineDrawStart.x} y2={canvasPixelSize.height}
+                        stroke="#3498db" strokeWidth="0.5"
+                        strokeDasharray="3 4" opacity="0.3"
+                      />
+                      <circle cx={lineDrawStart.x} cy={lineDrawStart.y} r="3" fill="#3498db" opacity="0.8" />
+                    </>
+                  )}
+
+                  {/* Temp Line Preview */}
+                  {tempLine && (
+                    <>
+                      <line
+                        x1={tempLine.x1}
+                        y1={tempLine.y1}
+                        x2={tempLine.x2}
+                        y2={tempLine.y2}
+                        stroke="var(--color-primary)"
+                        strokeWidth="1.5"
+                        opacity="0.9"
+                      />
+                      {(() => {
+                        const dx = tempLine.x2 - tempLine.x1;
+                        const dy = tempLine.y2 - tempLine.y1;
+                        const len = Math.sqrt(dx * dx + dy * dy);
+                        const angleDeg = Math.round(Math.atan2(dy, dx) * (180 / Math.PI));
+                        const lenMm = Math.round((len / MM_TO_PX) * 10) / 10;
+                        if (len < 5) return null;
+                        return (
+                          <>
+                            <circle cx={tempLine.x2} cy={tempLine.y2} r="3" fill="var(--color-primary)" />
+                            <foreignObject
+                              x={tempLine.x2 + 8}
+                              y={tempLine.y2 - 14}
+                              width="90" height="28"
                             >
-                              {lenMm}mm &nbsp;{angleDeg}°
-                            </div>
-                          </foreignObject>
-                        </>
-                      );
-                    })()}
-                  </svg>
-                )}
+                              <div
+                                xmlns="http://www.w3.org/1999/xhtml"
+                                style={{
+                                  background: 'rgba(15,23,42,0.85)',
+                                  color: '#fff',
+                                  fontSize: 10,
+                                  fontFamily: 'monospace',
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                  whiteSpace: 'nowrap',
+                                  lineHeight: 1.5,
+                                }}
+                              >
+                                {lenMm}mm &nbsp;{angleDeg}°
+                              </div>
+                            </foreignObject>
+                          </>
+                        );
+                      })()}
+                    </>
+                  )}
+                </svg>
 
                 {tempBarcode &&
                   tempBarcode.width > 0 &&
@@ -2133,6 +2290,56 @@ const DesignCanvas = forwardRef(
                   >
                     <span className="text-[10px] text-blue-600 font-semibold bg-white/80 px-2 py-1 rounded shadow-sm">
                       T {Math.round(tempText.width / MM_TO_PX)} × {Math.round(tempText.height / MM_TO_PX)}mm
+                    </span>
+                  </div>
+                )}
+
+                {/* ── Image frame draw preview ── */}
+                {tempImage && tempImage.width > 0 && tempImage.height > 0 && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: tempImage.x,
+                      top: tempImage.y,
+                      width: tempImage.width,
+                      height: tempImage.height,
+                      border: "2px dashed #ec4899",
+                      backgroundColor: "rgba(236, 72, 153, 0.1)",
+                      pointerEvents: "none",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <div className="flex flex-col items-center gap-1">
+                      <ImageIcon size={18} className="text-pink-500 opacity-50" />
+                      <span className="text-[10px] text-pink-600 font-bold bg-white/80 px-2 rounded shadow-sm">
+                        IMG {Math.round(tempImage.width / MM_TO_PX)} × {Math.round(tempImage.height / MM_TO_PX)}mm
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Table grid draw preview ── */}
+                {tempTable && tempTable.width > 0 && tempTable.height > 0 && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: tempTable.x,
+                      top: tempTable.y,
+                      width: tempTable.width,
+                      height: tempTable.height,
+                      border: "2px dashed #06b6d4",
+                      backgroundColor: "rgba(6, 182, 212, 0.1)",
+                      pointerEvents: "none",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <div className="w-full h-full grid grid-cols-2 grid-rows-2 border border-cyan-500/20" />
+                    <span className="absolute text-[10px] text-cyan-600 font-bold bg-white/80 px-2 py-1 rounded shadow-sm">
+                      TABLE {Math.round(tempTable.width / MM_TO_PX)} × {Math.round(tempTable.height / MM_TO_PX)}mm
                     </span>
                   </div>
                 )}
