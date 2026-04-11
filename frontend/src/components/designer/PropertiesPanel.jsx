@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Trash2, Undo, Redo, Copy, Plus, Check, FileText, ArrowUp, ArrowDown, RotateCw, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, ChevronDown, ChevronUp, Layers, Image as ImageIcon, Settings, Ruler, X } from "lucide-react";
+import { Trash2, Undo, Redo, Copy, Plus, Check, FileText, ArrowUp, ArrowDown, RotateCw, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, ChevronDown, ChevronUp, Layers, Image as ImageIcon, Settings, Ruler, X, Search } from "lucide-react";
 import { useTheme } from "../../ThemeContext";
 import { convertToPx, convertFromPx } from "../../supabaseClient";
 

@@ -3,7 +3,7 @@ import {
   ArrowLeft, Save, Minus, X, Grid, ZoomIn, ZoomOut,
   RefreshCw, Search, Plus, Trash2, LayoutGrid, Check,
   ChevronRight, FileText, Settings, History, Layers,
-  Monitor, Info, Palette
+  Monitor, Info, Palette, Image as ImageIcon, Table
 } from "lucide-react";
 
 import DesignCanvas from "./DesignCanvas";
