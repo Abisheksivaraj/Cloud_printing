@@ -33,6 +33,7 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
   };
 
   const [elements, setElements] = useState(label?.elements || []);
+  const [deletedElementIds, setDeletedElementIds] = useState([]);
   const [selectedElementId, setSelectedElementId] = useState(null);
   const [labelSize, setLabelSize] = useState(getInitialDimensions(label));
   const [showGrid, setShowGrid] = useState(true);
@@ -74,8 +75,26 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
       try {
         const data = await callEdgeFunction(API_URLS.GET_DESIGN, { design_id: designId });
         const normalized = normalizeDesign(data);
-        const repairedElements = (normalized.elements || []).filter(el => !el.isSystem && !el.id?.startsWith('border-'));
-        setElements(repairedElements);
+        
+        // Check for local unsaved changes
+        const localData = localStorage.getItem(`unsaved_design_${designId}`);
+        if (localData) {
+          try {
+            const { elements: savedElements, deletedIds: savedDeletedIds, timestamp } = JSON.parse(localData);
+            // Only restore if the local data is newer or user wants it (simplified: always restore if exists)
+            console.log(`Restoring unsaved changes from ${new Date(timestamp).toLocaleString()}`);
+            setElements(savedElements);
+            setDeletedElementIds(savedDeletedIds || []);
+          } catch (e) {
+            console.error("Local restore failed:", e);
+            const repairedElements = (normalized.elements || []).filter(el => !el.isSystem && !el.id?.startsWith('border-'));
+            setElements(repairedElements);
+          }
+        } else {
+          const repairedElements = (normalized.elements || []).filter(el => !el.isSystem && !el.id?.startsWith('border-'));
+          setElements(repairedElements);
+        }
+        
         setLabelSize(normalized.labelSize);
 
         // Apply size-specific initial zoom
@@ -89,6 +108,22 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     };
     syncAndFetch();
   }, [label?.id]);
+
+  // Autosave to localStorage
+  useEffect(() => {
+    const designId = label?.design_id || label?.id;
+    if (!designId || elements.length === 0) return;
+
+    const timeoutId = setTimeout(() => {
+      localStorage.setItem(`unsaved_design_${designId}`, JSON.stringify({
+        elements,
+        deletedIds: deletedElementIds,
+        timestamp: Date.now()
+      }));
+    }, 1000); // Debounce saves
+
+    return () => clearTimeout(timeoutId);
+  }, [elements, deletedElementIds, label?.id]);
 
   const elementIdCounter = useRef(0);
   const canvasRef = useRef(null);
@@ -152,7 +187,79 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
 
   const handleSave = async (status = null) => {
     if (userRole === 'viewer') return;
-    if (onSave) await onSave({ elements, labelSize, status: status || label?.status });
+    const designId = label.design_id || label.id;
+    if (!designId) return;
+
+    try {
+      // 1. Sync deletions
+      if (deletedElementIds.length > 0) {
+        // We use a separate loop and try/catch so one missing element doesn't break the entire save
+        for (const id of deletedElementIds) {
+          try {
+            // Skip local-only IDs just in case they slipped in
+            if (String(id).startsWith('element_')) continue;
+
+            await callEdgeFunction(API_URLS.DELETE_ELEMENT, { 
+              element_id: id, 
+              design_id: designId, 
+              version_major: label.version_major || 0, 
+              version_minor: label.version_minor || 1 
+            });
+          } catch (delError) {
+            // If the element is already gone (404/Element not found), ignore the error
+            if (delError.message?.includes("not found") || delError.status === 404) {
+              console.warn(`Element ${id} already deleted from server.`);
+              continue;
+            }
+            // Propagate other more serious errors
+            throw delError;
+          }
+        }
+      }
+
+      // 2. Sync Additions and Updates
+      const syncTasks = elements.map(async (el) => {
+        const payload = mapElementToPayload(el);
+        if (String(el.id).startsWith('element_')) {
+          // New element
+          return await callEdgeFunction(API_URLS.ADD_ELEMENT, payload);
+        } else {
+          try {
+            // Existing element
+            payload.element_id = el.id;
+            return await callEdgeFunction(API_URLS.UPDATE_ELEMENT, payload);
+          } catch (updError) {
+            // If the element is missing from the DB, fallback to Adding it
+            if (updError.message?.includes("not found") || updError.status === 404) {
+              console.warn(`Element ${el.id} missing from server. Attempting to re-add.`);
+              // Remove the fixed element_id so a new one is generated
+              delete payload.element_id;
+              return await callEdgeFunction(API_URLS.ADD_ELEMENT, payload);
+            }
+            throw updError;
+          }
+        }
+      });
+
+      const results = await Promise.all(syncTasks);
+
+      // 3. Clear local storage for this design
+      localStorage.removeItem(`unsaved_design_${designId}`);
+      setDeletedElementIds([]);
+
+      // 4. Update the parent/metadata
+      if (onSave) {
+        await onSave({ 
+          elements, 
+          labelSize, 
+          status: status || label?.status 
+        });
+      }
+    } catch (error) {
+      console.error("Bulk save failure:", error);
+      // We could show a specific error toast here too
+      throw error;
+    }
   };
 
   const mapElementToPayload = (el) => {
@@ -220,7 +327,11 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     } else if (type === "rectangle" || type === "circle") {
       newElement = { ...newElement, borderWidth: 2, borderColor: "#000000", borderStyle: "solid", backgroundColor: "transparent" };
     } else if (type === "text" || type === "barcode") {
-      newElement = { ...newElement, width: extra.width || (type === "text" ? 151 : 227), height: extra.height || (type === "text" ? 30 : 95), content: extra.content || (type === "text" ? "Sample Text" : "123456789"), barcodeType: type === "barcode" ? (extra.barcodeType || "CODE128") : undefined, fontSize: extra.fontSize || 14, fontFamily: extra.fontFamily || "Arial" };
+      const bType = extra.barcodeType || "CODE128";
+      const isGs1 = ["DATAMATRIX", "PDF417", "DATABAR"].includes(bType);
+      const defaultContent = isGs1 ? "(01)01234567890128" : (bType === "EAN13" ? "7612345002958" : "123456789");
+      
+      newElement = { ...newElement, width: extra.width || (type === "text" ? 151 : 227), height: extra.height || (type === "text" ? 30 : 95), content: extra.content || (type === "text" ? "Sample Text" : defaultContent), barcodeType: type === "barcode" ? bType : undefined, fontSize: extra.fontSize || 14, fontFamily: extra.fontFamily || "Arial" };
       if (type === "text" && !extra.width) { const dims = measureText(newElement.content, newElement); newElement.width = dims.width; newElement.height = dims.height; }
     } else if (type === "line" && Object.keys(extra).length === 0) { setIsDrawingLine(true); return; }
     setElements((prev) => [...prev, newElement]);
@@ -233,17 +344,6 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     const updatedElement = { ...pendingBindingElement, binding_type: bindingType };
     setElements((prev) => prev.map(el => el.id === pendingBindingElement.id ? updatedElement : el));
     setPendingBindingElement(null);
-    const designId = label?.design_id || label?.id;
-    if (!designId) return;
-    try {
-      const payload = mapElementToPayload(updatedElement);
-      const result = await callEdgeFunction(API_URLS.ADD_ELEMENT, payload);
-      if (result) {
-        const synced = { ...updatedElement, ...mapPayloadToElement(result) };
-        setElements((prev) => prev.some(el => el.id === updatedElement.id) ? prev.map(el => el.id === updatedElement.id ? synced : el) : [...prev, synced]);
-        setSelectedElementId(synced.id);
-      }
-    } catch (error) { console.error("Sync error:", error); }
   };
 
   const handleImageUpload = (e) => {
@@ -286,19 +386,8 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     const tempId = generateId();
     const defaults = { id: tempId, type: "placeholder", content: placeholderName, fontSize: 14, fontFamily: "Arial", rotation: 0, zIndex: elements.length };
     const dims = measureText(placeholderName, defaults);
-    const element = { ...defaults, x: 38, y: 38, width: dims.width, height: dims.height };
+    const element = { ...defaults, x: 38, y: 38, width: dims.width, height: dims.height, binding_type: "placeholder" };
     setElements((prev) => [...prev, element]); setSelectedElementId(tempId);
-    const designId = label?.design_id || label?.id;
-    if (!designId) return;
-    try {
-      const payload = mapElementToPayload(element); payload.binding_type = "placeholder";
-      const result = await callEdgeFunction(API_URLS.ADD_ELEMENT, payload);
-      if (result) {
-        const synced = { ...element, ...mapPayloadToElement(result) };
-        setElements((prev) => prev.map(el => el.id === tempId ? synced : el));
-        setSelectedElementId(synced.id);
-      }
-    } catch (error) { console.error("Placeholder sync failure:", error); }
   };
 
   const updateElementLocal = (id, updates) => {
@@ -308,15 +397,6 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     return updated;
   };
 
-  const syncElementUpdate = async (id, fullElement = null) => {
-    if (userRole === 'viewer') return;
-    const designId = label?.design_id || label?.id; if (!designId) return;
-    const target = fullElement || elements.find(el => el.id === id); if (!target) return;
-    try {
-      const payload = mapElementToPayload(target); payload.element_id = id;
-      await callEdgeFunction(API_URLS.UPDATE_ELEMENT, payload);
-    } catch (error) { console.error("Update sync failure:", error); }
-  };
 
   const updateElement = async (id, updates, shouldSync = true) => {
     const target = elements.find(e => e.id === id);
@@ -325,21 +405,19 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
       const dims = measureText(combined.content || target.content, combined);
       updates.width = dims.width; updates.height = dims.height;
     }
-    const updated = updateElementLocal(id, updates);
-    if (shouldSync && updated) await syncElementUpdate(id, updated);
+    updateElementLocal(id, updates);
+    // Note: shouldSync is ignored now as everything is local-first
   };
 
   const deleteElement = async () => {
     if (selectedElementId) {
       const idToDelete = selectedElementId;
+      // Track real (DB) IDs for deletion on save
+      if (!String(idToDelete).startsWith('element_')) {
+        setDeletedElementIds(prev => [...prev, idToDelete]);
+      }
       setElements((prev) => prev.filter((el) => el.id !== idToDelete));
       setSelectedElementId(null);
-      const designId = label?.design_id || label?.id;
-      if (designId) {
-        try {
-          await callEdgeFunction(API_URLS.DELETE_ELEMENT, { element_id: idToDelete, design_id: designId, version_major: label.version_major || 0, version_minor: label.version_minor || 1 });
-        } catch (error) { console.error("Delete sync failure:", error); }
-      }
     }
   };
 
@@ -393,7 +471,7 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
       <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
 
       {/* ─── Premium Workspace Rail (Smarter Sidebar) ─── */}
-      <div className="flex flex-col border-r border-slate-200 bg-white z-30 shadow-md relative">
+      <div className="flex flex-col border-r border-slate-200 bg-white z-[60] shadow-md relative">
         <ToolsPalette
           onAddElement={addElement}
           onActivateLineDrawing={activateLineDrawing}
@@ -441,6 +519,12 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
                 <div className="flex items-center gap-2 text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-0.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/40 animate-pulse" />
                   {labelSize.width} × {labelSize.height} {labelSize.unit?.toUpperCase()} <span className="text-slate-700">•</span> {elements.length} LAYERS
+                  {localStorage.getItem(`unsaved_design_${label?.design_id || label?.id}`) && (
+                    <>
+                      <span className="text-slate-700 ml-2">•</span>
+                      <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 text-[8px] font-black animate-pulse">UNSAVED</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -531,7 +615,6 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
             generateId={generateId}
             selectedBarcodeType={selectedBarcodeType}
             updateElement={updateElementLocal}
-            onUpdateEnd={syncElementUpdate}
             onAddElement={addElement}
             setSelectedBarcodeType={setSelectedBarcodeType}
             zoom={zoom}
@@ -549,8 +632,8 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
 
       {/* ─── Inspector Sheet (Properties) ─── */}
       <div
-        className={`fixed top-[72px] bottom-4 right-4 z-40 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] rounded-2xl overflow-hidden border border-slate-200 shadow-xl ${isPropertiesExpanded ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-[calc(100%+20px)] opacity-0 scale-95'}`}
-        style={{ width: "340px", backgroundColor: "rgba(255, 255, 255, 0.95)", backdropFilter: "blur(20px)" }}
+        className={`fixed top-[72px] bottom-4 right-4 z-40 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] rounded-2xl overflow-hidden border border-slate-200/60 shadow-2xl ${isPropertiesExpanded ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-[calc(100%+20px)] opacity-0 scale-95'}`}
+        style={{ width: "280px", backgroundColor: "rgba(255, 255, 255, 0.92)", backdropFilter: "blur(40px)" }}
       >
         <button
           onClick={() => setIsPropertiesExpanded(!isPropertiesExpanded)}

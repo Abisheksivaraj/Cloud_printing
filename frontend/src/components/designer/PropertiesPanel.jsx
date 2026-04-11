@@ -41,8 +41,9 @@ const PropertiesPanel = ({
     { value: "CODE128", label: "Code 128" },
     { value: "CODE39", label: "Code 39" },
     { value: "EAN13", label: "EAN-13" },
-    { value: "EAN8", label: "EAN-8" },
-    { value: "UPC", label: "UPC-A" },
+    { value: "ITF", label: "ITF (I2of5)" },
+    { value: "CODE93", label: "Code 93" },
+    { value: "DATABAR", label: "Databar Expanded" },
     { value: "QR", label: "QR Code" },
     { value: "DATAMATRIX", label: "Data Matrix" },
     { value: "PDF417", label: "PDF417" },
@@ -89,12 +90,12 @@ const PropertiesPanel = ({
   const unit = labelSize?.unit || "mm";
 
   const SectionHeader = ({ children, icon: Icon }) => (
-    <div className="flex items-center gap-2 mb-4 mt-6 first:mt-2 px-1">
-      {Icon && <Icon size={12} className="text-slate-400" />}
-      <h5 className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400 flex-1">
+    <div className="flex items-center gap-2 mb-2.5 mt-4 first:mt-1 px-1">
+      {Icon && <Icon size={11} className="text-slate-400" />}
+      <h5 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400/80 flex-1">
         {children}
       </h5>
-      <div className="h-px bg-slate-100 flex-1" />
+      <div className="h-px bg-slate-100/60 flex-1" />
     </div>
   );
 
@@ -105,7 +106,7 @@ const PropertiesPanel = ({
   );
 
   const ControlGroup = ({ children, className = "" }) => (
-    <div className={`p-4 rounded-xl border border-slate-100 bg-white/50 backdrop-blur-sm space-y-4 ${className}`}>
+    <div className={`p-3.5 rounded-xl border border-slate-100 bg-white/40 backdrop-blur-sm space-y-3.5 ${className}`}>
       {children}
     </div>
   );
@@ -115,14 +116,11 @@ const PropertiesPanel = ({
     const formattedValue = isPx && unit !== 'px' ? Math.round(displayValue * 100) / 100 : displayValue;
 
     return (
-      <div className="flex flex-col gap-1.5 flex-1">
-        <div className="flex items-center justify-between px-0.5">
-          <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
-          <span className="text-[8px] font-mono text-slate-300 lowercase">{unit}</span>
-        </div>
+      <div className="flex flex-col gap-1 flex-1">
+        <label className="text-[7.5px] font-black text-slate-400 uppercase tracking-widest px-0.5">{label}</label>
         <div className="relative group/input">
           {prefix && (
-            <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-300 uppercase select-none">
+            <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[8px] font-black text-slate-300 uppercase select-none">
               {prefix}
             </div>
           )}
@@ -136,7 +134,7 @@ const PropertiesPanel = ({
             min={min}
             max={max}
             step={unit === 'px' ? 1 : 0.01}
-            className={`w-full bg-slate-50/50 border border-slate-200/60 hover:border-slate-300 focus:border-slate-400 focus:bg-white text-slate-900 text-[11px] py-1.5 rounded-lg transition-all outline-none font-mono text-center ${prefix ? 'pl-7' : 'px-2'}`}
+            className={`w-full bg-slate-50/50 border border-slate-200/50 hover:border-slate-300/80 focus:border-blue-400/50 focus:bg-white text-slate-900 text-[10px] py-1.5 rounded-lg transition-all outline-none font-mono text-center ${prefix ? 'pl-7' : 'px-2'}`}
           />
         </div>
       </div>
@@ -144,9 +142,9 @@ const PropertiesPanel = ({
   };
 
   const ColorPicker = ({ label, value, onChange }) => (
-    <div className="flex flex-col gap-1.5 flex-1">
-      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest px-0.5">{label}</label>
-      <div className="flex items-center gap-2 p-1.5 rounded-lg border border-slate-200/60 bg-slate-50/50 hover:bg-white transition-all group/color">
+    <div className="flex flex-col gap-1 flex-1">
+      <label className="text-[7.5px] font-black text-slate-400 uppercase tracking-widest px-0.5">{label}</label>
+      <div className="flex items-center gap-2 p-1 rounded-lg border border-slate-200/50 bg-slate-50/50 hover:bg-white transition-all group/color">
         <div className="relative w-5 h-5 rounded-md overflow-hidden border border-slate-200 shadow-sm shrink-0">
           <input
             type="color"
@@ -178,7 +176,7 @@ const PropertiesPanel = ({
       className="flex flex-col h-full bg-white/90 backdrop-blur-2xl text-slate-700"
     >
       {/* Top action bar */}
-      <div className="p-6 border-b border-slate-200 shrink-0 bg-slate-50/50">
+      <div className="p-4 border-b border-slate-100 shrink-0 bg-slate-50/30">
         <div className="flex gap-2">
           <button
             onClick={onUndo}
@@ -216,7 +214,7 @@ const PropertiesPanel = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 py-8 space-y-8 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6 custom-scrollbar">
 
         {!el && (
           <div className="space-y-6">
@@ -275,12 +273,12 @@ const PropertiesPanel = ({
                 </div>
               ) : (
                 <div className="space-y-3 opacity-40">
-                  <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mx-auto border border-slate-100">
-                    <Layers size={20} className="text-slate-300" />
+                  <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center mx-auto border border-slate-100">
+                    <Layers size={18} className="text-slate-300" />
                   </div>
                   <div className="space-y-1">
-                    <p className="font-black text-[11px] uppercase tracking-widest text-slate-400">Queue Empty</p>
-                    <p className="text-[10px] text-slate-400">Select an element to inspect properties</p>
+                    <p className="font-black text-[10px] uppercase tracking-widest text-slate-400">Queue Empty</p>
+                    <p className="text-[9px] text-slate-400">Select an element to inspect</p>
                   </div>
                 </div>
               )}
@@ -322,9 +320,16 @@ const PropertiesPanel = ({
                 style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
               >
                 <option value="" disabled>Select Format...</option>
-                {barcodeTypes.map((type) => (
-                  <option key={type.value} value={type.value}>{type.label}</option>
-                ))}
+                <optgroup label="1D Barcodes">
+                  {barcodeTypes.slice(0, 6).map((type) => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="2D / QR Codes">
+                  {barcodeTypes.slice(6).map((type) => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </optgroup>
               </select>
               <div className={`text-[9px] font-bold uppercase tracking-widest flex items-center gap-2 ${!selectedBarcodeType ? 'text-amber-500/80' : 'text-indigo-500/80'}`}>
                 <div className={`w-1.5 h-1.5 rounded-full ${!selectedBarcodeType ? 'bg-amber-500 animate-pulse' : 'bg-indigo-500'}`} />
@@ -603,6 +608,24 @@ const PropertiesPanel = ({
                           className={`flex-1 py-1 rounded-md text-[10px] font-black uppercase tracking-widest transition-all ${(el.showBarcodeText !== false ? true : false) === opt.val ? 'bg-white shadow-sm text-slate-900 border border-slate-200/50' : 'text-slate-400'}`}
                         >{opt.label}</button>
                       ))}
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-slate-100 flex flex-col gap-3">
+                    <div className="flex flex-col gap-2">
+                      <Label className="mb-0 px-0.5">Symbology Label</Label>
+                      <div className="flex gap-2">
+                        <div className="flex-1 flex bg-slate-100/50 p-1 rounded-lg border border-slate-200/50">
+                          <button
+                            onClick={() => updateElement(id, { showBarcodeLabel: !el.showBarcodeLabel })}
+                            className={`flex-1 py-1 rounded-md text-[10px] font-black uppercase tracking-widest transition-all ${el.showBarcodeLabel ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                          >
+                            {el.showBarcodeLabel ? 'Enabled' : 'Disabled'}
+                          </button>
+                        </div>
+                        {el.showBarcodeLabel && (
+                          <ColorPicker label="Label Color" value={el.barcodeLabelColor || "#3b82f6"} onChange={(v) => updateElement(id, { barcodeLabelColor: v })} />
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

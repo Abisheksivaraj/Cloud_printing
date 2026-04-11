@@ -1047,12 +1047,13 @@ const DesignCanvas = forwardRef(
             return;
           }
 
+          const isGs1 = ["DATAMATRIX", "PDF417", "DATABAR"].includes(selectedBarcodeType);
           const props = {
             x: Math.min(barcodeDrawStart.x, x),
             y: Math.min(barcodeDrawStart.y, y),
             width: Math.max(width, 100),
             height: Math.max(height, 50),
-            content: "123456789",
+            content: isGs1 ? "(01)01234567890128" : (selectedBarcodeType === "EAN13" ? "7612345002958" : "123456789"),
             barcodeType: selectedBarcodeType || "CODE128",
           };
 
