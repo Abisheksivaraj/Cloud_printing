@@ -222,13 +222,20 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
         const payload = mapElementToPayload(el);
         if (String(el.id).startsWith('element_')) {
           // New element
+          console.log(`➕ Adding new element: ${el.type} (${el.id})`);
           return await callEdgeFunction(API_URLS.ADD_ELEMENT, payload);
         } else {
           try {
             // Existing element
             payload.element_id = el.id;
+            console.log(`🔄 Updating element: ${el.type} (${el.id})`, { 
+              payload_keys: Object.keys(payload),
+              static_content_length: payload.static_content?.length,
+              properties_keys: Object.keys(payload.properties || {})
+            });
             return await callEdgeFunction(API_URLS.UPDATE_ELEMENT, payload);
           } catch (updError) {
+            console.error(`❌ Failed to update element ${el.id} (${el.type}):`, updError.message);
             // If the element is missing from the DB, fallback to Adding it
             if (updError.message?.includes("not found") || updError.status === 404) {
               console.warn(`Element ${el.id} missing from server. Attempting to re-add.`);
@@ -268,36 +275,58 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     if (el.type === "image") content = el.src || "";
     if (!content && ["line", "rectangle", "circle", "shape"].includes(el.type)) content = el.type.toUpperCase();
     const currentUnit = labelSize.unit || 'mm';
-    const properties = {
-      ...el,
-      x: convertFromPx(el.x, currentUnit),
-      y: convertFromPx(el.y, currentUnit),
-      width: convertFromPx(el.width, currentUnit),
-      height: convertFromPx(el.height, currentUnit),
-      fontSize: el.fontSize ? convertFromPx(el.fontSize, currentUnit) : undefined,
-      borderWidth: el.borderWidth !== undefined ? convertFromPx(el.borderWidth, currentUnit) : undefined,
-      borderRadius: el.borderRadius !== undefined ? convertFromPx(el.borderRadius, currentUnit) : undefined,
-      letterSpacing: el.letterSpacing !== undefined ? convertFromPx(el.letterSpacing, currentUnit) : undefined,
-    };
-    if (el.x1 !== undefined) properties.x1 = convertFromPx(el.x1, currentUnit);
-    if (el.y1 !== undefined) properties.y1 = convertFromPx(el.y1, currentUnit);
-    if (el.x2 !== undefined) properties.x2 = convertFromPx(el.x2, currentUnit);
-    if (el.y2 !== undefined) properties.y2 = convertFromPx(el.y2, currentUnit);
 
-    return {
+    // Sanitize: ensure numeric value or fallback to 0
+    const safeConvert = (val, unit) => {
+      const result = convertFromPx(val, unit);
+      return (result !== undefined && result !== null && !isNaN(result)) ? result : 0;
+    };
+
+    // Strip large/non-serializable fields from the properties JSON
+    const { src, tableData, ...cleanEl } = el;
+    const properties = {
+      ...cleanEl,
+      x: safeConvert(el.x, currentUnit),
+      y: safeConvert(el.y, currentUnit),
+      width: safeConvert(el.width, currentUnit),
+      height: safeConvert(el.height, currentUnit),
+      fontSize: el.fontSize ? safeConvert(el.fontSize, currentUnit) : undefined,
+      borderWidth: el.borderWidth !== undefined ? safeConvert(el.borderWidth, currentUnit) : undefined,
+      borderRadius: el.borderRadius !== undefined ? safeConvert(el.borderRadius, currentUnit) : undefined,
+      letterSpacing: el.letterSpacing !== undefined ? safeConvert(el.letterSpacing, currentUnit) : undefined,
+    };
+    if (el.x1 !== undefined) properties.x1 = safeConvert(el.x1, currentUnit);
+    if (el.y1 !== undefined) properties.y1 = safeConvert(el.y1, currentUnit);
+    if (el.x2 !== undefined) properties.x2 = safeConvert(el.x2, currentUnit);
+    if (el.y2 !== undefined) properties.y2 = safeConvert(el.y2, currentUnit);
+
+    // For table elements, store tableData compactly in properties
+    if (el.type === "table" && tableData) {
+      properties.tableData = tableData;
+    }
+
+    const payload = {
       design_id: designId,
       version_major: label.version_major || 0,
       version_minor: label.version_minor || 1,
       element_type: el.type,
-      position_x: properties.x,
-      position_y: properties.y,
-      width: properties.width,
-      height: properties.height,
+      position_x: safeConvert(el.x, currentUnit),
+      position_y: safeConvert(el.y, currentUnit),
+      width: safeConvert(el.width, currentUnit),
+      height: safeConvert(el.height, currentUnit),
       binding_type: el.binding_type || null,
       static_content: content || " ",
       properties,
       sort_order: el.zIndex || 0
     };
+
+    // Debug: log payload size to catch oversized requests
+    const payloadSize = new Blob([JSON.stringify(payload)]).size;
+    if (payloadSize > 1_000_000) {
+      console.warn(`⚠️ Large payload for element ${el.id} (${el.type}): ${(payloadSize / 1024 / 1024).toFixed(2)} MB`);
+    }
+
+    return payload;
   };
 
   const handleZoomChange = useCallback((newZoom) => setZoom(newZoom), []);
