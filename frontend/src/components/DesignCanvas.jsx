@@ -1048,12 +1048,13 @@ const DesignCanvas = forwardRef(
           }
 
           const isGs1 = ["DATAMATRIX", "PDF417", "DATABAR"].includes(selectedBarcodeType);
+          const defaultContentMap = { EAN13: "5901234123457", EAN8: "96385074", UPCA: "012345678905" };
           const props = {
             x: Math.min(barcodeDrawStart.x, x),
             y: Math.min(barcodeDrawStart.y, y),
             width: Math.max(width, 100),
             height: Math.max(height, 50),
-            content: isGs1 ? "(01)01234567890128" : (selectedBarcodeType === "EAN13" ? "7612345002958" : "123456789"),
+            content: isGs1 ? "(01)01234567890128" : (defaultContentMap[selectedBarcodeType] || "123456789"),
             barcodeType: selectedBarcodeType || "CODE128",
           };
 
@@ -1832,14 +1833,58 @@ const DesignCanvas = forwardRef(
               </div>
             );
           case "rectangle":
+          case "rounded":
           case "circle":
+          case "ellipse":
+          case "dot":
+          case "triangle":
+          case "rightTriangle":
+          case "parallelogram":
+          case "trapezoid":
+          case "diamond":
+          case "cross":
+          case "heart":
+          case "moon":
+          case "arrowRight":
+          case "arrowLeft":
+          case "arrowUp":
+          case "arrowDown":
+          case "doubleH":
+          case "doubleV":
+          case "diagUpRight":
+          case "diagUpLeft":
+          case "diagDownRight":
+          case "diagDownLeft":
+          case "blockArrowRight":
+          case "blockArrowLeft":
+          case "blockArrowUp":
+          case "blockArrowDown":
+          case "blockArrowLeftRight":
+          case "blockArrowUpDown":
+          case "arc":
+          case "doubleArc":
+          case "waveBanner":
+          case "pentagon":
+          case "hexagon":
+          case "octagon":
+          case "star4":
+          case "star5":
+          case "star6":
+          case "star8":
             return (
               <div
                 key={element.id}
                 style={style}
                 onMouseDown={(e) => handleElementMouseDown(e, element)}
-                className="select-none"
+                className="select-none flex items-center justify-center"
               >
+                {/* For complex shapes that aren't basic rectangles/circles, render a generic SVG placeholder for now */}
+                {!["rectangle", "rounded", "circle", "ellipse", "dot"].includes(element.type) && (
+                    <svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+                        <rect x="0" y="0" width="24" height="24" stroke={element.borderColor || "#000"} strokeWidth={element.borderWidth || 2} />
+                        <text x="50%" y="50%" dominantBaseline="middle" textAnchor="middle" fontSize="4" fill={element.borderColor || "#000"}>{element.type}</text>
+                    </svg>
+                )}
                 {renderResizeHandles(element)}
               </div>
             );
@@ -2029,11 +2074,11 @@ const DesignCanvas = forwardRef(
             }}
           >
             <div
-              className="min-h-full min-w-full flex flex-col items-center justify-start p-12"
+              className="min-h-full min-w-full flex p-12"
             >
               <div
                 ref={canvasRef}
-                className="relative bg-white shadow-xl transition-shadow"
+                className="relative bg-white shadow-xl transition-shadow m-auto"
                 style={{
                   width: `${canvasPixelSize.width}px`,
                   height: `${canvasPixelSize.height}px`,

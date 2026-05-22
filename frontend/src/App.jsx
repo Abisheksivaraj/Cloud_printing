@@ -441,7 +441,7 @@ const App = () => {
   return (
     <div className="min-h-screen w-full transition-colors duration-300 flex flex-col bg-white">
       {/* Navigation / Header - Only show for main app functionality */}
-      {(isAuthenticated || currentView === "library" || currentView === "designer" || currentView === "admin_dashboard" || currentView === "profile") && !isLoading && (
+      {(isAuthenticated || currentView === "library" || currentView === "admin_dashboard" || currentView === "profile") && currentView !== "designer" && !isLoading && (
         <AppHeader
           onNavigate={navigateTo}
           currentView={currentView}

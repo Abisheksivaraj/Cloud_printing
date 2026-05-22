@@ -12,6 +12,8 @@ export const BarcodeElement = ({ element }) => {
     { value: "CODE128", label: "Code 128", library: "jsbarcode" },
     { value: "CODE39", label: "Code 39", library: "jsbarcode" },
     { value: "EAN13", label: "EAN-13", library: "bwip" },
+    { value: "EAN8", label: "EAN-8", library: "bwip" },
+    { value: "UPCA", label: "UPC-A", library: "bwip" },
     { value: "ITF", label: "ITF (I2of5)", library: "bwip" },
     { value: "CODE93", label: "Code 93", library: "bwip" },
     { value: "DATABAR", label: "Databar Expanded", library: "bwip" },
@@ -136,6 +138,8 @@ export const BarcodeElement = ({ element }) => {
             PDF417: 'pdf417',
             AZTEC: 'azteccode',
             EAN13: 'ean13',
+            EAN8: 'ean8',
+            UPCA: 'upca',
           };
 
           const bcid = bcidMap[element.barcodeType];
@@ -143,7 +147,7 @@ export const BarcodeElement = ({ element }) => {
 
           // Generator function to allow fallbacks
           const generateSymbol = (symId) => {
-            const isEan13 = symId === 'ean13';
+            const isRetailBarcode = ['ean13', 'ean8', 'upca'].includes(symId);
             const is2D = ['azteccode', 'datamatrix', 'pdf417', 'qrcode'].includes(symId);
             const isGs1 = ['databarexpanded', 'datamatrix', 'pdf417'].includes(symId);
             
@@ -152,14 +156,14 @@ export const BarcodeElement = ({ element }) => {
                 text: combinedValue,
                 scale: 3,
                 // Hide text for 2D codes by default as requested
-                includetext: isEan13 || (element.showBarcodeText && !is2D),
+                includetext: isRetailBarcode || (element.showBarcodeText && !is2D),
                 alttext: combinedValue,
-                guardwhitespace: isEan13,
+                guardwhitespace: isRetailBarcode,
                 parse: isGs1, // Enable GS1 parsing for expanded symbologies
             };
             
-            // Only add textxalign if it's not EAN-13 to avoid BWIPP undefined error
-            if (!isEan13) {
+            // Only add textxalign if it's not a retail barcode to avoid BWIPP undefined error
+            if (!isRetailBarcode) {
               opts.textxalign = 'center';
             }
             

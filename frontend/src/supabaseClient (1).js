@@ -192,7 +192,7 @@ export const mapPayloadToElement = (payload) => {
     return {
         ...props, // Load extra style properties from JSON field
         id: payload.id,
-        type: props.actualType || payload.element_type || payload.type,
+        type: payload.element_type || payload.type,
         x: payload.position_x !== undefined ? payload.position_x : (props.x !== undefined ? props.x : payload.x),
         y: payload.position_y !== undefined ? payload.position_y : (props.y !== undefined ? props.y : payload.y),
         width: payload.width !== undefined ? payload.width : props.width,
@@ -265,3 +265,4 @@ export const normalizeDesign = (design) => {
         elements
     };
 };
+

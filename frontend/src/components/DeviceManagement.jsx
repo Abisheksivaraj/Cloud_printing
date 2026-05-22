@@ -4,8 +4,24 @@ import {
     CheckCircle, X, Server, Activity, 
     Settings, Loader2, 
     RefreshCw, Shield, 
-    Wifi, Info, Key, Monitor, Plug
+    Wifi, Info, Key, Monitor, Plug,
+    AlertTriangle, FileX, Wind, DoorOpen, 
+    Scissors, Cpu, Thermometer, HardDrive, 
+    Layers, AlertCircle, Clock
 } from "lucide-react";
+
+const ERROR_METADATA = {
+    'Media Out': { icon: FileX, color: 'text-amber-500', bg: 'bg-amber-50/50', darkBg: 'dark:bg-amber-500/10', description: 'Printer is out of labels or tags.' },
+    'Ribbon Out': { icon: Wind, color: 'text-amber-500', bg: 'bg-amber-50/50', darkBg: 'dark:bg-amber-500/10', description: 'Thermal transfer ribbon is empty.' },
+    'Head Open': { icon: DoorOpen, color: 'text-rose-500', bg: 'bg-rose-50/50', darkBg: 'dark:bg-rose-500/10', description: 'The printhead assembly is not closed.' },
+    'Paper Jam': { icon: AlertTriangle, color: 'text-rose-500', bg: 'bg-rose-50/50', darkBg: 'dark:bg-rose-500/10', description: 'Media is stuck in the printer path.' },
+    'Cutter Fault': { icon: Scissors, color: 'text-rose-500', bg: 'bg-rose-50/50', darkBg: 'dark:bg-rose-500/10', description: 'Issue with the automatic cutter.' },
+    'Head Fault': { icon: Cpu, color: 'text-rose-600', bg: 'bg-rose-50/50', darkBg: 'dark:bg-rose-600/10', description: 'Critical printhead failure detected.' },
+    'Motor Over Temperature': { icon: Thermometer, color: 'text-rose-600', bg: 'bg-rose-50/50', darkBg: 'dark:bg-rose-600/10', description: 'Motor temperature exceeded safe limits.' },
+    'Printhead Over Temperature': { icon: Thermometer, color: 'text-rose-600', bg: 'bg-rose-50/50', darkBg: 'dark:bg-rose-600/10', description: 'Printhead is too hot to continue.' },
+    'Memory Full': { icon: HardDrive, color: 'text-blue-500', bg: 'bg-blue-50/50', darkBg: 'dark:bg-blue-500/10', description: 'Internal memory is exhausted.' },
+    'Print Buffer Full': { icon: Layers, color: 'text-blue-500', bg: 'bg-blue-50/50', darkBg: 'dark:bg-blue-500/10', description: 'The incoming data buffer is full.' }
+};
 import { useTheme } from "../ThemeContext";
 import { callEdgeFunction, API_URLS } from "../supabaseClient";
 
@@ -27,6 +43,10 @@ const DeviceManagement = ({ onNavigate }) => {
         port: "9100"
     });
 
+    const [printerErrors, setPrinterErrors] = useState([]);
+    const [selectedPrinterForErrors, setSelectedPrinterForErrors] = useState(null);
+    const [isResolving, setIsResolving] = useState(false);
+
     const [formData, setFormData] = useState({
         name: "",
         brand: "Honeywell",
@@ -38,17 +58,45 @@ const DeviceManagement = ({ onNavigate }) => {
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            const [connectorData, printerData] = await Promise.all([
+            const [connectorData, printerData, errorData] = await Promise.all([
                 callEdgeFunction(API_URLS.LIST_CONNECTORS),
-                callEdgeFunction(API_URLS.LIST_PRINTERS)
+                callEdgeFunction(API_URLS.LIST_PRINTERS),
+                callEdgeFunction(API_URLS.PRINTER_STATUS, null, { method: 'GET' })
             ]);
             
             if (connectorData) setConnectors(connectorData.connectors || (Array.isArray(connectorData) ? connectorData : []));
             if (printerData) setPrinters(printerData.printers || (Array.isArray(printerData) ? printerData : []));
+            
+            // Extract errors from printer-status for the Alerts column
+            const statusPrinters = errorData?.printers || [];
+            const flatErrors = statusPrinters.flatMap(sp =>
+                (sp.current_errors || []).map(errName => ({
+                    id: `${sp.id}-${errName}`,
+                    printer_id: sp.id,
+                    error_type: errName,
+                    created_at: sp.last_error_at || new Date().toISOString(),
+                }))
+            );
+            setPrinterErrors(flatErrors);
         } catch (error) {
             console.error("Fetch failure:", error);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleResolveError = async (errorId) => {
+        setIsResolving(true);
+        try {
+            const result = await callEdgeFunction(`${API_URLS.PRINTER_STATUS}/${errorId}/resolve`, null, { method: 'PATCH' });
+            if (result.success) {
+                setPrinterErrors(prev => prev.filter(e => e.id !== errorId));
+            }
+        } catch (error) {
+            console.error("Resolution failed:", error);
+            alert("Failed to resolve error: " + error.message);
+        } finally {
+            setIsResolving(false);
         }
     };
 
@@ -271,6 +319,7 @@ const DeviceManagement = ({ onNavigate }) => {
                                         <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Printer Model</th>
                                         <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">IP Address</th>
                                         <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Status</th>
+                                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Alerts</th>
                                         <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Actions</th>
                                     </tr>
                                 </thead>
@@ -303,6 +352,22 @@ const DeviceManagement = ({ onNavigate }) => {
                                                         <div className={`w-1.5 h-1.5 rounded-full ${p.status === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
                                                         {p.status || 'Offline'}
                                                     </span>
+                                                </td>
+                                                <td className="px-8 py-5">
+                                                    {(() => {
+                                                        const pErrors = printerErrors.filter(e => e.printer_id === p.id);
+                                                        return pErrors.length > 0 ? (
+                                                            <button 
+                                                                onClick={() => setSelectedPrinterForErrors(p)}
+                                                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-500/10 text-rose-600 border border-rose-500/20 text-[9px] font-bold uppercase tracking-widest hover:bg-rose-500/20 transition-colors"
+                                                            >
+                                                                <AlertCircle size={12} className="animate-pulse" />
+                                                                {pErrors.length} {pErrors.length === 1 ? 'Alert' : 'Alerts'}
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest ml-1">No Alerts</span>
+                                                        );
+                                                    })()}
                                                 </td>
                                                 <td className="px-8 py-5 text-right">
                                                    <div className="flex items-center justify-end gap-4">
@@ -516,6 +581,88 @@ const DeviceManagement = ({ onNavigate }) => {
                         >
                             Acknowledge & Dismiss
                         </button>
+                    </div>
+                </div>
+            )}
+            {/* Printer Errors Modal */}
+            {selectedPrinterForErrors && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[700] p-4 animate-in fade-in duration-300">
+                    <div className="w-full max-w-2xl bg-white dark:bg-slate-950 rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-200 dark:border-slate-800">
+                        <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 dark:border-slate-900 bg-slate-50/50 dark:bg-slate-900/50">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-rose-500 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-500/20">
+                                    <AlertTriangle size={24} className="text-white" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Active Terminal Alerts</h3>
+                                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{selectedPrinterForErrors.name} • {selectedPrinterForErrors.ip_address}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setSelectedPrinterForErrors(null)} className="p-2 hover:bg-slate-200/50 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-400">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-8 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-4">
+                            {(() => {
+                                const pErrors = printerErrors.filter(e => e.printer_id === selectedPrinterForErrors.id);
+                                return pErrors.length > 0 ? pErrors.map((error) => {
+                                    const meta = ERROR_METADATA[error.error_type] || { 
+                                        icon: AlertCircle, 
+                                        color: 'text-slate-500', 
+                                        bg: 'bg-slate-50', 
+                                        darkBg: 'dark:bg-slate-800',
+                                        description: 'An unknown hardware error occurred.' 
+                                    };
+                                    const Icon = meta.icon;
+
+                                    return (
+                                        <div key={error.id} className="group relative flex items-start gap-5 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/50 hover:border-rose-200 dark:hover:border-rose-900/30 transition-all duration-300">
+                                            <div className={`w-12 h-12 ${meta.bg} ${meta.darkBg} rounded-xl flex items-center justify-center ${meta.color} shrink-0`}>
+                                                <Icon size={24} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between gap-4 mb-1">
+                                                    <h4 className={`text-sm font-black uppercase tracking-wider ${meta.color}`}>{error.error_type}</h4>
+                                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-lg">
+                                                        <Clock size={10} />
+                                                        {new Date(error.created_at).toLocaleTimeString()}
+                                                    </div>
+                                                </div>
+                                                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-relaxed mb-4">
+                                                    {meta.description}
+                                                </p>
+                                                <button 
+                                                    disabled={isResolving}
+                                                    onClick={() => handleResolveError(error.id)}
+                                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-emerald-500 dark:hover:bg-emerald-500 hover:text-white transition-all disabled:opacity-50"
+                                                >
+                                                    {isResolving ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                                                    Mark as Resolved
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                }) : (
+                                    <div className="py-12 flex flex-col items-center justify-center text-center">
+                                        <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-500 mb-4">
+                                            <CheckCircle size={32} />
+                                        </div>
+                                        <h4 className="text-lg font-bold text-slate-900 dark:text-white">All Systems Normal</h4>
+                                        <p className="text-xs font-medium text-slate-500 uppercase tracking-widest mt-2">No unresolved hardware alerts found</p>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+
+                        <div className="p-8 border-t border-slate-100 dark:border-slate-900 bg-slate-50/50 dark:bg-slate-900/50 flex justify-end">
+                            <button 
+                                onClick={() => setSelectedPrinterForErrors(null)}
+                                className="btn btn-ghost h-12 px-8 uppercase text-[10px] tracking-widest font-black"
+                            >
+                                Close Dashboard
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
