@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { 
     ArrowLeft, 
-    Search, 
     Wifi, 
     Server, 
     CheckCircle, 
@@ -9,16 +8,22 @@ import {
     Plus,
     Printer as PrinterIcon,
     AlertCircle,
-    Trash2
+    Trash2,
+    Plug
 } from "lucide-react";
 import { useTheme } from "../ThemeContext";
 import { callEdgeFunction, API_URLS } from "../supabaseClient";
 
 const AddPrinter = ({ onBack, connectorId }) => {
     const { theme, isDarkMode } = useTheme();
+    const [printerType, setPrinterType] = useState("lan"); // "lan" | "usb"
     const [name, setName] = useState("");
     const [ipAddress, setIpAddress] = useState("");
     const [port, setPort] = useState("9100");
+    const [dpi, setDpi] = useState(203);
+    const [usbPath, setUsbPath] = useState("");
+    const [usbIpAddress, setUsbIpAddress] = useState("");
+    const [usbPort, setUsbPort] = useState("");
     const [isSearching, setIsSearching] = useState(false);
     const [searchResult, setSearchResult] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
@@ -62,17 +67,44 @@ const AddPrinter = ({ onBack, connectorId }) => {
         e.preventDefault();
         setIsSaving(true);
         try {
-            const payload = {
-                name,
-                connector_id: connectorId,
-                ip_address: ipAddress,
-                port: parseInt(port)
-            };
+            // Validate USB optional LAN fields — must be both or neither
+            if (printerType === 'usb' && (usbIpAddress || usbPort)) {
+                if (!usbIpAddress || !usbPort) {
+                    alert("For LAN status monitoring of a USB printer, both IP address and port must be provided together.");
+                    setIsSaving(false);
+                    return;
+                }
+            }
+
+            let payload;
+
+            if (printerType === 'lan') {
+                payload = {
+                    name,
+                    connector_id: connectorId,
+                    ip_address: ipAddress,
+                    port: parseInt(port),
+                    dpi: Number(dpi),
+                    printer_type: "lan"
+                };
+            } else {
+                payload = {
+                    name,
+                    connector_id: connectorId,
+                    usb_path: usbPath,
+                    dpi: Number(dpi),
+                    printer_type: "usb",
+                    ...(usbIpAddress && usbPort ? {
+                        ip_address: usbIpAddress,
+                        port: parseInt(usbPort)
+                    } : {})
+                };
+            }
+
             const result = await callEdgeFunction(API_URLS.ADD_PRINTER, payload);
-            if (result.success) {
-                setName("");
-                setIpAddress("");
-                setPort("9100");
+            if (result.success || result.printer) {
+                setName(""); setIpAddress(""); setPort("9100");
+                setUsbPath(""); setUsbIpAddress(""); setUsbPort(""); setDpi(203);
                 setSearchResult(null);
                 fetchPrintersForConnector();
             } else {
@@ -88,7 +120,6 @@ const AddPrinter = ({ onBack, connectorId }) => {
 
     const handleDeletePrinter = async (printerId) => {
         if (!window.confirm("Are you sure you want to delete this printer?")) return;
-        
         try {
             await callEdgeFunction(API_URLS.DELETE_PRINTER, { printer_id: printerId });
             fetchPrintersForConnector();
@@ -103,6 +134,10 @@ const AddPrinter = ({ onBack, connectorId }) => {
         backdropFilter: 'blur(20px)',
         borderColor: theme.border
     };
+
+    const isSubmitDisabled = isSaving || !name ||
+        (printerType === 'lan' && (!ipAddress || isSearching)) ||
+        (printerType === 'usb' && !usbPath);
 
     return (
         <div className="min-h-screen p-6 md:p-12 lg:p-16 animate-in fade-in duration-1000 max-w-[1800px] mx-auto">
@@ -137,21 +172,46 @@ const AddPrinter = ({ onBack, connectorId }) => {
                 {/* Left Column: Form Section */}
                 <div className="lg:col-span-5 space-y-8">
                     <div className="p-8 md:p-10 rounded-[3rem] border transition-all duration-500 shadow-sm" style={surfaceStyle}>
-                        <div className="flex flex-col gap-1 mb-10">
+                        <div className="flex flex-col gap-1 mb-8">
                             <h3 className="text-xl font-black tracking-tight" style={{ color: theme.text }}>Network Endpoint</h3>
                             <p className="text-[10px] font-bold uppercase tracking-widest opacity-30" style={{ color: theme.text }}>Configure hardware bridging link</p>
                         </div>
 
                         <form onSubmit={handleSavePrinter} className="space-y-6">
-                            {/* Premium Input Group */}
+                            {/* Connection Type Tabs */}
+                            <div className="space-y-2">
+                                <label className="text-[9px] font-black uppercase tracking-widest opacity-40 px-2" style={{ color: theme.text }}>Connection Type</label>
+                                <div className="flex p-1 rounded-2xl" style={{ backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }}>
+                                    {[
+                                        { key: 'lan', label: 'LAN / Network', icon: <Wifi size={13} /> },
+                                        { key: 'usb', label: 'USB / Direct', icon: <Plug size={13} /> }
+                                    ].map(t => (
+                                        <button
+                                            key={t.key}
+                                            type="button"
+                                            onClick={() => setPrinterType(t.key)}
+                                            className={`flex-1 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
+                                                printerType === t.key
+                                                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+                                                    : 'opacity-30 hover:opacity-60'
+                                            }`}
+                                            style={{ color: printerType === t.key ? undefined : theme.text }}
+                                        >
+                                            {t.icon} {t.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div className="space-y-4">
+                                {/* Printer Name */}
                                 <div className="space-y-1.5 px-2">
                                     <label className="text-[9px] font-black uppercase tracking-widest opacity-40" style={{ color: theme.text }}>Resource Name</label>
                                     <input
                                         required
                                         type="text"
                                         placeholder="EX: Shipping Label A1"
-                                        className="w-full bg-transparent border-b-2 py-3 outline-none transition-all focus:border-blue-500 font-bold text-base placeholder:opacity-20 translate-y-0 focus:-translate-y-1"
+                                        className="w-full bg-transparent border-b-2 py-3 outline-none transition-all focus:border-blue-500 font-bold text-base placeholder:opacity-20"
                                         style={{ borderColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', color: theme.text }}
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
@@ -159,38 +219,112 @@ const AddPrinter = ({ onBack, connectorId }) => {
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-6">
-                                    <div className="col-span-2 space-y-1.5 px-2">
-                                        <label className="text-[9px] font-black uppercase tracking-widest opacity-40" style={{ color: theme.text }}>Host Address</label>
-                                        <input
-                                            required
-                                            type="text"
-                                            placeholder="192.168.1.100"
-                                            className="w-full bg-transparent border-b-2 py-3 outline-none transition-all focus:border-blue-500 font-bold text-base placeholder:opacity-20"
-                                            style={{ borderColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', color: theme.text }}
-                                            value={ipAddress}
-                                            onChange={(e) => setIpAddress(e.target.value)}
-                                            disabled={isSearching || isSaving}
-                                        />
+                                {/* LAN Fields */}
+                                {printerType === 'lan' && (
+                                    <div className="grid grid-cols-3 gap-6">
+                                        <div className="col-span-2 space-y-1.5 px-2">
+                                            <label className="text-[9px] font-black uppercase tracking-widest opacity-40" style={{ color: theme.text }}>IP Address</label>
+                                            <input
+                                                required
+                                                type="text"
+                                                placeholder="192.168.1.100"
+                                                className="w-full bg-transparent border-b-2 py-3 outline-none transition-all focus:border-blue-500 font-bold text-base placeholder:opacity-20"
+                                                style={{ borderColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', color: theme.text }}
+                                                value={ipAddress}
+                                                onChange={(e) => setIpAddress(e.target.value)}
+                                                disabled={isSearching || isSaving}
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5 px-2">
+                                            <label className="text-[9px] font-black uppercase tracking-widest opacity-40" style={{ color: theme.text }}>Port</label>
+                                            <input
+                                                required
+                                                type="number"
+                                                placeholder="9100"
+                                                className="w-full bg-transparent border-b-2 py-3 outline-none transition-all focus:border-blue-500 font-bold text-base placeholder:opacity-20 text-center"
+                                                style={{ borderColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', color: theme.text }}
+                                                value={port}
+                                                onChange={(e) => setPort(e.target.value)}
+                                                disabled={isSearching || isSaving}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="space-y-1.5 px-2">
-                                        <label className="text-[9px] font-black uppercase tracking-widest opacity-40" style={{ color: theme.text }}>Port</label>
-                                        <input
-                                            required
-                                            type="number"
-                                            placeholder="9100"
-                                            className="w-full bg-transparent border-b-2 py-3 outline-none transition-all focus:border-blue-500 font-bold text-base placeholder:opacity-20 text-center"
-                                            style={{ borderColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', color: theme.text }}
-                                            value={port}
-                                            onChange={(e) => setPort(e.target.value)}
-                                            disabled={isSearching || isSaving}
-                                        />
+                                )}
+
+                                {/* USB Fields */}
+                                {printerType === 'usb' && (
+                                    <div className="space-y-5">
+                                        <div className="space-y-1.5 px-2">
+                                            <label className="text-[9px] font-black uppercase tracking-widest opacity-40" style={{ color: theme.text }}>USB Path</label>
+                                            <input
+                                                required
+                                                type="text"
+                                                placeholder="USB001"
+                                                className="w-full bg-transparent border-b-2 py-3 outline-none transition-all focus:border-blue-500 font-bold text-base placeholder:opacity-20 font-mono"
+                                                style={{ borderColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', color: theme.text }}
+                                                value={usbPath}
+                                                onChange={(e) => setUsbPath(e.target.value)}
+                                                disabled={isSaving}
+                                            />
+                                        </div>
+                                        {/* Optional LAN monitoring for USB */}
+                                        <div className="mx-2 p-4 rounded-2xl border border-dashed opacity-70" style={{ borderColor: theme.border }}>
+                                            <p className="text-[9px] font-black uppercase tracking-widest opacity-50 mb-4" style={{ color: theme.text }}>LAN Status Monitoring (Optional — both or neither)</p>
+                                            <div className="grid grid-cols-3 gap-4">
+                                                <div className="col-span-2 space-y-1">
+                                                    <label className="text-[8px] font-black uppercase tracking-widest opacity-30" style={{ color: theme.text }}>IP Address</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="192.168.1.100"
+                                                        className="w-full bg-transparent border-b py-2 outline-none focus:border-blue-500 font-bold text-sm placeholder:opacity-20 font-mono"
+                                                        style={{ borderColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', color: theme.text }}
+                                                        value={usbIpAddress}
+                                                        onChange={(e) => setUsbIpAddress(e.target.value)}
+                                                        disabled={isSaving}
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[8px] font-black uppercase tracking-widest opacity-30" style={{ color: theme.text }}>Port</label>
+                                                    <input
+                                                        type="number"
+                                                        placeholder="9100"
+                                                        className="w-full bg-transparent border-b py-2 outline-none focus:border-blue-500 font-bold text-sm placeholder:opacity-20 text-center"
+                                                        style={{ borderColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', color: theme.text }}
+                                                        value={usbPort}
+                                                        onChange={(e) => setUsbPort(e.target.value)}
+                                                        disabled={isSaving}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* DPI Selector */}
+                                <div className="space-y-2 px-2">
+                                    <label className="text-[9px] font-black uppercase tracking-widest opacity-40" style={{ color: theme.text }}>Print Density</label>
+                                    <div className="flex gap-3">
+                                        {[203, 300, 600].map((d) => (
+                                            <button
+                                                key={d}
+                                                type="button"
+                                                onClick={() => setDpi(d)}
+                                                className={`flex-1 py-3 rounded-2xl border-2 font-black text-[11px] transition-all ${
+                                                    dpi === d
+                                                        ? 'border-blue-500 bg-blue-500/10 text-blue-500'
+                                                        : 'border-transparent bg-black/5 dark:bg-white/5 opacity-40 hover:opacity-70'
+                                                }`}
+                                                style={{ color: dpi === d ? undefined : theme.text }}
+                                            >
+                                                {d}<br/><span className="text-[8px] opacity-60">DPI</span>
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Search/Scan Visual Feedback */}
-                            { (isSearching || searchResult) && (
+                            {/* Search/Scan Feedback (LAN only) */}
+                            {printerType === 'lan' && (isSearching || searchResult) && (
                                 <div className="p-5 rounded-2xl bg-blue-500/5 border border-blue-500/10 animate-in slide-in-from-top-2">
                                     {isSearching ? (
                                         <div className="flex items-center gap-3">
@@ -215,22 +349,24 @@ const AddPrinter = ({ onBack, connectorId }) => {
                             <div className="pt-8 flex flex-col gap-4">
                                 <button
                                     type="submit"
-                                    disabled={isSaving || !name || !ipAddress || isSearching}
+                                    disabled={isSubmitDisabled}
                                     className="w-full py-5 bg-blue-500 hover:bg-blue-600 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] text-[11px] shadow-xl shadow-blue-500/20 transition-all active:scale-95 disabled:opacity-30 flex items-center justify-center gap-3"
                                 >
                                     {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} strokeWidth={3} />}
                                     Commit Resource
                                 </button>
                                 
-                                <button
-                                    type="button"
-                                    onClick={handleSearchClick}
-                                    disabled={!ipAddress || isSearching || isSaving}
-                                    className="w-full py-4 text-[10px] font-black uppercase tracking-[0.2em] opacity-40 hover:opacity-100 transition-all"
-                                    style={{ color: theme.text }}
-                                >
-                                    Dry-Run Connection Setup
-                                </button>
+                                {printerType === 'lan' && (
+                                    <button
+                                        type="button"
+                                        onClick={handleSearchClick}
+                                        disabled={!ipAddress || isSearching || isSaving}
+                                        className="w-full py-4 text-[10px] font-black uppercase tracking-[0.2em] opacity-40 hover:opacity-100 transition-all"
+                                        style={{ color: theme.text }}
+                                    >
+                                        Dry-Run Connection Setup
+                                    </button>
+                                )}
                             </div>
                         </form>
                     </div>
@@ -242,7 +378,7 @@ const AddPrinter = ({ onBack, connectorId }) => {
                         </div>
                         <div>
                             <p className="text-[11px] font-bold text-amber-600/80 leading-relaxed mb-1">Infrastructure Requirement</p>
-                            <p className="text-[10px] text-amber-600/50 leading-relaxed">Ensure the printer is in dynamic RAW (9100) mode and accessible from the bridging host.</p>
+                            <p className="text-[10px] text-amber-600/50 leading-relaxed">Ensure the printer is in dynamic RAW (9100) mode and accessible from the bridging host. DPI must match the printer's physical hardware capability.</p>
                         </div>
                     </div>
                 </div>
@@ -281,13 +417,17 @@ const AddPrinter = ({ onBack, connectorId }) => {
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-6">
                                                 <div className="w-16 h-16 rounded-[2rem] bg-blue-500/10 flex items-center justify-center text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-all duration-700">
-                                                    <PrinterIcon size={24} strokeWidth={1.5} />
+                                                    {p.usb_path ? <Plug size={24} strokeWidth={1.5} /> : <PrinterIcon size={24} strokeWidth={1.5} />}
                                                 </div>
                                                 <div>
                                                     <h4 className="text-lg font-black tracking-tight mb-1" style={{ color: theme.text }}>{p.name}</h4>
                                                     <div className="flex items-center gap-4 text-[10px] font-bold tracking-widest uppercase opacity-40" style={{ color: theme.text }}>
-                                                        <span className="flex items-center gap-1.5"><Wifi size={12} className="text-blue-500" /> {p.ip_address}</span>
-                                                        <span>Port {p.port}</span>
+                                                        {p.usb_path
+                                                            ? <span className="flex items-center gap-1.5"><Plug size={12} className="text-purple-500" /> {p.usb_path}</span>
+                                                            : <span className="flex items-center gap-1.5"><Wifi size={12} className="text-blue-500" /> {p.ip_address}</span>
+                                                        }
+                                                        {p.port && <span>Port {p.port}</span>}
+                                                        {p.dpi && <span>{p.dpi} DPI</span>}
                                                     </div>
                                                 </div>
                                             </div>
@@ -316,7 +456,6 @@ const AddPrinter = ({ onBack, connectorId }) => {
                                                         <Trash2 size={16} />
                                                     </button>
                                                 </div>
-                                                <p className="text-[8px] font-black uppercase tracking-[0.3em] opacity-20" style={{ color: theme.text }}>Check Success</p>
                                             </div>
                                         </div>
                                     </div>
@@ -336,3 +475,4 @@ const AddPrinter = ({ onBack, connectorId }) => {
 };
 
 export default AddPrinter;
+

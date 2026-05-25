@@ -39,8 +39,13 @@ const DeviceManagement = ({ onNavigate }) => {
 
     const [printerForm, setPrinterForm] = useState({
         name: "",
+        printerType: "lan",   // "lan" | "usb"
         ipAddress: "",
-        port: "9100"
+        port: "9100",
+        dpi: 203,
+        usbPath: "",
+        usbIpAddress: "",  // optional LAN monitoring for USB printers
+        usbPort: ""
     });
 
     const [printerErrors, setPrinterErrors] = useState([]);
@@ -150,15 +155,45 @@ const DeviceManagement = ({ onNavigate }) => {
         e.preventDefault();
         setIsSaving(true);
         try {
-            const payload = {
-                name: printerForm.name,
-                connector_id: connectors[0].id,
-                ip_address: printerForm.ipAddress,
-                port: parseInt(printerForm.port)
-            };
+            const isLan = printerForm.printerType === "lan";
+
+            // Validate USB optional LAN fields — must be both or neither
+            if (!isLan && (printerForm.usbIpAddress || printerForm.usbPort)) {
+                if (!printerForm.usbIpAddress || !printerForm.usbPort) {
+                    alert("For LAN status monitoring of a USB printer, both IP address and port must be provided together.");
+                    setIsSaving(false);
+                    return;
+                }
+            }
+
+            let payload;
+
+            if (isLan) {
+                payload = {
+                    name: printerForm.name,
+                    connector_id: connectors[0].id,
+                    ip_address: printerForm.ipAddress,
+                    port: parseInt(printerForm.port),
+                    dpi: Number(printerForm.dpi),
+                    printer_type: "lan"
+                };
+            } else {
+                payload = {
+                    name: printerForm.name,
+                    connector_id: connectors[0].id,
+                    usb_path: printerForm.usbPath,
+                    dpi: Number(printerForm.dpi),
+                    printer_type: "usb",
+                    ...(printerForm.usbIpAddress && printerForm.usbPort ? {
+                        ip_address: printerForm.usbIpAddress,
+                        port: parseInt(printerForm.usbPort)
+                    } : {})
+                };
+            }
+
             const result = await callEdgeFunction(API_URLS.ADD_PRINTER, payload);
-            if (result.success) {
-                setPrinterForm({ name: "", ipAddress: "", port: "9100" });
+            if (result.success || result.printer) {
+                setPrinterForm({ name: "", printerType: "lan", ipAddress: "", port: "9100", dpi: 203, usbPath: "", usbIpAddress: "", usbPort: "" });
                 setShowAddPrinterModal(false);
                 fetchData();
             } else {
@@ -495,23 +530,54 @@ const DeviceManagement = ({ onNavigate }) => {
                                     </button>
                                 </div>
 
-                                <form onSubmit={handleSavePrinter} className="p-8 space-y-6">
-                                    <div className="space-y-5">
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase tracking-widest opacity-60">Resource Name</label>
-                                            <input
-                                                required
-                                                type="text"
-                                                placeholder="EX: Shipping Label A1"
-                                                className="input py-3 w-full font-bold"
-                                                value={printerForm.name}
-                                                onChange={(e) => setPrinterForm({ ...printerForm, name: e.target.value })}
-                                            />
+                                <form onSubmit={handleSavePrinter} className="p-8 space-y-5">
+                                    {/* Printer Type Tabs */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase tracking-widest opacity-60">Connection Type</label>
+                                        <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl">
+                                            <button
+                                                type="button"
+                                                onClick={() => setPrinterForm({ ...printerForm, printerType: 'lan' })}
+                                                className={`flex-1 py-2 rounded-lg font-bold text-[11px] transition-all flex items-center justify-center gap-2 ${
+                                                    printerForm.printerType === 'lan'
+                                                    ? 'bg-white dark:bg-slate-800 text-indigo-600 shadow-sm'
+                                                    : 'text-slate-400 hover:text-slate-600'
+                                                }`}
+                                            >
+                                                <Wifi size={14} /> LAN / Network
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPrinterForm({ ...printerForm, printerType: 'usb' })}
+                                                className={`flex-1 py-2 rounded-lg font-bold text-[11px] transition-all flex items-center justify-center gap-2 ${
+                                                    printerForm.printerType === 'usb'
+                                                    ? 'bg-white dark:bg-slate-800 text-indigo-600 shadow-sm'
+                                                    : 'text-slate-400 hover:text-slate-600'
+                                                }`}
+                                            >
+                                                <Plug size={14} /> USB / Direct
+                                            </button>
                                         </div>
+                                    </div>
 
-                                        <div className="grid grid-cols-3 gap-6">
+                                    {/* Common Fields */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase tracking-widest opacity-60">Resource Name</label>
+                                        <input
+                                            required
+                                            type="text"
+                                            placeholder="EX: Shipping Label A1"
+                                            className="input py-3 w-full font-bold"
+                                            value={printerForm.name}
+                                            onChange={(e) => setPrinterForm({ ...printerForm, name: e.target.value })}
+                                        />
+                                    </div>
+
+                                    {/* LAN-specific Fields */}
+                                    {printerForm.printerType === 'lan' && (
+                                        <div className="grid grid-cols-3 gap-4">
                                             <div className="col-span-2 space-y-1.5">
-                                                <label className="text-[10px] font-black uppercase tracking-widest opacity-60">Host Address</label>
+                                                <label className="text-[10px] font-black uppercase tracking-widest opacity-60">IP Address <span className="text-rose-500">*</span></label>
                                                 <input
                                                     required
                                                     type="text"
@@ -522,7 +588,7 @@ const DeviceManagement = ({ onNavigate }) => {
                                                 />
                                             </div>
                                             <div className="space-y-1.5">
-                                                <label className="text-[10px] font-black uppercase tracking-widest opacity-60">Port</label>
+                                                <label className="text-[10px] font-black uppercase tracking-widest opacity-60">Port <span className="text-rose-500">*</span></label>
                                                 <input
                                                     required
                                                     type="number"
@@ -533,10 +599,84 @@ const DeviceManagement = ({ onNavigate }) => {
                                                 />
                                             </div>
                                         </div>
+                                    )}
+
+                                    {/* USB-specific Fields */}
+                                    {printerForm.printerType === 'usb' && (
+                                        <div className="space-y-4">
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-black uppercase tracking-widest opacity-60">USB Path <span className="text-rose-500">*</span></label>
+                                                <input
+                                                    required
+                                                    type="text"
+                                                    placeholder="USB001"
+                                                    className="input py-3 w-full font-bold font-mono"
+                                                    value={printerForm.usbPath}
+                                                    onChange={(e) => setPrinterForm({ ...printerForm, usbPath: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-dashed border-slate-200 dark:border-slate-700 space-y-3">
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">LAN Status Monitoring (Optional — both required if used)</p>
+                                                <div className="grid grid-cols-3 gap-4">
+                                                    <div className="col-span-2 space-y-1.5">
+                                                        <label className="text-[10px] font-semibold text-slate-400">IP Address</label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="192.168.1.100"
+                                                            className="input py-2.5 w-full font-bold font-mono text-xs"
+                                                            value={printerForm.usbIpAddress}
+                                                            onChange={(e) => setPrinterForm({ ...printerForm, usbIpAddress: e.target.value })}
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-semibold text-slate-400">Port</label>
+                                                        <input
+                                                            type="number"
+                                                            placeholder="9100"
+                                                            className="input py-2.5 w-full font-bold text-center font-mono text-xs"
+                                                            value={printerForm.usbPort}
+                                                            onChange={(e) => setPrinterForm({ ...printerForm, usbPort: e.target.value })}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* DPI Selector — common to both */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase tracking-widest opacity-60">Print Density (DPI) <span className="text-rose-500">*</span></label>
+                                        <div className="flex gap-3">
+                                            {[203, 300, 600].map((d) => (
+                                                <button
+                                                    key={d}
+                                                    type="button"
+                                                    onClick={() => setPrinterForm({ ...printerForm, dpi: d })}
+                                                    className={`flex-1 py-2.5 rounded-xl border-2 font-black text-xs transition-all ${
+                                                        printerForm.dpi === d
+                                                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600'
+                                                        : 'border-slate-200 dark:border-slate-700 text-slate-400 hover:border-slate-300'
+                                                    }`}
+                                                >
+                                                    {d} DPI
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
-                                    <div className="flex gap-4 pt-4 mt-8 border-t border-slate-100 dark:border-slate-800">
+
+                                    <div className="flex gap-4 pt-4 mt-2 border-t border-slate-100 dark:border-slate-800">
                                         <button type="button" onClick={() => setShowAddPrinterModal(false)} className="btn btn-ghost flex-1 h-12 uppercase text-[10px] tracking-widest font-black">Discard</button>
-                                        <button type="submit" disabled={!printerForm.name || !printerForm.ipAddress} className="btn btn-primary bg-indigo-500 hover:bg-indigo-600 flex-1 h-12 uppercase text-[10px] tracking-widest font-black shadow-xl shadow-indigo-500/20 disabled:opacity-50">Commit Resource</button>
+                                        <button
+                                            type="submit"
+                                            disabled={
+                                                !printerForm.name ||
+                                                (printerForm.printerType === 'lan' && (!printerForm.ipAddress || !printerForm.port)) ||
+                                                (printerForm.printerType === 'usb' && !printerForm.usbPath)
+                                            }
+                                            className="btn btn-primary bg-indigo-500 hover:bg-indigo-600 flex-1 h-12 uppercase text-[10px] tracking-widest font-black shadow-xl shadow-indigo-500/20 disabled:opacity-50"
+                                        >
+                                            Commit Resource
+                                        </button>
                                     </div>
                                 </form>
                             </>

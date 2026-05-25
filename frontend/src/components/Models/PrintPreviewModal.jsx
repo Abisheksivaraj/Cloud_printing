@@ -208,6 +208,9 @@ const PrintPreviewModal = ({ label, onClose }) => {
       }
 
       // Create print job record
+      // design_dpi is explicitly passed so the backend connector uses the DESIGN's DPI
+      // (not the printer's stored hardware default) when converting mm → dots.
+      const designDpi = (label.settings && label.settings.dpi) ? Number(label.settings.dpi) : selectedDpi;
       const jobData = {
         design_id: label.design_id || label.id || label.design?.id || label.data?.id,
         version_major: (label.version_major !== undefined && label.version_major !== null) ? label.version_major : 1,
@@ -215,7 +218,11 @@ const PrintPreviewModal = ({ label, onClose }) => {
         connector_id: selectedConnectorId,
         printer_id: selectedPrinterId,
         idempotency_key: `print_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-        input_data: {} // Empty as per user example, but could be extended
+        design_dpi: designDpi,   // ← Fix: always use design DPI, not printer's stored default
+        input_data: {},
+        raster_image: renderedPng, // Send the exact WYSIWYG raster image
+        image_data: renderedPng,   // Fallback field name
+        print_mode: renderedPng ? 'raster' : 'zpl', // Hint for the connector
       };
 
       console.log("Submitting Print Job Data:", jobData);
