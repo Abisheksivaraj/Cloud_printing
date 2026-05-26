@@ -45,7 +45,11 @@ const DeviceManagement = ({ onNavigate }) => {
         dpi: 203,
         usbPath: "",
         usbIpAddress: "",  // optional LAN monitoring for USB printers
-        usbPort: ""
+        usbPort: "",
+        vid: "",
+        pid: "",
+        usb_serial: "",
+        language: "zpl"
     });
 
     const [printerErrors, setPrinterErrors] = useState([]);
@@ -182,6 +186,10 @@ const DeviceManagement = ({ onNavigate }) => {
                     name: printerForm.name,
                     connector_id: connectors[0].id,
                     usb_path: printerForm.usbPath,
+                    vid: printerForm.vid,
+                    pid: printerForm.pid,
+                    usb_serial: printerForm.usb_serial,
+                    language: printerForm.language,
                     dpi: Number(printerForm.dpi),
                     printer_type: "usb",
                     ...(printerForm.usbIpAddress && printerForm.usbPort ? {
@@ -193,7 +201,7 @@ const DeviceManagement = ({ onNavigate }) => {
 
             const result = await callEdgeFunction(API_URLS.ADD_PRINTER, payload);
             if (result.success || result.printer) {
-                setPrinterForm({ name: "", printerType: "lan", ipAddress: "", port: "9100", dpi: 203, usbPath: "", usbIpAddress: "", usbPort: "" });
+                setPrinterForm({ name: "", printerType: "lan", ipAddress: "", port: "9100", dpi: 203, usbPath: "", usbIpAddress: "", usbPort: "", vid: "", pid: "", usb_serial: "", language: "zpl" });
                 setShowAddPrinterModal(false);
                 fetchData();
             } else {
@@ -604,42 +612,65 @@ const DeviceManagement = ({ onNavigate }) => {
                                     {/* USB-specific Fields */}
                                     {printerForm.printerType === 'usb' && (
                                         <div className="space-y-4">
-                                            <div className="space-y-1.5">
-                                                <label className="text-[10px] font-black uppercase tracking-widest opacity-60">USB Path <span className="text-rose-500">*</span></label>
-                                                <input
-                                                    required
-                                                    type="text"
-                                                    placeholder="USB001"
-                                                    className="input py-3 w-full font-bold font-mono"
-                                                    value={printerForm.usbPath}
-                                                    onChange={(e) => setPrinterForm({ ...printerForm, usbPath: e.target.value })}
-                                                />
-                                            </div>
-                                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-dashed border-slate-200 dark:border-slate-700 space-y-3">
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">LAN Status Monitoring (Optional — both required if used)</p>
-                                                <div className="grid grid-cols-3 gap-4">
-                                                    <div className="col-span-2 space-y-1.5">
-                                                        <label className="text-[10px] font-semibold text-slate-400">IP Address</label>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="192.168.1.100"
-                                                            className="input py-2.5 w-full font-bold font-mono text-xs"
-                                                            value={printerForm.usbIpAddress}
-                                                            onChange={(e) => setPrinterForm({ ...printerForm, usbIpAddress: e.target.value })}
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-1.5">
-                                                        <label className="text-[10px] font-semibold text-slate-400">Port</label>
-                                                        <input
-                                                            type="number"
-                                                            placeholder="9100"
-                                                            className="input py-2.5 w-full font-bold text-center font-mono text-xs"
-                                                            value={printerForm.usbPort}
-                                                            onChange={(e) => setPrinterForm({ ...printerForm, usbPort: e.target.value })}
-                                                        />
-                                                    </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-black uppercase tracking-widest opacity-60">USB Path <span className="text-rose-500">*</span></label>
+                                                    <input
+                                                        required
+                                                        type="text"
+                                                        placeholder="USB001"
+                                                        className="input py-3 w-full font-bold font-mono text-xs"
+                                                        value={printerForm.usbPath}
+                                                        onChange={(e) => setPrinterForm({ ...printerForm, usbPath: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-black uppercase tracking-widest opacity-60">Language</label>
+                                                    <select
+                                                        className="input py-3 w-full font-bold text-xs"
+                                                        value={printerForm.language}
+                                                        onChange={(e) => setPrinterForm({ ...printerForm, language: e.target.value })}
+                                                    >
+                                                        <option value="zpl">ZPL</option>
+                                                        <option value="tspl">TSPL</option>
+                                                        <option value="escpos">ESC/POS</option>
+                                                    </select>
                                                 </div>
                                             </div>
+
+                                            <div className="grid grid-cols-3 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-black uppercase tracking-widest opacity-60">VID</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="0x067e"
+                                                        className="input py-3 w-full font-bold font-mono text-xs"
+                                                        value={printerForm.vid}
+                                                        onChange={(e) => setPrinterForm({ ...printerForm, vid: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-black uppercase tracking-widest opacity-60">PID</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="0x0042"
+                                                        className="input py-3 w-full font-bold font-mono text-xs"
+                                                        value={printerForm.pid}
+                                                        onChange={(e) => setPrinterForm({ ...printerForm, pid: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-black uppercase tracking-widest opacity-60">Serial No</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="148C2230113"
+                                                        className="input py-3 w-full font-bold font-mono text-xs"
+                                                        value={printerForm.usb_serial}
+                                                        onChange={(e) => setPrinterForm({ ...printerForm, usb_serial: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+                                           
                                         </div>
                                     )}
 
