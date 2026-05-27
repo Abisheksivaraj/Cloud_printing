@@ -360,6 +360,16 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
       else safeBackendType = 'rectangle';
     }
 
+    const finalBindingType = (function(bt) {
+      if (!bt) return 'static';
+      bt = String(bt).toLowerCase().trim();
+      if (['dynamic', 'placeholder'].includes(bt)) return 'input';
+      if (bt === 'computational') return 'computed';
+      return ['static', 'input', 'computed'].includes(bt) ? bt : 'static';
+    })(el.binding_type);
+
+    const derivedBindingKey = el.binding_key || el.content || `field_${el.id}`;
+
     const payload = {
       design_id: designId,
       version_major: label.version_major || 0,
@@ -369,9 +379,13 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
       position_y: safeConvert(el.y, currentUnit),
       width: safeConvert(el.width, currentUnit),
       height: safeConvert(el.height, currentUnit),
-      binding_type: el.binding_type || "static",
+      binding_type: finalBindingType,
+      binding_key: derivedBindingKey,
       static_content: content || " ",
-      properties,
+      properties: {
+        ...properties,
+        binding_key: derivedBindingKey
+      },
       sort_order: el.zIndex || 0
     };
 
@@ -481,7 +495,7 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     const tempId = generateId();
     const defaults = { id: tempId, type: "placeholder", content: placeholderName, fontSize: 14, fontFamily: "Arial", rotation: 0, zIndex: elements.length };
     const dims = measureText(placeholderName, defaults);
-    const element = { ...defaults, x: 38, y: 38, width: dims.width, height: dims.height, binding_type: "placeholder" };
+    const element = { ...defaults, x: 38, y: 38, width: dims.width, height: dims.height, binding_type: "input" };
     setElements((prev) => [...prev, element]); setSelectedElementId(tempId);
   };
 
@@ -517,7 +531,7 @@ const LabelDesigner = ({ label, labels = [], onSave, onBack, onSelectLabel, onCr
     const placeholder = `<<${String(serialStart).padStart(parseInt(serialDigits) || 1, '0')}..${serialEnd}>>`;
     addElement(serialType, { 
       content: placeholder, 
-      binding_type: 'computational', 
+      binding_type: 'computed', 
       isSerial: true, 
       serialStart, 
       serialEnd, 

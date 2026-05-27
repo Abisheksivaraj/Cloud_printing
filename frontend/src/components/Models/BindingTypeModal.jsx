@@ -4,8 +4,8 @@ import { useTheme } from "../../ThemeContext";
 
 const BINDING_TYPES = [
   { id: "static", label: "Static Content", desc: "Fixed text, images, or shapes that do not change.", icon: <Database size={18} /> },
-  { id: "dynamic", label: "Dynamic Data", desc: "Content populated automatically from a database or API.", icon: <Link size={18} /> },
-  { id: "computational", label: "Computational", desc: "Value derived dynamically using a formula.", icon: <Calculator size={18} /> }
+  { id: "input", label: "Dynamic Data", desc: "Content populated automatically from a database or API.", icon: <Link size={18} /> },
+  { id: "computed", label: "Computational", desc: "Value derived dynamically using a formula.", icon: <Calculator size={18} /> }
 ];
 
 const BindingTypeModal = ({ isOpen, onClose, onSave, defaultType = "static" }) => {

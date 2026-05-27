@@ -211,6 +211,7 @@ const AIChatbot = ({ onGenerateElements, labelSize, generateId, onCreateLabel })
                         height: el.height,
                         static_content: (el.content || (el.type === "image" ? (el.src || el.content) : "")) || " ", 
                         binding_type: selectedBindingType || "static",
+                        binding_key: ["input", "computed"].includes(selectedBindingType) ? (el.content || `field_${i}`) : undefined,
                         properties: {
                             ...el,
                             id: undefined, // Don't send local ID to DB properties JSON

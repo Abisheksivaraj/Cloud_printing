@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import {
     Printer, Plus, Search, Trash2,
-    CheckCircle, X, Server, Activity, 
-    Settings, Loader2, 
-    RefreshCw, Shield, 
+    CheckCircle, X, Server, Activity,
+    Settings, Loader2,
+    RefreshCw, Shield,
     Wifi, Info, Key, Monitor, Plug,
-    AlertTriangle, FileX, Wind, DoorOpen, 
-    Scissors, Cpu, Thermometer, HardDrive, 
+    AlertTriangle, FileX, Wind, DoorOpen,
+    Scissors, Cpu, Thermometer, HardDrive,
     Layers, AlertCircle, Clock
 } from "lucide-react";
 
@@ -33,6 +33,7 @@ const DeviceManagement = ({ onNavigate }) => {
     const [isSaving, setIsSaving] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showKeyModal, setShowKeyModal] = useState(false);
+    const [showConnectorModal, setShowConnectorModal] = useState(false);
     const [showAddPrinterModal, setShowAddPrinterModal] = useState(false);
     const [generatedKey, setGeneratedKey] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
@@ -72,10 +73,10 @@ const DeviceManagement = ({ onNavigate }) => {
                 callEdgeFunction(API_URLS.LIST_PRINTERS),
                 callEdgeFunction(API_URLS.PRINTER_STATUS, null, { method: 'GET' })
             ]);
-            
+
             if (connectorData) setConnectors(connectorData.connectors || (Array.isArray(connectorData) ? connectorData : []));
             if (printerData) setPrinters(printerData.printers || (Array.isArray(printerData) ? printerData : []));
-            
+
             // Extract errors from printer-status for the Alerts column
             const statusPrinters = errorData?.printers || [];
             const flatErrors = statusPrinters.flatMap(sp =>
@@ -232,32 +233,39 @@ const DeviceManagement = ({ onNavigate }) => {
 
     const primaryConnector = connectors.length > 0 ? connectors[0] : null;
 
-    const filteredPrinters = printers.filter(p => 
+    const filteredPrinters = printers.filter(p =>
         (p.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
         (p.ip_address || "").toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     return (
-        <div className="max-w-[1600px] mx-auto px-6 py-10 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            
+        <div className="max-w-[1600px] mx-auto px-6 py-10 animate-in fade-in slide-in-from-bottom-2 duration-700">
+
             {/* Professional Header Section */}
-            <div className="flex justify-between items-start mb-8">
-                <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-slate-900 dark:bg-white rounded-2xl flex items-center justify-center shadow-xl">
-                            <Server size={20} className="text-white dark:text-slate-900" />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Infrastructure Node</h1>
-                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.3em]">Device Management</p>
-                        </div>
+            <div className="flex justify-between items-center mb-6 relative z-10">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--color-gradient-start)] to-[var(--color-gradient-end)] flex items-center justify-center text-white shadow-[var(--shadow-glow)] border border-white/20">
+                        <Printer size={20} />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 tracking-tight">Device Management</h1>
+                        <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.3em] mt-0.5">Connected Endpoints</p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-5">
-                    <button onClick={fetchData} className="btn h-10 w-10 p-0 text-slate-400 hover:text-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-all rounded-xl border border-transparent hover:border-blue-100 dark:hover:border-blue-800">
-                        <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+                <div className="flex items-center gap-3">
+                    <button onClick={fetchData} className="btn h-10 w-10 p-0 text-slate-500 hover:text-[var(--color-gradient-start)] hover:shadow-[var(--shadow-glow)] rounded-xl transition-all duration-300 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50 flex items-center justify-center group">
+                        <RefreshCw size={18} className={`transition-transform duration-500 group-hover:rotate-180 ${isLoading ? "animate-spin" : ""}`} />
                     </button>
+                    {primaryConnector && (
+                        <button
+                            onClick={() => setShowConnectorModal(true)}
+                            className="btn h-10 px-4 gap-2 text-slate-700 dark:text-slate-300 hover:text-[var(--color-gradient-start)] hover:shadow-[var(--shadow-glow)] rounded-xl transition-all duration-300 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50 flex items-center justify-center font-black uppercase text-[10px] tracking-widest"
+                        >
+                            <Settings size={16} />
+                            Node Settings
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -284,192 +292,143 @@ const DeviceManagement = ({ onNavigate }) => {
                     </button>
                 </div>
             ) : (
-                <div className="space-y-8">
-                    
-                    {/* Primary Node Overview Card */}
-                    <div className="card p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 border border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl bg-white dark:bg-slate-900">
-                        <div className="flex items-center gap-5">
-                            <div className="w-14 h-14 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 shrink-0">
-                                <Server size={24} />
-                            </div>
-                            <div>
-                                <div className="flex items-center gap-3 mb-1">
-                                    <h2 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white">{primaryConnector.name}</h2>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 text-[10px] font-bold uppercase tracking-wider">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                        Active
-                                    </span>
-                                </div>
-                                <p className="text-xs text-slate-500 font-medium">Node ID: {primaryConnector.id}</p>
-                            </div>
+                <div className="space-y-4">
+                    {/* Search & Add Bar */}
+                    <div className="flex items-center gap-4 mb-2">
+                        <div className="relative flex-1 max-w-md">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                            <input
+                                type="text"
+                                placeholder="Search printers..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-10 py-2.5 rounded-xl border border-white/40 dark:border-slate-700/50 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-gradient-start)] focus:border-transparent transition-all shadow-inner"
+                            />
                         </div>
-
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-                            <div className="flex items-center gap-3">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider hidden md:block">API Token</span>
-                                <div className="px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 font-mono text-sm tracking-widest text-slate-500">
-                                    ••••••••••••••••••••
-                                </div>
-                            </div>
-                            
-                            <div className="flex items-center gap-2">
-                                <button onClick={() => handleResetConnector(primaryConnector.id)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" title="Regenerate Key">
-                                    <Key size={18} />
-                                </button>
-                                <button onClick={() => handleDeleteConnector(primaryConnector.id)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors" title="Delete Node">
-                                    <Trash2 size={18} />
-                                </button>
-                            </div>
-                        </div>
+                        <button
+                            onClick={() => setShowAddPrinterModal(true)}
+                            className="btn btn-primary h-10 px-5 gap-2 text-[11px] uppercase tracking-widest whitespace-nowrap ml-auto"
+                        >
+                            <Plus size={16} strokeWidth={3} />
+                            Add Printer
+                        </button>
                     </div>
 
-                    {/* Printers Section Header */}
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-12 mb-6 px-2">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-600">
-                                <Printer size={16} />
-                            </div>
-                            <h3 className="text-lg font-black text-slate-900 dark:text-white">Connected Endpoints</h3>
-                        </div>
+                    {/* Card-Based Printer List */}
+                    <div className="space-y-3">
+                        {filteredPrinters.length > 0 ? (
+                            filteredPrinters.map((p, i) => {
+                                const pErrors = printerErrors.filter(e => e.printer_id === p.id);
+                                const isOnline = p.status === 'online';
+                                return (
+                                    <div
+                                        key={p.id}
+                                        className="group glass-card p-5 flex items-center gap-6 hover:scale-[1.01] hover:shadow-xl transition-all duration-300 cursor-default"
+                                        style={{ animationDelay: `${i * 60}ms` }}
+                                    >
+                                        {/* Printer Icon */}
+                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border transition-all duration-300 ${isOnline
+                                            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400 group-hover:shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                                            : 'bg-slate-100 dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50 text-slate-400'
+                                        }`}>
+                                            <Printer size={22} />
+                                        </div>
 
-                        <div className="flex items-center gap-3 w-full sm:w-auto">
-                            <div className="relative flex-1 sm:flex-none w-full sm:w-[300px]">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                <input
-                                    type="text"
-                                    placeholder="Search endpoints..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="input pl-11 py-2.5 w-full text-xs shadow-sm bg-slate-50/50 dark:bg-slate-900/50"
-                                />
-                            </div>
-                            <button
-                                onClick={() => setShowAddPrinterModal(true)}
-                                className="btn btn-primary h-10 px-5 gap-2 text-[10px] uppercase tracking-widest whitespace-nowrap shadow-md shadow-blue-500/15"
-                            >
-                                <Plus size={14} strokeWidth={3} />
-                                Add Printer
-                            </button>
-                        </div>
-                    </div>
+                                        {/* Name & Brand */}
+                                        <div className="min-w-[160px]">
+                                            <p className="font-black text-[15px] text-slate-900 dark:text-white leading-tight">{p.name}</p>
+                                            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">{p.brand || 'Generic'} {p.model || 'Matrix'}</p>
+                                        </div>
 
-                    {/* Endpoint Registry Table */}
-                    <div className="card-premium overflow-hidden rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-sm">
-                        <div className="overflow-x-auto custom-scrollbar">
-                            <table className="w-full text-left border-collapse min-w-[800px]">
-                                <thead>
-                                    <tr className="bg-slate-50/80 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
-                                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Printer Model</th>
-                                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">IP Address</th>
-                                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Status</th>
-                                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Alerts</th>
-                                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50 dark:divide-slate-900">
-                                    {filteredPrinters.length > 0 ? (
-                                        filteredPrinters.map((p) => (
-                                            <tr key={p.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors">
-                                                <td className="px-8 py-5">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-slate-500 dark:text-slate-400 shrink-0 border border-slate-200/50 dark:border-slate-800/50">
-                                                            <Printer size={16} />
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-bold text-sm text-slate-900 dark:text-slate-100">{p.name}</p>
-                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{p.brand || 'Generic'} {p.model || 'Matrix'}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-8 py-5">
-                                                    <div className="flex flex-col gap-1">
-                                                        <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 w-fit px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800">
-                                                            <Wifi size={12} className="text-blue-500" />
-                                                            {p.ip_address}
-                                                        </div>
-                                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Port <span className="text-slate-600 dark:text-slate-200">{p.port || 9100}</span></p>
-                                                    </div>
-                                                </td>
-                                                <td className="px-8 py-5">
-                                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest ${p.status === 'online' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}`}>
-                                                        <div className={`w-1.5 h-1.5 rounded-full ${p.status === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
-                                                        {p.status || 'Offline'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-8 py-5">
-                                                    {(() => {
-                                                        const pErrors = printerErrors.filter(e => e.printer_id === p.id);
-                                                        return pErrors.length > 0 ? (
-                                                            <button 
-                                                                onClick={() => setSelectedPrinterForErrors(p)}
-                                                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-500/10 text-rose-600 border border-rose-500/20 text-[9px] font-bold uppercase tracking-widest hover:bg-rose-500/20 transition-colors"
-                                                            >
-                                                                <AlertCircle size={12} className="animate-pulse" />
-                                                                {pErrors.length} {pErrors.length === 1 ? 'Alert' : 'Alerts'}
-                                                            </button>
-                                                        ) : (
-                                                            <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest ml-1">No Alerts</span>
-                                                        );
-                                                    })()}
-                                                </td>
-                                                <td className="px-8 py-5 text-right">
-                                                   <div className="flex items-center justify-end gap-4">
-                                                       <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                          Last Ping: {p.last_status_update_at ? new Date(p.last_status_update_at).toLocaleTimeString() : 'Never'}
-                                                       </div>
-                                                       <button 
-                                                           onClick={() => handleDeletePrinter(p.id)} 
-                                                           className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                                                       >
-                                                           <Trash2 size={16} />
-                                                       </button>
-                                                   </div>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan="4" className="py-20 text-center">
-                                                <Printer size={32} className="mx-auto mb-4 text-slate-200 dark:text-slate-800" />
-                                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">No Endpoint Devices Connected</p>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                                        {/* IP Address */}
+                                        <div className="hidden md:flex items-center gap-2 text-xs font-mono text-slate-600 dark:text-slate-300 bg-white/60 dark:bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+                                            <Wifi size={12} className="text-[var(--color-gradient-start)]" />
+                                            <span>{p.ip_address || '—'}</span>
+                                            <span className="text-slate-400 text-[10px]">:{p.port || 9100}</span>
+                                        </div>
+
+                                        {/* Status Badge */}
+                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isOnline
+                                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700/50'
+                                        }`}>
+                                            <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                                            {p.status || 'Offline'}
+                                        </span>
+
+                                        {/* Alerts */}
+                                        {pErrors.length > 0 ? (
+                                            <button
+                                                onClick={() => setSelectedPrinterForErrors(p)}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30 text-[10px] font-black uppercase tracking-widest hover:bg-rose-500/20 transition-all hover:scale-105"
+                                            >
+                                                <AlertCircle size={12} className="animate-pulse" />
+                                                {pErrors.length} {pErrors.length === 1 ? 'Alert' : 'Alerts'}
+                                            </button>
+                                        ) : (
+                                            <span className="text-[10px] font-bold text-emerald-500/60 uppercase tracking-widest flex items-center gap-1.5">
+                                                <CheckCircle size={12} />
+                                                Clear
+                                            </span>
+                                        )}
+
+                                        {/* Spacer */}
+                                        <div className="flex-1" />
+
+                                        {/* Last Ping */}
+                                        <div className="hidden lg:block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest whitespace-nowrap">
+                                            {p.last_status_update_at ? new Date(p.last_status_update_at).toLocaleTimeString() : '—'}
+                                        </div>
+
+                                        {/* Delete */}
+                                        <button
+                                            onClick={() => handleDeletePrinter(p.id)}
+                                            className="p-2 text-slate-300 dark:text-slate-600 hover:text-white hover:bg-rose-500 hover:shadow-[0_0_15px_rgba(244,63,94,0.4)] rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <div className="glass-panel py-20 flex flex-col items-center text-center">
+                                <Printer size={40} className="mb-5 text-slate-300 dark:text-slate-700 drop-shadow-sm" />
+                                <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-500">No Endpoint Devices Connected</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
 
-            {/* Redesigned Provision Modal (Unchanged Layout but clean functionality) */}
+            {/* Redesigned Provision Modal */}
             {showAddModal && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[500] p-4 animate-in fade-in duration-300">
-                    <div className="w-full max-w-xl bg-white dark:bg-slate-950 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-200 dark:border-slate-800">
+                <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-md flex items-center justify-center z-[500] p-4 animate-in fade-in duration-500">
+                    <div className="w-full max-w-xl glass-panel flex flex-col overflow-hidden animate-in zoom-in-95 duration-500 relative border border-white/20">
                         {isSaving ? (
-                            <div className="p-20 flex flex-col items-center justify-center text-center space-y-6">
+                            <div className="p-24 flex flex-col items-center justify-center text-center space-y-8 relative overflow-hidden">
+                                <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-gradient-start)] to-[var(--color-gradient-end)] opacity-10 animate-pulse" />
                                 <div className="relative">
-                                    <div className="absolute inset-0 bg-blue-500/20 blur-2xl rounded-full scale-150 animate-pulse" />
-                                    <RefreshCw size={60} className="text-blue-500 animate-spin relative z-10" />
+                                    <div className="absolute inset-0 bg-[var(--color-gradient-start)] blur-3xl rounded-full scale-150 animate-pulse opacity-20" />
+                                    <RefreshCw size={64} className="text-[var(--color-gradient-start)] animate-spin relative z-10" />
                                 </div>
-                                <div>
-                                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Establishing Link</h3>
-                                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Provisioning infrastructure on core server</p>
+                                <div className="relative z-10">
+                                    <h3 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-gradient-end)] mb-3">Establishing Link</h3>
+                                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap">Provisioning infrastructure on core server</p>
                                 </div>
                             </div>
                         ) : (
                             <>
-                                <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 dark:border-slate-900 bg-slate-50/50 dark:bg-slate-900/50">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-                                            <Server size={20} className="text-white" />
+                                <div className="flex items-center justify-between px-8 py-6 border-b border-white/10 bg-white/20 dark:bg-slate-900/20 backdrop-blur-md">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-gradient-to-br from-[var(--color-gradient-start)] to-[var(--color-gradient-end)] rounded-2xl flex items-center justify-center shadow-[var(--shadow-glow)]">
+                                            <Server size={22} className="text-white" />
                                         </div>
                                         <div>
-                                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Provision Core Node</h3>
-                                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Infrastructure Setup</p>
+                                            <h3 className="text-xl font-black text-slate-900 dark:text-white">Provision Core Node</h3>
+                                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-1">Infrastructure Setup</p>
                                         </div>
                                     </div>
-                                    <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-slate-200/50 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-400">
+                                    <button onClick={() => setShowAddModal(false)} className="p-2.5 hover:bg-white/40 dark:hover:bg-slate-800/40 rounded-xl transition-all text-slate-500 hover:text-slate-900 dark:hover:text-white backdrop-blur-sm">
                                         <X size={20} />
                                     </button>
                                 </div>
@@ -508,32 +467,33 @@ const DeviceManagement = ({ onNavigate }) => {
 
             {/* Add Printer Modal */}
             {showAddPrinterModal && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[500] p-4 animate-in fade-in duration-300">
-                    <div className="w-full max-w-lg bg-white dark:bg-slate-950 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-200 dark:border-slate-800">
+                <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-md flex items-center justify-center z-[500] p-4 animate-in fade-in duration-500">
+                    <div className="w-full max-w-lg glass-panel flex flex-col overflow-hidden animate-in zoom-in-95 duration-500 relative border border-white/20">
                         {isSaving ? (
-                            <div className="p-20 flex flex-col items-center justify-center text-center space-y-6">
+                            <div className="p-24 flex flex-col items-center justify-center text-center space-y-8 relative overflow-hidden">
+                                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-500 opacity-10 animate-pulse" />
                                 <div className="relative">
-                                    <div className="absolute inset-0 bg-blue-500/20 blur-2xl rounded-full scale-150 animate-pulse" />
-                                    <RefreshCw size={60} className="text-blue-500 animate-spin relative z-10" />
+                                    <div className="absolute inset-0 bg-indigo-500 blur-3xl rounded-full scale-150 animate-pulse opacity-20" />
+                                    <RefreshCw size={64} className="text-indigo-500 animate-spin relative z-10" />
                                 </div>
-                                <div>
-                                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Binding Resource</h3>
-                                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Establishing link through node</p>
+                                <div className="relative z-10">
+                                    <h3 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-purple-500 mb-3">Binding Resource</h3>
+                                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap">Establishing link through node</p>
                                 </div>
                             </div>
                         ) : (
                             <>
-                                <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 dark:border-slate-900 bg-slate-50/50 dark:bg-slate-900/50">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                                            <Printer size={20} className="text-white" />
+                                <div className="flex items-center justify-between px-8 py-6 border-b border-white/10 bg-white/20 dark:bg-slate-900/20 backdrop-blur-md">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-[var(--color-gradient-end)] rounded-2xl flex items-center justify-center shadow-[0_0_15px_rgba(99,102,241,0.5)]">
+                                            <Printer size={22} className="text-white drop-shadow-sm" />
                                         </div>
                                         <div>
-                                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Add Printer Endpoint</h3>
-                                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Configure Hardware Link</p>
+                                            <h3 className="text-xl font-black text-slate-900 dark:text-white">Add Printer Endpoint</h3>
+                                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-1">Configure Hardware Link</p>
                                         </div>
                                     </div>
-                                    <button onClick={() => setShowAddPrinterModal(false)} className="p-2 hover:bg-slate-200/50 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-400">
+                                    <button onClick={() => setShowAddPrinterModal(false)} className="p-2.5 hover:bg-white/40 dark:hover:bg-slate-800/40 rounded-xl transition-all text-slate-500 hover:text-slate-900 dark:hover:text-white backdrop-blur-sm">
                                         <X size={20} />
                                     </button>
                                 </div>
@@ -546,22 +506,20 @@ const DeviceManagement = ({ onNavigate }) => {
                                             <button
                                                 type="button"
                                                 onClick={() => setPrinterForm({ ...printerForm, printerType: 'lan' })}
-                                                className={`flex-1 py-2 rounded-lg font-bold text-[11px] transition-all flex items-center justify-center gap-2 ${
-                                                    printerForm.printerType === 'lan'
-                                                    ? 'bg-white dark:bg-slate-800 text-indigo-600 shadow-sm'
-                                                    : 'text-slate-400 hover:text-slate-600'
-                                                }`}
+                                                className={`flex-1 py-2 rounded-lg font-bold text-[11px] transition-all flex items-center justify-center gap-2 ${printerForm.printerType === 'lan'
+                                                        ? 'bg-white dark:bg-slate-800 text-indigo-600 shadow-sm'
+                                                        : 'text-slate-400 hover:text-slate-600'
+                                                    }`}
                                             >
                                                 <Wifi size={14} /> LAN / Network
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => setPrinterForm({ ...printerForm, printerType: 'usb' })}
-                                                className={`flex-1 py-2 rounded-lg font-bold text-[11px] transition-all flex items-center justify-center gap-2 ${
-                                                    printerForm.printerType === 'usb'
-                                                    ? 'bg-white dark:bg-slate-800 text-indigo-600 shadow-sm'
-                                                    : 'text-slate-400 hover:text-slate-600'
-                                                }`}
+                                                className={`flex-1 py-2 rounded-lg font-bold text-[11px] transition-all flex items-center justify-center gap-2 ${printerForm.printerType === 'usb'
+                                                        ? 'bg-white dark:bg-slate-800 text-indigo-600 shadow-sm'
+                                                        : 'text-slate-400 hover:text-slate-600'
+                                                    }`}
                                             >
                                                 <Plug size={14} /> USB / Direct
                                             </button>
@@ -614,14 +572,12 @@ const DeviceManagement = ({ onNavigate }) => {
                                         <div className="space-y-4">
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="space-y-1.5">
-                                                    <label className="text-[10px] font-black uppercase tracking-widest opacity-60">USB Path <span className="text-rose-500">*</span></label>
+                                                    <label className="text-[10px] font-black uppercase tracking-widest opacity-60">Connector ID</label>
                                                     <input
-                                                        required
+                                                        readOnly
                                                         type="text"
-                                                        placeholder="USB001"
-                                                        className="input py-3 w-full font-bold font-mono text-xs"
-                                                        value={printerForm.usbPath}
-                                                        onChange={(e) => setPrinterForm({ ...printerForm, usbPath: e.target.value })}
+                                                        className="input py-3 w-full font-bold font-mono text-[10px] text-slate-500 bg-slate-50 dark:bg-slate-900 cursor-not-allowed border-dashed"
+                                                        value={primaryConnector?.id || "N/A"}
                                                     />
                                                 </div>
                                                 <div className="space-y-1.5">
@@ -670,7 +626,6 @@ const DeviceManagement = ({ onNavigate }) => {
                                                     />
                                                 </div>
                                             </div>
-                                           
                                         </div>
                                     )}
 
@@ -683,11 +638,10 @@ const DeviceManagement = ({ onNavigate }) => {
                                                     key={d}
                                                     type="button"
                                                     onClick={() => setPrinterForm({ ...printerForm, dpi: d })}
-                                                    className={`flex-1 py-2.5 rounded-xl border-2 font-black text-xs transition-all ${
-                                                        printerForm.dpi === d
-                                                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600'
-                                                        : 'border-slate-200 dark:border-slate-700 text-slate-400 hover:border-slate-300'
-                                                    }`}
+                                                    className={`flex-1 py-2.5 rounded-xl border-2 font-black text-xs transition-all ${printerForm.dpi === d
+                                                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600'
+                                                            : 'border-slate-200 dark:border-slate-700 text-slate-400 hover:border-slate-300'
+                                                        }`}
                                                 >
                                                     {d} DPI
                                                 </button>
@@ -702,7 +656,7 @@ const DeviceManagement = ({ onNavigate }) => {
                                             disabled={
                                                 !printerForm.name ||
                                                 (printerForm.printerType === 'lan' && (!printerForm.ipAddress || !printerForm.port)) ||
-                                                (printerForm.printerType === 'usb' && !printerForm.usbPath)
+                                                (printerForm.printerType === 'usb' && (!printerForm.vid || !printerForm.pid))
                                             }
                                             className="btn btn-primary bg-indigo-500 hover:bg-indigo-600 flex-1 h-12 uppercase text-[10px] tracking-widest font-black shadow-xl shadow-indigo-500/20 disabled:opacity-50"
                                         >
@@ -718,58 +672,62 @@ const DeviceManagement = ({ onNavigate }) => {
 
             {/* Professional Security Key Modal */}
             {showKeyModal && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[600] p-4 animate-in fade-in duration-300">
-                    <div className="w-full max-w-md bg-white dark:bg-slate-950 rounded-2xl shadow-2xl p-10 flex flex-col items-center text-center border border-slate-100 dark:border-slate-800">
-                        <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-6 border border-emerald-500/20">
-                            <Shield size={32} className="text-emerald-500 drop-shadow-sm" />
-                        </div>
-                        <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">NODE <span className="text-emerald-500 uppercase">SECURED</span></h3>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-8">Identity Credentials Ready</p>
+                <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-md flex items-center justify-center z-[600] p-4 animate-in fade-in duration-500">
+                    <div className="w-full max-w-md glass-panel p-10 flex flex-col items-center text-center border border-white/20 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-emerald-500/5 dark:bg-emerald-500/10 backdrop-blur-3xl z-0" />
+                        <div className="relative z-10 flex flex-col items-center w-full">
+                            <div className="w-20 h-20 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center mb-8 shadow-[0_0_20px_rgba(16,185,129,0.4)] border border-white/20">
+                                <Shield size={40} className="text-white drop-shadow-md" />
+                            </div>
+                            <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-2">NODE <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-emerald-300">SECURED</span></h3>
+                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-8">Identity Credentials Ready</p>
 
-                        <div className="w-full relative group mb-8">
-                             <div 
-                                className="w-full p-5 bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl font-mono text-sm break-all cursor-pointer hover:border-emerald-500/40 transition-all text-slate-700 dark:text-slate-300 shadow-inner"
-                                onClick={() => {
-                                    navigator.clipboard.writeText(generatedKey);
-                                    // optional toast integration if you have it available globally
-                                }}
-                             >
-                                {generatedKey}
-                             </div>
-                             <p className="text-[9px] font-bold text-emerald-500 uppercase mt-3 tracking-widest">Click to copy infrastructure token</p>
-                        </div>
+                            <div className="w-full relative group mb-8">
+                                <div
+                                    className="w-full p-5 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-emerald-500/30 rounded-xl font-mono text-sm break-all cursor-pointer hover:border-emerald-500 transition-all text-slate-800 dark:text-slate-200 shadow-inner hover:shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(generatedKey);
+                                    }}
+                                >
+                                    {generatedKey}
+                                </div>
+                                <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase mt-4 tracking-[0.2em]">Click to copy infrastructure token</p>
+                            </div>
 
-                        <div className="w-full p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-xl text-left mb-8">
-                             <div className="flex items-start gap-3">
-                                 <Info size={16} className="text-amber-500 shrink-0 mt-0.5" />
-                                 <p className="text-[10px] font-bold text-amber-700 dark:text-amber-500 leading-relaxed uppercase tracking-widest">CRITICAL: The key is only displayed once securely. Store it immediately.</p>
-                             </div>
-                        </div>
+                            <div className="w-full p-5 bg-amber-500/10 backdrop-blur-md border border-amber-500/30 rounded-xl text-left mb-8 shadow-inner">
+                                <div className="flex items-start gap-4">
+                                    <Info size={20} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                    <p className="text-[11px] font-bold text-amber-700 dark:text-amber-400 leading-relaxed uppercase tracking-[0.1em]">CRITICAL: The key is only displayed once securely. Store it immediately.</p>
+                                </div>
+                            </div>
 
-                        <button
-                            onClick={() => setShowKeyModal(false)}
-                            className="btn btn-primary w-full h-12 uppercase text-[11px] tracking-widest font-black shadow-lg shadow-blue-500/20"
-                        >
-                            Acknowledge & Dismiss
-                        </button>
+                            <button
+                                onClick={() => setShowKeyModal(false)}
+                                className="btn w-full h-14 uppercase text-xs tracking-widest font-black shadow-[0_0_20px_rgba(16,185,129,0.3)] bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white border border-emerald-400/50 hover:scale-[1.02]"
+                            >
+                                Acknowledge & Dismiss
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
             {/* Printer Errors Modal */}
             {selectedPrinterForErrors && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[700] p-4 animate-in fade-in duration-300">
-                    <div className="w-full max-w-2xl bg-white dark:bg-slate-950 rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-200 dark:border-slate-800">
-                        <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 dark:border-slate-900 bg-slate-50/50 dark:bg-slate-900/50">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-rose-500 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-500/20">
-                                    <AlertTriangle size={24} className="text-white" />
+                <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-md flex items-center justify-center z-[700] p-4 animate-in fade-in duration-500">
+                    <div className="w-full max-w-2xl glass-panel flex flex-col overflow-hidden animate-in zoom-in-95 duration-500 relative border border-white/20">
+                        <div className="absolute inset-0 bg-rose-500/5 backdrop-blur-3xl z-0 pointer-events-none" />
+                        
+                        <div className="flex items-center justify-between px-8 py-6 border-b border-white/10 bg-white/20 dark:bg-slate-900/20 backdrop-blur-md relative z-10">
+                            <div className="flex items-center gap-5">
+                                <div className="w-14 h-14 bg-gradient-to-br from-rose-500 to-rose-600 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(244,63,94,0.4)] border border-white/20">
+                                    <AlertTriangle size={26} className="text-white drop-shadow-md" />
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Active Terminal Alerts</h3>
-                                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{selectedPrinterForErrors.name} • {selectedPrinterForErrors.ip_address}</p>
+                                    <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Active Terminal Alerts</h3>
+                                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-1">{selectedPrinterForErrors.name} • {selectedPrinterForErrors.ip_address}</p>
                                 </div>
                             </div>
-                            <button onClick={() => setSelectedPrinterForErrors(null)} className="p-2 hover:bg-slate-200/50 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-400">
+                            <button onClick={() => setSelectedPrinterForErrors(null)} className="p-3 hover:bg-white/40 dark:hover:bg-slate-800/40 rounded-xl transition-all text-slate-500 hover:text-slate-900 dark:hover:text-white backdrop-blur-sm">
                                 <X size={20} />
                             </button>
                         </div>
@@ -778,12 +736,12 @@ const DeviceManagement = ({ onNavigate }) => {
                             {(() => {
                                 const pErrors = printerErrors.filter(e => e.printer_id === selectedPrinterForErrors.id);
                                 return pErrors.length > 0 ? pErrors.map((error) => {
-                                    const meta = ERROR_METADATA[error.error_type] || { 
-                                        icon: AlertCircle, 
-                                        color: 'text-slate-500', 
-                                        bg: 'bg-slate-50', 
+                                    const meta = ERROR_METADATA[error.error_type] || {
+                                        icon: AlertCircle,
+                                        color: 'text-slate-500',
+                                        bg: 'bg-slate-50',
                                         darkBg: 'dark:bg-slate-800',
-                                        description: 'An unknown hardware error occurred.' 
+                                        description: 'An unknown hardware error occurred.'
                                     };
                                     const Icon = meta.icon;
 
@@ -803,7 +761,7 @@ const DeviceManagement = ({ onNavigate }) => {
                                                 <p className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-relaxed mb-4">
                                                     {meta.description}
                                                 </p>
-                                                <button 
+                                                <button
                                                     disabled={isResolving}
                                                     onClick={() => handleResolveError(error.id)}
                                                     className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-emerald-500 dark:hover:bg-emerald-500 hover:text-white transition-all disabled:opacity-50"
@@ -826,12 +784,79 @@ const DeviceManagement = ({ onNavigate }) => {
                             })()}
                         </div>
 
-                        <div className="p-8 border-t border-slate-100 dark:border-slate-900 bg-slate-50/50 dark:bg-slate-900/50 flex justify-end">
-                            <button 
+                        <div className="p-8 border-t border-white/10 bg-white/20 dark:bg-slate-900/20 backdrop-blur-md flex justify-end relative z-10">
+                            <button
                                 onClick={() => setSelectedPrinterForErrors(null)}
-                                className="btn btn-ghost h-12 px-8 uppercase text-[10px] tracking-widest font-black"
+                                className="btn btn-ghost h-12 px-8 uppercase text-[11px] tracking-widest font-black hover:bg-white/40 dark:hover:bg-slate-800/40 rounded-xl"
                             >
                                 Close Dashboard
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Connector Modal */}
+            {showConnectorModal && primaryConnector && (
+                <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-md flex items-center justify-center z-[500] p-4 animate-in fade-in duration-500">
+                    <div className="w-full max-w-xl glass-panel flex flex-col overflow-hidden animate-in zoom-in-95 duration-500 relative border border-white/20">
+                        <div className="flex items-center justify-between px-8 py-6 border-b border-white/10 bg-white/20 dark:bg-slate-900/20 backdrop-blur-md">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-gradient-to-br from-[var(--color-gradient-start)] to-[var(--color-gradient-end)] rounded-2xl flex items-center justify-center shadow-[var(--shadow-glow)]">
+                                    <Server size={22} className="text-white" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-900 dark:text-white">Node Settings</h3>
+                                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-1">Infrastructure Configuration</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowConnectorModal(false)} className="p-2.5 hover:bg-white/40 dark:hover:bg-slate-800/40 rounded-xl transition-all text-slate-500 hover:text-slate-900 dark:hover:text-white backdrop-blur-sm">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-8 space-y-8">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h4 className="text-sm font-black text-slate-900 dark:text-white mb-1">{primaryConnector.name}</h4>
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold tracking-wider uppercase">Node ID: <span className="font-mono text-slate-600 dark:text-slate-300 ml-1">{primaryConnector.id}</span></p>
+                                </div>
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                                    Active
+                                </span>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] ml-1">API Token</label>
+                                    <div className="px-5 py-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-700/50 font-mono text-sm tracking-[0.2em] text-slate-600 dark:text-slate-400 shadow-inner flex items-center justify-between">
+                                        <span>••••••••••••••••••••••••••••</span>
+                                        <button onClick={() => handleResetConnector(primaryConnector.id)} className="p-2 text-slate-500 hover:text-[var(--color-gradient-start)] hover:bg-white dark:hover:bg-slate-800 rounded-lg transition-all" title="Regenerate Key">
+                                            <Key size={16} />
+                                        </button>
+                                    </div>
+                                    <p className="text-[9px] text-slate-400 mt-2 ml-1 leading-relaxed">If you regenerate your key, any existing connected agents will immediately lose access and must be re-configured.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-8 border-t border-white/10 bg-white/20 dark:bg-slate-900/20 backdrop-blur-md flex justify-between items-center relative z-10">
+                            <button
+                                onClick={() => {
+                                    handleDeleteConnector(primaryConnector.id);
+                                    setShowConnectorModal(false);
+                                }}
+                                className="btn h-12 px-6 gap-2 text-rose-500 hover:text-white hover:bg-rose-500 hover:shadow-[0_0_20px_rgba(244,63,94,0.4)] hover:border-rose-500 rounded-xl transition-all duration-300 bg-rose-500/10 border border-rose-500/20 font-black uppercase text-[10px] tracking-widest"
+                            >
+                                <Trash2 size={16} />
+                                Delete Node
+                            </button>
+                            <button
+                                onClick={() => setShowConnectorModal(false)}
+                                className="btn btn-ghost h-12 px-8 uppercase text-[11px] tracking-widest font-black hover:bg-white/40 dark:hover:bg-slate-800/40 rounded-xl"
+                            >
+                                Done
                             </button>
                         </div>
                     </div>

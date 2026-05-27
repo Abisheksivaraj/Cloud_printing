@@ -98,9 +98,24 @@ export const callEdgeFunction = async (functionName, body, options = {}, retryCo
             console.log(`🔑 Token present for ${functionName} (${token.substring(0, 10)}...)`);
         }
 
-        const url = `${supabaseUrl}functions/v1/${functionName}?apikey=${supabaseAnonKey}`;
+        // upload-import is routed through connector-host (proxied via Vite to avoid CORS)
+        let url;
+        if (functionName === API_URLS.UPLOAD_IMPORT) {
+            url = `/connector-api/api/imports/upload`;
+        } else {
+            url = `${supabaseUrl}functions/v1/${functionName}?apikey=${supabaseAnonKey}`;
+        }
+
+        // Append query params if provided (e.g. for GET-style edge functions)
+        if (options.queryParams) {
+            const params = new URLSearchParams(options.queryParams).toString();
+            url += (url.includes('?') ? '&' : '?') + params;
+        }
+        
+        const isFormData = body instanceof FormData;
+        
         const fetchHeaders = {
-            'Content-Type': 'application/json',
+            ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
             ...options.headers
         };
 
@@ -111,7 +126,7 @@ export const callEdgeFunction = async (functionName, body, options = {}, retryCo
         const response = await fetch(url, {
             method: options.method || 'POST',
             headers: fetchHeaders,
-            body: body ? JSON.stringify(body) : undefined
+            body: isFormData ? body : (body ? JSON.stringify(body) : undefined)
         });
 
         if (!response.ok) {

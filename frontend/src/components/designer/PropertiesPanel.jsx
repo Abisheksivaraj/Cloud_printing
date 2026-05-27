@@ -501,7 +501,7 @@ const PropertiesPanel = ({
                   </div>
 
                   <div className="flex gap-4">
-                    <NumInput label="Pt Size" value={el.fontSize || 14} onChange={(v) => updateElement(id, { fontSize: Math.max(1, v) })} min={1} max={500} unit="pt" isPx={false} />
+                    <NumInput label="Font Size" value={el.fontSize || 14} onChange={(v) => updateElement(id, { fontSize: Math.max(1, v) })} min={0.1} max={500} isPx={true} />
                     <ColorPicker label="Fill Color" value={el.color || "#000000"} onChange={(v) => updateElement(id, { color: v })} />
                   </div>
 
@@ -592,7 +592,7 @@ const PropertiesPanel = ({
                     </select>
                   </div>
                   <div className="flex gap-4">
-                    <NumInput label="Mod Width" value={el.barcodeWidth || 2} onChange={(v) => updateElement(id, { barcodeWidth: Math.max(1, v) })} min={1} max={5} unit="px" isPx={false} />
+                    <NumInput label="Mod Width" value={el.barcodeWidth || 2} onChange={(v) => updateElement(id, { barcodeWidth: Math.max(0.1, v) })} min={0.1} max={10} isPx={true} />
                     <NumInput label="Ratio %" value={el.barcodeBarHeight || 70} onChange={(v) => updateElement(id, { barcodeBarHeight: Math.max(20, Math.min(100, v)) })} min={20} max={100} unit="%" isPx={false} />
                   </div>
                   <div className="flex flex-col gap-2">
