@@ -70,8 +70,8 @@ export const API_URLS = {
 
 // Helper to call edge functions using the SDK
 export const callEdgeFunction = async (functionName, body, options = {}, retryCount = 0) => {
-    // Skip Authorization header ONLY for public/onboarding endpoints and external upload endpoint
-    const authEndpoints = [API_URLS.LOGIN, API_URLS.COMPLETE_PROFILE, API_URLS.GET_INVITATION, API_URLS.UPLOAD_IMPORT];
+    // Skip Authorization header ONLY for public/onboarding endpoints
+    const authEndpoints = [API_URLS.LOGIN, API_URLS.COMPLETE_PROFILE, API_URLS.GET_INVITATION];
 
     console.log(`Calling Edge Function: ${functionName} (Retry: ${retryCount})`);
     
