@@ -98,10 +98,12 @@ export const callEdgeFunction = async (functionName, body, options = {}, retryCo
             console.log(`🔑 Token present for ${functionName} (${token.substring(0, 10)}...)`);
         }
 
-        // upload-import is routed through connector-host (proxied via Vite to avoid CORS)
+        // upload-import is routed through connector-host (proxied via Vite locally to avoid CORS)
         let url;
         if (functionName === API_URLS.UPLOAD_IMPORT) {
-            url = `/connector-api/api/imports/upload`;
+            url = import.meta.env.PROD 
+                ? 'https://connector-host.onrender.com/api/imports/upload'
+                : '/connector-api/api/imports/upload';
         } else {
             url = `${supabaseUrl}functions/v1/${functionName}?apikey=${supabaseAnonKey}`;
         }
